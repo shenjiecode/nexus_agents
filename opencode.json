@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "tencent-coding-plan/glm-5",
+  "small_model": "tencent-coding-plan/minimax-m2.5",
+  "enabled_providers": ["tencent-coding-plan"],
+  "plugin": [
+    "oh-my-openagent@latest"
+  ],
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp@latest", "--headless", "--no-sandbox", "--viewport-size=1920x1080"]
+    }
+  }
+}
