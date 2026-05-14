@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 
+# pnpm
+.pnpm-store/
+pnpm-lock.yaml
+
 # Build
 dist/
 
@@ -43,3 +47,6 @@ backend/opc-aicom
 backend/server
 backend/bin/
 frontend/dist/
+
+# Data directory
+data/
