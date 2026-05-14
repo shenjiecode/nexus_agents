@@ -1,5 +1,5 @@
 # Auto-generated Dockerfile for role: researcher
-# Build: podman build -t nexus-role-researcher:v1.0.0 .
+# Build: docker build -t nexus-role-researcher:v1.0.0 .
 
 # Use base image (pre-built with OpenCode CLI)
 ARG BASE_IMAGE=localhost/nexus-base:latest

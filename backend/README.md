@@ -39,6 +39,8 @@ node dist/index.js
 | `PORT` | 服务端口 | `13207` |
 | `LOG_LEVEL` | 日志级别 | `info` |
 | `NODE_ENV` | 环境 | `development` |
+| `DOCKER_CMD` | 容器构建命令 | `docker` |
+| `DOCKER_HOST` | Docker/Podman socket 路径 | 自动检测 |
 
 ## 日志规范
 
@@ -194,14 +196,14 @@ data/
         └── docs/
 ```
 
-## Docker/Podman
+## Docker (兼容 Podman)
 
 ### 基础镜像
 
 位于 `images/base/Dockerfile`:
 
 ```bash
-podman build -t localhost/nexus-base:latest images/base/
+docker build -t localhost/nexus-base:latest images/base/
 ```
 
 ### 角色镜像
@@ -210,9 +212,9 @@ podman build -t localhost/nexus-base:latest images/base/
 
 ### Socket 检测
 
-自动检测 Docker/Podman socket:
-- `/run/user/1000/podman/podman.sock`
-- `/var/run/docker.sock`
+自动检测 Docker/Podman socket (Docker 优先):
+- `/var/run/docker.sock` (Docker 默认)
+- `/run/user/1000/podman/podman.sock` (Podman rootless)
 - 环境变量 `DOCKER_HOST`
 
 ## 开发规范

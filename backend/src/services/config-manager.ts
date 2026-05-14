@@ -63,7 +63,7 @@ function getDockerfilePath(slug: string): string {
  */
 function generateDockerfile(slug: string): string {
   return `# Auto-generated Dockerfile for role: ${slug}
-# Build: podman build -t nexus-role-${slug}:v1.0.0 .
+# Build: docker build -t nexus-role-${slug}:v1.0.0 .
 
 # Use base image (pre-built with OpenCode CLI)
 ARG BASE_IMAGE=localhost/nexus-base:latest

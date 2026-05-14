@@ -76,12 +76,10 @@ async function buildRoleImage(slug: string, version: string): Promise<string> {
   const imageName = `nexus-role-${slug}:${version}`;
   
   try {
-    // Build image using podman
     const { stderr } = await execAsync(
-      `podman build -t ${imageName} ${roleDir}`,
-      { timeout: 300000 } // 5 minute timeout
+      `docker build -t ${imageName} ${roleDir}`,
+      { timeout: 300000 }
     );
-    
     logger.info(`Built image: ${imageName}`);
     if (stderr) logger.warn({ stderr }, 'Build warnings');
     

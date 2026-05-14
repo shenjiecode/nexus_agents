@@ -11,17 +11,16 @@ function getDockerSocket(): string {
   if (process.env.DOCKER_HOST) {
     return process.env.DOCKER_HOST.replace('unix://', '');
   }
-  // Try common socket paths in order
+  // Try common socket paths in order (Docker first)
   const socketPaths = [
-    '/run/user/1000/podman/podman.sock',
     '/var/run/docker.sock',
+    '/run/user/1000/podman/podman.sock',
   ];
   for (const path of socketPaths) {
     if (existsSync(path)) {
       return path;
     }
   }
-  // Default fallback
   return '/var/run/docker.sock';
 }
 
