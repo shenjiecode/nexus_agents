@@ -419,7 +419,7 @@ const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
                     <tr
                       key={container.id}
                       className="border-b border-cyber-cyan/10 hover:bg-cyber-cyan/5 transition-colors cursor-pointer"
-                      onClick={() => navigate(`/agents/${container.id}`)}
+                      onClick={() => navigate(`/containers/${container.id}`)}
                     >
                       <td className="py-4 px-6">
                         <span className="font-medium text-cyber-white">{container.roleSlug}</span>

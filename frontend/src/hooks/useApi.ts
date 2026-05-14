@@ -92,9 +92,13 @@ export async function apiRequest<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<ApiResponse<T>> {
+  // Only set Content-Type if there's a body
+  const hasBody = options?.body !== undefined;
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    headers: {
+    headers: hasBody ? {
       'Content-Type': 'application/json',
+      ...options?.headers,
+    } : {
       ...options?.headers,
     },
     ...options,
