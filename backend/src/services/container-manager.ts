@@ -3,6 +3,7 @@ import Docker from 'dockerode';
 import { randomBytes } from 'crypto';
 import { existsSync } from 'fs';
 import { containers as containersTable, initDatabase } from '../db/index.js';
+import { eq } from 'drizzle-orm';
 import { initContainerMemory } from './config-manager.js';
 import { getOrgAuthPath } from './org-service.js';
 
@@ -171,9 +172,33 @@ export async function createContainer(
     // Mount organization auth.json if configured
     const authPath = getOrgAuthPath(orgSlug);
     const containerAuthPath = '/app/.opencode/auth.json';
+    let authMounted = false;
     
     if (existsSync(authPath)) {
       volumes.push(`${authPath}:${containerAuthPath}:ro`);
+      authMounted = true;
+    } else {
+      // Fallback: generate auth.json from .env if ANTHROPIC_API_KEY is set
+      const anthropicKey = process.env.ANTHROPIC_API_KEY;
+      if (anthropicKey) {
+        const { writeFileSync, mkdirSync } = await import('fs');
+        const { join } = await import('path');
+        const tempAuthDir = join(process.cwd(), 'data', 'orgs', orgSlug);
+        if (!existsSync(tempAuthDir)) {
+          mkdirSync(tempAuthDir, { recursive: true });
+        }
+        const tempAuthPath = join(tempAuthDir, 'auth.json');
+        const authConfig = {
+          anthropic: {
+            type: 'api',
+            key: anthropicKey,
+          },
+        };
+        writeFileSync(tempAuthPath, JSON.stringify(authConfig, null, 2), 'utf-8');
+        volumes.push(`${tempAuthPath}:${containerAuthPath}:ro`);
+        authMounted = true;
+        logger.info({ orgSlug }, 'Generated auth.json from .env fallback');
+      }
     }
 
     // Prepare environment variables
@@ -184,7 +209,7 @@ export async function createContainer(
     ];
     
     // Set auth path if auth.json is mounted
-    if (existsSync(authPath)) {
+    if (authMounted) {
       envVars.push(`OPENCODE_AUTH_PATH=${containerAuthPath}`);
     }
 
@@ -268,6 +293,16 @@ export async function startContainer(containerId: string): Promise<ContainerInst
     instance.startedAt = new Date();
     instance.errorMessage = undefined;
 
+    // Update database status
+    try {
+      const db = await initDatabase();
+      await db.update(containersTable).set({
+        status: 'running',
+      }).where(eq(containersTable.id, containerId));
+    } catch (dbError) {
+      logger.error(dbError, 'Failed to update container status in database');
+    }
+
     return instance;
   } catch (error) {
     instance.status = 'error';
@@ -276,6 +311,9 @@ export async function startContainer(containerId: string): Promise<ContainerInst
   }
 }
 
+/**
+ * Stop a container
+ */
 /**
  * Stop a container
  */
@@ -301,6 +339,16 @@ export async function stopContainer(
     instance.status = 'stopped';
     instance.stoppedAt = new Date();
     instance.healthStatus = 'unknown';
+
+    // Update database status
+    try {
+      const db = await initDatabase();
+      await db.update(containersTable).set({
+        status: 'stopped',
+      }).where(eq(containersTable.id, containerId));
+    } catch (dbError) {
+      logger.error(dbError, 'Failed to update container status in database');
+    }
 
     return instance;
   } catch (error) {
@@ -356,6 +404,14 @@ export async function removeContainer(containerId: string, force: boolean = fals
 
     await container.remove({ force });
     containers.delete(containerId);
+
+    // Delete from database
+    try {
+      const db = await initDatabase();
+      await db.delete(containersTable).where(eq(containersTable.id, containerId));
+    } catch (dbError) {
+      logger.error(dbError, 'Failed to delete container from database');
+    }
   } catch (error) {
     if (error instanceof Error && !error.message.includes('No such container')) {
       throw error;

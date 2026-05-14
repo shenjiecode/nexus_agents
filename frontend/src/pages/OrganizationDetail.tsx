@@ -48,6 +48,22 @@ function StopIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+function KeyIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+    </svg>
+  );
+}
+
+function RefreshIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+  );
+}
+
 
 export function OrganizationDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -60,6 +76,9 @@ export function OrganizationDetail() {
     roleSlug: '',
     roleVersion: '',
   });
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   const { data: organization, loading: orgLoading, error: orgError } = 
     useApi<Organization>(`/api/organizations/${slug}`);
@@ -102,6 +121,22 @@ export function OrganizationDetail() {
       refetchContainers();
     } catch (err) {
       console.error('Failed to remove container:', err);
+    }
+  };
+
+  const handleRegenerateApiKey = async () => {
+    if (!slug) return;
+    setIsRegeneratingKey(true);
+    try {
+      const result = await apiRequest<{ apiKey: string }>(`/api/orgs/${slug}/apikey`, {
+        method: 'POST',
+      });
+      setApiKey(result.data.apiKey);
+      setShowApiKeyModal(true);
+    } catch (err) {
+      console.error('Failed to regenerate API key:', err);
+    } finally {
+      setIsRegeneratingKey(false);
     }
   };
 
@@ -173,7 +208,35 @@ export function OrganizationDetail() {
         </div>
       </CyberCard>
 
-      {/* Containers Section */}
+      {/* API Key Section */}
+      <CyberCard>
+        <div className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <KeyIcon className="w-5 h-5 text-cyber-purple" />
+              <div>
+                <h3 className="font-display font-semibold text-cyber-white">API Key</h3>
+                <p className="text-sm text-cyber-muted">用于 API 请求认证</p>
+              </div>
+            </div>
+            <CyberButton
+              variant="secondary"
+              size="sm"
+              icon={<RefreshIcon className="w-4 h-4" />}
+              onClick={handleRegenerateApiKey}
+              disabled={isRegeneratingKey}
+            >
+              {isRegeneratingKey ? '重新生成中...' : '重新生成'}
+            </CyberButton>
+          </div>
+          <div className="mt-4 p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/10">
+            <p className="text-sm text-cyber-muted">
+              API Key 用于认证组织级别的 API 请求。重新生成后旧 Key 将失效。
+            </p>
+          </div>
+        </div>
+      </CyberCard>
+
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-display font-semibold text-cyber-white">Containers</h2>
@@ -360,6 +423,40 @@ export function OrganizationDetail() {
         <p className="text-cyber-muted">
           确定要移除此 Container 吗？此操作不可撤销。
         </p>
+      </CyberModal>
+
+      {/* API Key Display Modal */}
+      <CyberModal
+        isOpen={showApiKeyModal && !!apiKey}
+        onClose={() => { setShowApiKeyModal(false); setApiKey(null); }}
+        title="API Key 已生成"
+        size="sm"
+        footer={
+          <>
+            <CyberButton variant="ghost" onClick={() => { setShowApiKeyModal(false); setApiKey(null); }}>
+              关闭
+            </CyberButton>
+            <CyberButton
+              onClick={() => {
+                navigator.clipboard.writeText(apiKey!);
+              }}
+            >
+              复制 Key
+            </CyberButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="p-3 rounded-lg bg-cyber-dark border border-cyber-warning/30">
+            <p className="text-sm text-cyber-warning mb-2">⚠️ 请妥善保管此 Key，关闭后将无法再次查看。</p>
+            <code className="block text-sm font-mono text-cyber-cyan break-all select-all">
+              {apiKey}
+            </code>
+          </div>
+          <p className="text-sm text-cyber-muted">
+            使用方式: 在 API 请求头中添加 <code className="text-cyber-cyan">X-Api-Key: {apiKey?.slice(0, 12)}...</code> 或 <code className="text-cyber-cyan">Authorization: Bearer {apiKey?.slice(0, 12)}...</code>
+          </p>
+        </div>
       </CyberModal>
     </div>
   );

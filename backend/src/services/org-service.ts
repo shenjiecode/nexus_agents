@@ -37,6 +37,81 @@ function generateOrgId(): string {
 }
 
 /**
+ * Generate an API key for organization authentication
+ * Format: nexus_live_{32 random hex chars}
+ */
+function generateApiKey(): string {
+  return `nexus_live_${randomBytes(16).toString('hex')}`;
+}
+
+/**
+ * Verify an API key and return the organization
+ */
+export async function verifyApiKey(apiKey: string): Promise<{
+  id: string;
+  name: string;
+  slug: string;
+} | null> {
+  if (!apiKey || !apiKey.startsWith('nexus_live_')) {
+    return null;
+  }
+  
+  const database = await getDb();
+  const records = await database
+    .select()
+    .from(organizations)
+    .where(eq(organizations.apiKey, apiKey));
+  
+  if (records.length === 0) {
+    return null;
+  }
+  
+  const org = records[0];
+  return {
+    id: org.id,
+    name: org.name,
+    slug: org.slug,
+  };
+}
+
+/**
+ * Regenerate API key for an organization
+ */
+export async function regenerateApiKey(orgId: string): Promise<string | null> {
+  const database = await getDb();
+  const existing = await getOrganizationById(orgId);
+  if (!existing) {
+    return null;
+  }
+  
+  const newApiKey = generateApiKey();
+  await database
+    .update(organizations)
+    .set({ apiKey: newApiKey, updatedAt: Date.now() })
+    .where(eq(organizations.id, orgId));
+  
+  return newApiKey;
+}
+
+/**
+ * Revoke API key for an organization (set to null)
+ */
+export async function revokeApiKey(orgId: string): Promise<boolean> {
+  const database = await getDb();
+  const existing = await getOrganizationById(orgId);
+  if (!existing) {
+    return false;
+  }
+  
+  await database
+    .update(organizations)
+    .set({ apiKey: null, updatedAt: Date.now() })
+    .where(eq(organizations.id, orgId));
+  
+  return true;
+}
+
+/**
  * Slugify a name to create a valid slug
  */
 export function slugify(name: string): string {
@@ -69,6 +144,7 @@ export async function createOrganization(input: CreateOrgInput): Promise<{
   name: string;
   slug: string;
   description?: string;
+  apiKey: string;
   createdAt: number;
   updatedAt: number;
 }> {
@@ -82,12 +158,14 @@ export async function createOrganization(input: CreateOrgInput): Promise<{
 
   const now = Date.now();
   const orgId = generateOrgId();
+  const apiKey = generateApiKey();
 
   await database.insert(organizations).values({
     id: orgId,
     name: validated.name,
     slug: validated.slug,
     description: validated.description || null,
+    apiKey: apiKey,
     createdAt: now,
     updatedAt: now,
   });
@@ -97,6 +175,7 @@ export async function createOrganization(input: CreateOrgInput): Promise<{
     name: validated.name,
     slug: validated.slug,
     description: validated.description,
+    apiKey: apiKey,
     createdAt: now,
     updatedAt: now,
   };
@@ -148,6 +227,7 @@ export async function getOrganizationById(orgId: string): Promise<{
   name: string;
   slug: string;
   description?: string;
+  apiKey?: string;
   createdAt: number;
   updatedAt: number;
 } | null> {
@@ -167,6 +247,7 @@ export async function getOrganizationById(orgId: string): Promise<{
     name: org.name,
     slug: org.slug,
     description: org.description || undefined,
+    apiKey: org.apiKey || undefined,
     createdAt: org.createdAt,
     updatedAt: org.updatedAt,
   };
@@ -181,6 +262,7 @@ export async function getOrganizationBySlug(slug: string): Promise<{
   slug: string;
   description?: string;
   createdAt: number;
+  updatedAt: number;
   containerCount?: number;
 } | null> {
   const database = await getDb();

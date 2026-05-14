@@ -6,6 +6,7 @@ export const organizations = sqliteTable('organizations', {
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
   description: text('description'),
+  apiKey: text('api_key').unique(), // Organization API key for authentication
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import logger from '../../lib/logger.js';
-  import {
+import {
   createOrganization,
   getAllOrganizations,
   getOrganizationById,
@@ -11,9 +11,10 @@ import logger from '../../lib/logger.js';
   getOrganizationAuth,
   setOrganizationAuth,
   deleteOrganizationAuth,
+  regenerateApiKey,
+  revokeApiKey,
   type AuthConfig,
 } from '../../services/org-service.js';
-
 // Standard API response helper
 function apiSuccess<T>(data: T) {
   return { success: true, data };
@@ -233,6 +234,85 @@ organizations.delete('/api/orgs/:slug/auth', async (c) => {
   } catch (error: any) {
     logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to delete auth configuration', 500), 500);
+  }
+});
+// ============ API Key Management ============
+
+// GET /api/orgs/:slug/apikey - Get organization's API key status
+organizations.get('/api/orgs/:slug/apikey', async (c) => {
+  try {
+    const slug = c.req.param('slug');
+    
+    // Verify organization exists
+    const org = await getOrganizationBySlug(slug);
+    if (!org) {
+      return c.json(apiError('Organization not found', 404), 404);
+    }
+    
+    // Get organization by ID to check apiKey
+    const orgById = await getOrganizationById(org.id);
+    
+    return c.json(apiSuccess({
+      hasApiKey: orgById?.apiKey ? true : false,
+      // Never return the actual key for security - only regenerate can give new key
+    }));
+  } catch (error: any) {
+    logger.error(error, "API error");
+    return c.json(apiError(error.message || 'Failed to get API key status', 500), 500);
+  }
+});
+
+// POST /api/orgs/:slug/apikey - Regenerate API key
+organizations.post('/api/orgs/:slug/apikey', async (c) => {
+  try {
+    const slug = c.req.param('slug');
+    
+    // Verify organization exists
+    const org = await getOrganizationBySlug(slug);
+    if (!org) {
+      return c.json(apiError('Organization not found', 404), 404);
+    }
+    
+    const newApiKey = await regenerateApiKey(org.id);
+    
+    if (!newApiKey) {
+      return c.json(apiError('Failed to regenerate API key', 500), 500);
+    }
+    
+    return c.json(apiSuccess({
+      apiKey: newApiKey,
+      message: 'API key regenerated. Store this key securely - it will not be shown again.',
+    }));
+  } catch (error: any) {
+    logger.error(error, "API error");
+    return c.json(apiError(error.message || 'Failed to regenerate API key', 500), 500);
+  }
+});
+
+// DELETE /api/orgs/:slug/apikey - Revoke API key
+organizations.delete('/api/orgs/:slug/apikey', async (c) => {
+  try {
+    const slug = c.req.param('slug');
+    
+    // Verify organization exists
+    const org = await getOrganizationBySlug(slug);
+    if (!org) {
+      return c.json(apiError('Organization not found', 404), 404);
+    }
+    
+    const result = await revokeApiKey(org.id);
+    
+    if (!result) {
+      return c.json(apiError('Failed to revoke API key', 500), 500);
+    }
+    
+    return c.json(apiSuccess({
+      success: true,
+      message: 'API key revoked. Organization can no longer access API.',
+    }));
+  } catch (error: any) {
+    logger.error(error, "API error");
+    return c.json(apiError(error.message || 'Failed to revoke API key', 500), 500);
   }
 });
 

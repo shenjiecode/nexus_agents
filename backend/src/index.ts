@@ -26,17 +26,19 @@ app.onError((err, c) => {
   return c.json({ error: err.message }, 500)
 })
 
-// Health check
+// Health check (public)
 app.get('/health', (c) => {
   return c.json({ status: 'ok' })
 })
 
-// API Routes
-app.route('/', organizationRoutes)
-app.route('/', roleRoutes)
-app.route('/', orgContainerRoutes)
-app.route('/', containerRoutes)
-app.route('/', sessionRoutes)
+// ============ API Routes ============
+
+// All routes accessible (auth middleware available for future external API use)
+app.route('/', organizationRoutes)  // Organization CRUD + Auth config + API Key management
+app.route('/', roleRoutes)          // Roles are global templates
+app.route('/', orgContainerRoutes)  // /api/orgs/:slug/containers/*
+app.route('/', sessionRoutes)       // /api/orgs/:slug/sessions/*
+app.route('/', containerRoutes)     // /api/containers/*
 
 // 404 handler
 app.notFound((c) => {

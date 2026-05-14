@@ -54,6 +54,7 @@ async function initSchema(database: any): Promise<void> {
       name TEXT NOT NULL,
       slug TEXT NOT NULL UNIQUE,
       description TEXT,
+      api_key TEXT UNIQUE,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );

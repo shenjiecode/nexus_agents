@@ -3,6 +3,7 @@ export interface Organization {
   name: string;
   slug: string;
   description: string;
+  apiKey?: string; // Only returned on creation
   createdAt: string;
   updatedAt: string;
   containerCount?: number;

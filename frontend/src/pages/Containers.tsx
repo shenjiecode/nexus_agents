@@ -149,7 +149,7 @@ export function Containers() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-cyber-cyan/20">
-                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">组织</th>
+                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Role</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Role</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">版本</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">状态</th>
@@ -186,9 +186,7 @@ export function Containers() {
                     className="border-b border-cyber-cyan/10 hover:bg-cyber-cyan/5 transition-colors"
                   >
                     <td className="py-4 px-6">
-                      <code className="font-mono text-xs text-cyber-muted">
-                        {container.organizationId.slice(0, 20)}...
-                      </code>
+                      <span className="font-medium text-cyber-white">{container.roleSlug}</span>
                     </td>
                     <td className="py-4 px-6">
                       <span className="font-medium text-cyber-white">{container.roleSlug}</span>
@@ -243,7 +241,7 @@ export function Containers() {
           <div className="w-full max-w-md bg-cyber-dark-card border border-cyber-cyan/30 rounded-xl shadow-2xl p-6">
             <h3 className="text-xl font-display font-bold text-cyber-white mb-4">移除 Container</h3>
             <p className="text-cyber-muted mb-6">
-              确定要移除 <strong className="text-cyber-white">{containerToRemove.roleName}</strong> 的 Container 吗？
+              确定要移除 <strong className="text-cyber-white">{containerToRemove.roleSlug}</strong> 的 Container 吗？
               此操作不可撤销。
             </p>
             <div className="flex justify-end gap-3">
