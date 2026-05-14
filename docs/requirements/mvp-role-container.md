@@ -900,7 +900,7 @@ CMD ["opencode", "serve", "--port", "4096", "--hostname", "0.0.0.0"]
 
 ```bash
 # 1. 创建角色配置
-curl -X POST http://localhost:3000/api/roles \
+curl -X POST http://localhost:13207/api/roles \
   -H "Content-Type: application/json" \
   -d '{
     "name": "copywriter",
@@ -913,13 +913,13 @@ curl -X POST http://localhost:3000/api/roles \
   }'
 
 # 2. 启动容器
-curl -X POST http://localhost:3000/api/roles/role_xxx/containers
+curl -X POST http://localhost:13207/api/roles/role_xxx/containers
 
 # 3. 创建会话
-curl -X POST http://localhost:3000/api/roles/role_xxx/sessions
+curl -X POST http://localhost:13207/api/roles/role_xxx/sessions
 
 # 4. 发送消息
-curl -X POST http://localhost:3000/api/roles/role_xxx/sessions/sess_xxx/messages \
+curl -X POST http://localhost:13207/api/roles/role_xxx/sessions/sess_xxx/messages \
   -H "Content-Type: application/json" \
   -d '{
     "content": "请帮我写一段产品介绍"

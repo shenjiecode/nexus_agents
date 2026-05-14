@@ -60,9 +60,9 @@ async function initialize() {
     const { serve } = await import('@hono/node-server')
     serve({
       fetch: app.fetch,
-      port: 3000
+      port: 13207
     })
-    logger.info('Server started on port 3000')
+    logger.info('Server started on port 13207')
   } catch (error) {
     logger.error(error, 'Failed to initialize')
     process.exit(1)

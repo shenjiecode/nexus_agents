@@ -1,0 +1,262 @@
+import { useState } from 'react';
+import { CyberCard } from '../components/CyberCard';
+import { CyberButton } from '../components/CyberButton';
+import { CyberModal } from '../components/CyberModal';
+import { useApi, apiRequest } from '../hooks/useApi';
+import type { Role, CreateRoleRequest } from '../types';
+
+function UserIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+  );
+}
+
+function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+  );
+}
+
+function TagIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+    </svg>
+  );
+}
+
+function SearchIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+  );
+}
+
+export function Roles() {
+  const { data: roles, loading, error, refetch } = useApi<Role[]>('/api/roles');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedRole, setExpandedRole] = useState<number | null>(null);
+  const [formData, setFormData] = useState<CreateRoleRequest>({
+    name: '',
+    slug: '',
+    description: '',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const filteredRoles = roles?.filter(role =>
+    role.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    role.slug.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      await apiRequest<Role>('/api/roles', {
+        method: 'POST',
+        body: JSON.stringify(formData),
+      });
+      setIsModalOpen(false);
+      setFormData({ name: '', slug: '', description: '' });
+      refetch();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to create role');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const generateSlug = (name: string) => {
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  };
+
+  return (
+    <div className="page-transition space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="AI Roles">
+            AI Roles
+          </h1>
+          <p className="text-cyber-muted mt-1">Define and manage AI agent roles</p>
+        </div>
+        <CyberButton
+          onClick={() => setIsModalOpen(true)}
+          icon={<PlusIcon className="w-5 h-5" />}
+        >
+          Create Role
+        </CyberButton>
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-md">
+        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-cyber-muted" />
+        <input
+          type="text"
+          placeholder="Search roles..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-10 pr-4 py-2 rounded-lg bg-cyber-dark-card border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none focus:ring-1 focus:ring-cyber-cyan"
+        />
+      </div>
+
+      {/* Roles Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <CyberCard key={i} className="h-48">
+              <div className="p-6 skeleton h-full" />
+            </CyberCard>
+          ))}
+        </div>
+      ) : error ? (
+        <CyberCard>
+          <div className="p-8 text-center text-cyber-error">
+            Error loading roles: {error}
+          </div>
+        </CyberCard>
+      ) : filteredRoles?.length === 0 ? (
+        <CyberCard>
+          <div className="p-8 text-center text-cyber-muted">
+            No roles found
+          </div>
+        </CyberCard>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredRoles?.map((role) => (
+            <CyberCard key={role.id} className="group" hoverEffect>
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-3 rounded-lg bg-cyber-purple/10 text-cyber-purple group-hover:bg-cyber-purple/20 transition-colors">
+                    <UserIcon className="w-6 h-6" />
+                  </div>
+                  <span className="text-xs font-mono text-cyber-muted">
+                    {role.versions.length} version{role.versions.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                
+                <h3 className="text-lg font-display font-semibold text-cyber-white group-hover:text-cyber-cyan transition-colors">
+                  {role.name}
+                </h3>
+                <code className="text-sm text-cyber-muted font-mono">{role.slug}</code>
+                
+                {role.description && (
+                  <p className="mt-2 text-cyber-muted text-sm line-clamp-2">{role.description}</p>
+                )}
+
+                {/* Version History */}
+                {role.versions.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-cyber-cyan/10">
+                    <button
+                      onClick={() => setExpandedRole(expandedRole === role.id ? null : role.id)}
+                      className="text-xs text-cyber-cyan hover:text-cyber-white transition-colors flex items-center gap-1"
+                    >
+                      <TagIcon className="w-3 h-3" />
+                      {expandedRole === role.id ? 'Hide versions' : 'Show versions'}
+                    </button>
+                    
+                    {expandedRole === role.id && (
+                      <div className="mt-2 space-y-2">
+                        {role.versions.map((version) => (
+                          <div
+                            key={version.id}
+                            className="flex items-center justify-between p-2 rounded bg-cyber-dark text-sm"
+                          >
+                            <div>
+                              <span className="text-cyber-purple font-mono">v{version.version}</span>
+                              <span className="text-cyber-muted ml-2">{version.imageName}</span>
+                            </div>
+                            <span className="text-xs text-cyber-muted">
+                              {new Date(version.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CyberCard>
+          ))}
+        </div>
+      )}
+
+      {/* Create Modal */}
+      <CyberModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Create Role"
+        footer={
+          <>
+            <CyberButton variant="ghost" onClick={() => setIsModalOpen(false)}>
+              Cancel
+            </CyberButton>
+            <CyberButton
+              type="submit"
+              form="role-form"
+              disabled={isSubmitting || !formData.name || !formData.slug}
+            >
+              {isSubmitting ? 'Creating...' : 'Create Role'}
+            </CyberButton>
+          </>
+        }
+      >
+        <form id="role-form" onSubmit={handleSubmit} className="space-y-4">
+          {submitError && (
+            <div className="p-3 rounded-lg bg-cyber-error/10 border border-cyber-error/30 text-cyber-error text-sm">
+              {submitError}
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-cyber-muted mb-1">Role Name</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => {
+                const name = e.target.value;
+                setFormData(prev => ({
+                  ...prev,
+                  name,
+                  slug: prev.slug || generateSlug(name),
+                }));
+              }}
+              placeholder="e.g., Customer Support Agent"
+              className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-cyber-muted mb-1">Slug</label>
+            <input
+              type="text"
+              value={formData.slug}
+              onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+              placeholder="e.g., customer-support"
+              className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none font-mono"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-cyber-muted mb-1">Description</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Describe what this AI agent does..."
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none resize-none"
+            />
+          </div>
+        </form>
+      </CyberModal>
+    </div>
+  );
+}
