@@ -4,6 +4,7 @@ import logger from './lib/logger.js'
 import organizationRoutes from './api/routes/organizations.js'
 import roleRoutes from './api/routes/roles.js'
 import orgContainerRoutes from './api/routes/org-containers.js'
+import containerRoutes from './api/routes/containers.js'
 import sessionRoutes from './api/routes/sessions.js'
 import { restoreContainers } from './services/container-manager.js'
 import { initDatabase, closeDatabase } from './db/index.js'
@@ -34,6 +35,7 @@ app.get('/health', (c) => {
 app.route('/', organizationRoutes)
 app.route('/', roleRoutes)
 app.route('/', orgContainerRoutes)
+app.route('/', containerRoutes)
 app.route('/', sessionRoutes)
 
 // 404 handler
