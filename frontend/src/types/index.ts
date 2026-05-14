@@ -3,10 +3,8 @@ export interface Organization {
   name: string;
   slug: string;
   description: string;
-  apiKey: string;
   createdAt: string;
   updatedAt: string;
-  status: 'active' | 'inactive';
   containerCount?: number;
 }
 

@@ -4,9 +4,9 @@ import { CyberCard } from '../components/CyberCard';
 import { useApi } from '../hooks/useApi';
 import type { Organization, Role, Container, SystemStats } from '../types';
 
-function StatCard({ title, value, subtitle, icon: Icon, color }: { 
-  title: string; 
-  value: number; 
+function StatCard({ title, value, subtitle, icon: Icon, color }: {
+  title: string;
+  value: number;
   subtitle?: string;
   icon: React.ElementType;
   color: 'cyan' | 'purple' | 'success';
@@ -137,12 +137,11 @@ export function Dashboard() {
 
   const loading = orgsLoading || rolesLoading || containersLoading;
 
-  // Mock activities for now
   const activities = [
-    { message: 'Organization "TechCorp" created', timestamp: '2 minutes ago', type: 'org_created' },
-    { message: 'Container hired for Sales role', timestamp: '15 minutes ago', type: 'container_hired' },
-    { message: 'Container status changed to running', timestamp: '1 hour ago', type: 'container_status_changed' },
-    { message: 'New role "Customer Support" added', timestamp: '2 hours ago', type: 'role_created' },
+    { message: '组织 "TechCorp" 已创建', timestamp: '2 分钟前', type: 'org_created' },
+    { message: '已为 Sales Role 雇佣 Container', timestamp: '15 分钟前', type: 'container_hired' },
+    { message: 'Container 状态已变为运行中', timestamp: '1 小时前', type: 'container_status_changed' },
+    { message: '新 Role "Customer Support" 已添加', timestamp: '2 小时前', type: 'role_created' },
   ];
 
   return (
@@ -150,14 +149,14 @@ export function Dashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="System Dashboard">
-            System Dashboard
+          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="系统控制台">
+            系统控制台
           </h1>
-          <p className="text-cyber-muted mt-1">Overview of your AI agent infrastructure</p>
+          <p className="text-cyber-muted mt-1">AI 代理基础设施概览</p>
         </div>
         <div className="flex items-center gap-2 text-sm text-cyber-muted font-mono">
           <span className="w-2 h-2 rounded-full bg-cyber-success status-pulse" />
-          System Online
+          系统在线
         </div>
       </div>
 
@@ -173,28 +172,28 @@ export function Dashboard() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
-            title="Organizations"
+            title="组织"
             value={stats.totalOrganizations}
             icon={BuildingIcon}
             color="cyan"
           />
           <StatCard
-            title="Active Roles"
+            title="活跃角色"
             value={stats.totalRoles}
             icon={UserIcon}
             color="purple"
           />
           <StatCard
-            title="Running Containers"
+            title="运行容器"
             value={stats.runningContainers}
-            subtitle={`of ${stats.totalContainers} total`}
+            subtitle={`共 ${stats.totalContainers} 个`}
             icon={ContainerIcon}
             color="success"
           />
           <StatCard
-            title="System Uptime"
+            title="系统运行时间"
             value={99.9}
-            subtitle="Last 30 days"
+            subtitle="过去30天"
             icon={ContainerIcon}
             color="cyan"
           />
@@ -205,29 +204,29 @@ export function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick Actions */}
         <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-xl font-display font-semibold text-cyber-white">Quick Actions</h2>
+          <h2 className="text-xl font-display font-semibold text-cyber-white">快捷操作</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <QuickActionCard
-              title="Add Organization"
-              description="Create a new organization to manage containers"
+              title="添加组织"
+              description="创建新组织以管理 Container"
               to="/organizations"
               icon={PlusIcon}
             />
             <QuickActionCard
-              title="Create Role"
-              description="Define a new AI agent role"
+              title="创建角色"
+              description="定义新的 AI 代理 Role"
               to="/roles"
               icon={UserIcon}
             />
             <QuickActionCard
-              title="View Containers"
-              description="Manage running AI agent instances"
+              title="查看 Container"
+              description="管理运行中的 AI 代理实例"
               to="/containers"
               icon={ContainerIcon}
             />
             <QuickActionCard
-              title="System Settings"
-              description="Configure global system preferences"
+              title="系统设置"
+              description="配置全局系统偏好设置"
               to="/"
               icon={ContainerIcon}
             />
@@ -236,7 +235,7 @@ export function Dashboard() {
 
         {/* Recent Activity */}
         <div className="space-y-4">
-          <h2 className="text-xl font-display font-semibold text-cyber-white">Recent Activity</h2>
+          <h2 className="text-xl font-display font-semibold text-cyber-white">最近活动</h2>
           <CyberCard>
             <div className="p-4">
               {activities.map((activity, index) => (

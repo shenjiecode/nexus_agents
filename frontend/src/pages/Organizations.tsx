@@ -69,16 +69,16 @@ export function Organizations() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="Organizations">
-            Organizations
+          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="组织管理">
+            组织管理
           </h1>
-          <p className="text-cyber-muted mt-1">Manage organizations and their AI agents</p>
+          <p className="text-cyber-muted mt-1">管理组织及其 AI 代理</p>
         </div>
         <CyberButton
           onClick={() => setIsModalOpen(true)}
           icon={<PlusIcon className="w-5 h-5" />}
         >
-          Add Organization
+          添加组织
         </CyberButton>
       </div>
 
@@ -87,7 +87,7 @@ export function Organizations() {
         <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-cyber-muted" />
         <input
           type="text"
-          placeholder="Search organizations..."
+          placeholder="搜索组织..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-10 pr-4 py-2 rounded-lg bg-cyber-dark-card border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none focus:ring-1 focus:ring-cyber-cyan"
@@ -100,11 +100,11 @@ export function Organizations() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-cyber-cyan/20">
-                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Name</th>
+                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">名称</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Slug</th>
-                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Status</th>
-                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Containers</th>
-                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Created</th>
+                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">状态</th>
+                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Container</th>
+                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">创建时间</th>
               </tr>
             </thead>
             <tbody>
@@ -119,13 +119,13 @@ export function Organizations() {
               ) : error ? (
                 <tr>
                   <td colSpan={5} className="py-8 px-6 text-center text-cyber-error">
-                    Error loading organizations: {error}
+                    加载组织失败：{error}
                   </td>
                 </tr>
               ) : filteredOrgs?.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-8 px-6 text-center text-cyber-muted">
-                    No organizations found
+                    未找到组织
                   </td>
                 </tr>
               ) : (
@@ -148,7 +148,11 @@ export function Organizations() {
                       </code>
                     </td>
                     <td className="py-4 px-6">
-                      <StatusDot status={org.status === 'active' ? 'active' : 'inactive'} showLabel />
+                      {org.containerCount && org.containerCount > 0 ? (
+                        <StatusDot status="active" showLabel />
+                      ) : (
+                        <span className="text-cyber-muted text-sm">无活跃容器</span>
+                      )}
                     </td>
                     <td className="py-4 px-6">
                       <span className="text-cyber-white font-mono">{org.containerCount || 0}</span>
@@ -168,18 +172,18 @@ export function Organizations() {
       <CyberModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Create Organization"
+        title="创建组织"
         footer={
           <>
             <CyberButton variant="ghost" onClick={() => setIsModalOpen(false)}>
-              Cancel
+              取消
             </CyberButton>
             <CyberButton
               type="submit"
               form="org-form"
               disabled={isSubmitting || !formData.name || !formData.slug}
             >
-              {isSubmitting ? 'Creating...' : 'Create Organization'}
+              {isSubmitting ? '创建中...' : '创建组织'}
             </CyberButton>
           </>
         }
@@ -191,7 +195,7 @@ export function Organizations() {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-cyber-muted mb-1">Organization Name</label>
+            <label className="block text-sm font-medium text-cyber-muted mb-1">组织名称</label>
             <input
               type="text"
               value={formData.name}
@@ -203,7 +207,7 @@ export function Organizations() {
                   slug: prev.slug || generateSlug(name),
                 }));
               }}
-              placeholder="e.g., Acme Corporation"
+              placeholder="例如：Acme Corporation"
               className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none"
               required
             />
@@ -218,14 +222,14 @@ export function Organizations() {
               className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none font-mono"
               required
             />
-            <p className="text-xs text-cyber-muted mt-1">Used in URLs and API calls</p>
+            <p className="text-xs text-cyber-muted mt-1">用于 URL 和 API 调用</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-cyber-muted mb-1">Description</label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Brief description of the organization..."
+              placeholder="组织简介..."
               rows={3}
               className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none resize-none"
             />

@@ -69,7 +69,7 @@ export function Roles() {
       setFormData({ name: '', slug: '', description: '' });
       refetch();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to create role');
+      setSubmitError(err instanceof Error ? err.message : '创建 Role 失败');
     } finally {
       setIsSubmitting(false);
     }
@@ -84,16 +84,16 @@ export function Roles() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="AI Roles">
-            AI Roles
+          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="AI 角色">
+            AI 角色
           </h1>
-          <p className="text-cyber-muted mt-1">Define and manage AI agent roles</p>
+          <p className="text-cyber-muted mt-1">定义和管理 AI 代理 Role</p>
         </div>
         <CyberButton
           onClick={() => setIsModalOpen(true)}
           icon={<PlusIcon className="w-5 h-5" />}
         >
-          Create Role
+          创建角色
         </CyberButton>
       </div>
 
@@ -102,7 +102,7 @@ export function Roles() {
         <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-cyber-muted" />
         <input
           type="text"
-          placeholder="Search roles..."
+          placeholder="搜索 Role..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-10 pr-4 py-2 rounded-lg bg-cyber-dark-card border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none focus:ring-1 focus:ring-cyber-cyan"
@@ -121,13 +121,13 @@ export function Roles() {
       ) : error ? (
         <CyberCard>
           <div className="p-8 text-center text-cyber-error">
-            Error loading roles: {error}
+            加载 Role 失败：{error}
           </div>
         </CyberCard>
       ) : filteredRoles?.length === 0 ? (
         <CyberCard>
           <div className="p-8 text-center text-cyber-muted">
-            No roles found
+            未找到 Role
           </div>
         </CyberCard>
       ) : (
@@ -140,15 +140,15 @@ export function Roles() {
                     <UserIcon className="w-6 h-6" />
                   </div>
                   <span className="text-xs font-mono text-cyber-muted">
-                    {role.versions.length} version{role.versions.length !== 1 ? 's' : ''}
+                    {role.versions.length} 个版本
                   </span>
                 </div>
-                
+
                 <h3 className="text-lg font-display font-semibold text-cyber-white group-hover:text-cyber-cyan transition-colors">
                   {role.name}
                 </h3>
                 <code className="text-sm text-cyber-muted font-mono">{role.slug}</code>
-                
+
                 {role.description && (
                   <p className="mt-2 text-cyber-muted text-sm line-clamp-2">{role.description}</p>
                 )}
@@ -161,9 +161,9 @@ export function Roles() {
                       className="text-xs text-cyber-cyan hover:text-cyber-white transition-colors flex items-center gap-1"
                     >
                       <TagIcon className="w-3 h-3" />
-                      {expandedRole === role.id ? 'Hide versions' : 'Show versions'}
+                      {expandedRole === role.id ? '隐藏版本' : '显示版本'}
                     </button>
-                    
+
                     {expandedRole === role.id && (
                       <div className="mt-2 space-y-2">
                         {role.versions.map((version) => (
@@ -194,18 +194,18 @@ export function Roles() {
       <CyberModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Create Role"
+        title="创建 Role"
         footer={
           <>
             <CyberButton variant="ghost" onClick={() => setIsModalOpen(false)}>
-              Cancel
+              取消
             </CyberButton>
             <CyberButton
               type="submit"
               form="role-form"
               disabled={isSubmitting || !formData.name || !formData.slug}
             >
-              {isSubmitting ? 'Creating...' : 'Create Role'}
+              {isSubmitting ? '创建中...' : '创建 Role'}
             </CyberButton>
           </>
         }
@@ -217,7 +217,7 @@ export function Roles() {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-cyber-muted mb-1">Role Name</label>
+            <label className="block text-sm font-medium text-cyber-muted mb-1">Role 名称</label>
             <input
               type="text"
               value={formData.name}
@@ -229,7 +229,7 @@ export function Roles() {
                   slug: prev.slug || generateSlug(name),
                 }));
               }}
-              placeholder="e.g., Customer Support Agent"
+              placeholder="例如：Customer Support Agent"
               className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none"
               required
             />
@@ -240,17 +240,17 @@ export function Roles() {
               type="text"
               value={formData.slug}
               onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-              placeholder="e.g., customer-support"
+              placeholder="例如：customer-support"
               className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none font-mono"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-cyber-muted mb-1">Description</label>
+            <label className="block text-sm font-medium text-cyber-muted mb-1">描述</label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Describe what this AI agent does..."
+              placeholder="描述此 AI 代理的职责..."
               rows={3}
               className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none resize-none"
             />

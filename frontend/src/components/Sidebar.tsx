@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 const navItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboardIcon },
-  { path: '/organizations', label: 'Organizations', icon: BuildingIcon },
-  { path: '/roles', label: 'Roles', icon: UserCogIcon },
-  { path: '/containers', label: 'Containers', icon: ContainerIcon },
+  { path: '/', label: '控制台', icon: LayoutDashboardIcon },
+  { path: '/organizations', label: '组织管理', icon: BuildingIcon },
+  { path: '/roles', label: '角色管理', icon: UserCogIcon },
+  { path: '/containers', label: 'Container', icon: ContainerIcon },
 ];
 
 function LayoutDashboardIcon() {
@@ -46,7 +46,7 @@ export function Sidebar() {
   const location = useLocation();
 
   return (
-    <aside 
+    <aside
       className={`
         fixed left-0 top-0 h-screen
         bg-cyber-dark-card border-r border-cyber-cyan/20
@@ -70,10 +70,10 @@ export function Sidebar() {
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="p-1.5 rounded-lg text-cyber-muted hover:text-cyber-cyan hover:bg-cyber-cyan/10 transition-colors"
         >
-          <svg 
-            className={`w-5 h-5 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} 
-            fill="none" 
-            viewBox="0 0 24 24" 
+          <svg
+            className={`w-5 h-5 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
             stroke="currentColor"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
@@ -90,8 +90,8 @@ export function Sidebar() {
             className={({ isActive }) => `
               flex items-center gap-3 px-3 py-2.5 rounded-lg
               transition-all duration-300 group relative
-              ${isActive 
-                ? 'bg-cyber-cyan/10 text-cyber-cyan border-l-2 border-cyber-cyan shadow-cyber-glow' 
+              ${isActive
+                ? 'bg-cyber-cyan/10 text-cyber-cyan border-l-2 border-cyber-cyan shadow-cyber-glow'
                 : 'text-cyber-muted hover:text-cyber-white hover:bg-cyber-cyan/5'
               }
               ${isCollapsed ? 'justify-center' : ''}
@@ -118,7 +118,7 @@ export function Sidebar() {
           <div className="w-2 h-2 rounded-full bg-cyber-success status-pulse" />
           {!isCollapsed && (
             <span className="text-xs text-cyber-muted font-mono">
-              System Online
+              系统在线
             </span>
           )}
         </div>

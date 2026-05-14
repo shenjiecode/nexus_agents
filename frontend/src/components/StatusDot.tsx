@@ -9,37 +9,37 @@ const statusConfig = {
     color: 'bg-cyber-cyan',
     glow: 'shadow-cyber-glow',
     pulse: true,
-    label: 'Running',
+    label: '运行中',
   },
   active: {
     color: 'bg-cyber-success',
     glow: 'shadow-success-glow',
     pulse: true,
-    label: 'Active',
+    label: '活跃',
   },
   stopped: {
     color: 'bg-cyber-muted',
     glow: '',
     pulse: false,
-    label: 'Stopped',
+    label: '已停止',
   },
   inactive: {
     color: 'bg-cyber-muted',
     glow: '',
     pulse: false,
-    label: 'Inactive',
+    label: '未激活',
   },
   error: {
     color: 'bg-cyber-error',
     glow: 'shadow-error-glow',
     pulse: true,
-    label: 'Error',
+    label: '错误',
   },
   pending: {
     color: 'bg-cyber-warning',
     glow: '',
     pulse: true,
-    label: 'Pending',
+    label: '等待中',
   },
 };
 

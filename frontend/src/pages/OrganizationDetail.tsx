@@ -49,14 +49,6 @@ function StopIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-function KeyIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-    </svg>
-  );
-}
-
 export function OrganizationDetail() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
@@ -156,24 +148,19 @@ export function OrganizationDetail() {
       {/* Organization Info Card */}
       <CyberCard cornerAccent>
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="text-xs font-mono text-cyber-muted uppercase">Slug</label>
               <code className="block mt-1 text-cyber-cyan font-mono">{organization.slug}</code>
             </div>
             <div>
-              <label className="text-xs font-mono text-cyber-muted uppercase">Status</label>
+              <label className="text-xs font-mono text-cyber-muted uppercase">容器数量</label>
               <div className="mt-1">
-                <StatusDot status={organization.status === 'active' ? 'active' : 'inactive'} showLabel />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-mono text-cyber-muted uppercase">API Key</label>
-              <div className="mt-1 flex items-center gap-2">
-                <code className="text-cyber-white font-mono text-sm">{organization.apiKey.slice(0, 12)}...</code>
-                <button className="text-cyber-muted hover:text-cyber-cyan transition-colors">
-                  <KeyIcon className="w-4 h-4" />
-                </button>
+                {organization.containerCount && organization.containerCount > 0 ? (
+                  <StatusDot status="active" showLabel />
+                ) : (
+                  <span className="text-cyber-muted">无活跃容器</span>
+                )}
               </div>
             </div>
           </div>

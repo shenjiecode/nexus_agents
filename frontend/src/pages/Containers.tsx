@@ -48,14 +48,14 @@ export function Containers() {
   const [containerToRemove, setContainerToRemove] = useState<Container | null>(null);
 
   const filteredContainers = containers?.filter(container => {
-    const matchesSearch = 
+    const matchesSearch =
       container.roleName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       container.organizationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       container.containerId.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     const matchesStatus = statusFilter === 'all' || container.status === statusFilter;
     const matchesOrg = orgFilter === 'all' || container.organizationSlug === orgFilter;
-    
+
     return matchesSearch && matchesStatus && matchesOrg;
   });
 
@@ -69,7 +69,7 @@ export function Containers() {
       setContainerToRemove(null);
       refetch();
     } catch (err) {
-      console.error('Failed to remove container:', err);
+      console.error('删除 Container 失败:', err);
     }
   };
 
@@ -85,20 +85,20 @@ export function Containers() {
           <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="Containers">
             Containers
           </h1>
-          <p className="text-cyber-muted mt-1">Manage running AI agent instances</p>
+          <p className="text-cyber-muted mt-1">管理运行中的 AI 代理实例</p>
         </div>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-cyber-cyan status-pulse" />
-            <span className="text-cyber-muted">{runningCount} running</span>
+            <span className="text-cyber-muted">{runningCount} 运行中</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-cyber-muted" />
-            <span className="text-cyber-muted">{stoppedCount} stopped</span>
+            <span className="text-cyber-muted">{stoppedCount} 已停止</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-cyber-error status-pulse-error" />
-            <span className="text-cyber-muted">{errorCount} error</span>
+            <span className="text-cyber-muted">{errorCount} 错误</span>
           </div>
         </div>
       </div>
@@ -110,24 +110,24 @@ export function Containers() {
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-cyber-muted" />
             <input
               type="text"
-              placeholder="Search containers..."
+              placeholder="搜索 Container..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none"
             />
           </div>
-          
+
           <div className="flex gap-2">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white focus:border-cyber-cyan focus:outline-none"
             >
-              <option value="all">All Status</option>
-              <option value="running">Running</option>
-              <option value="stopped">Stopped</option>
-              <option value="error">Error</option>
-              <option value="pending">Pending</option>
+              <option value="all">所有状态</option>
+              <option value="running">运行中</option>
+              <option value="stopped">已停止</option>
+              <option value="error">错误</option>
+              <option value="pending">等待中</option>
             </select>
 
             <select
@@ -135,7 +135,7 @@ export function Containers() {
               onChange={(e) => setOrgFilter(e.target.value)}
               className="px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white focus:border-cyber-cyan focus:outline-none"
             >
-              <option value="all">All Organizations</option>
+              <option value="all">所有组织</option>
               {organizations?.map(org => (
                 <option key={org.id} value={org.slug}>{org.name}</option>
               ))}
@@ -150,13 +150,13 @@ export function Containers() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-cyber-cyan/20">
-                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Organization</th>
+                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">组织</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Role</th>
-                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Version</th>
-                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Status</th>
-                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Port</th>
+                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">版本</th>
+                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">状态</th>
+                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">端口</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Container ID</th>
-                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Actions</th>
+                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -171,13 +171,13 @@ export function Containers() {
               ) : error ? (
                 <tr>
                   <td colSpan={7} className="py-8 px-6 text-center text-cyber-error">
-                    Error loading containers: {error}
+                    加载 Container 失败：{error}
                   </td>
                 </tr>
               ) : filteredContainers?.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 px-6 text-center text-cyber-muted">
-                    No containers found
+                    未找到 Container
                   </td>
                 </tr>
               ) : (
@@ -212,11 +212,11 @@ export function Containers() {
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-2">
                         {container.status === 'running' ? (
-                          <CyberButton variant="ghost" size="sm" className="!p-1" aria-label="Stop">
+                          <CyberButton variant="ghost" size="sm" className="!p-1" aria-label="停止">
                             <StopIcon className="w-4 h-4 text-cyber-warning" />
                           </CyberButton>
                         ) : (
-                          <CyberButton variant="ghost" size="sm" className="!p-1" aria-label="Start">
+                          <CyberButton variant="ghost" size="sm" className="!p-1" aria-label="启动">
                             <PlayIcon className="w-4 h-4 text-cyber-success" />
                           </CyberButton>
                         )}
@@ -225,7 +225,7 @@ export function Containers() {
                           size="sm"
                           className="!p-1"
                           onClick={() => setContainerToRemove(container)}
-                          aria-label="Remove"
+                          aria-label="移除"
                         >
                           <TrashIcon className="w-4 h-4 text-cyber-error" />
                         </CyberButton>
@@ -243,17 +243,17 @@ export function Containers() {
       {containerToRemove && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="w-full max-w-md bg-cyber-dark-card border border-cyber-cyan/30 rounded-xl shadow-2xl p-6">
-            <h3 className="text-xl font-display font-bold text-cyber-white mb-4">Remove Container</h3>
+            <h3 className="text-xl font-display font-bold text-cyber-white mb-4">移除 Container</h3>
             <p className="text-cyber-muted mb-6">
-              Are you sure you want to remove the container for <strong className="text-cyber-white">{containerToRemove.roleName}</strong>?
-              This action cannot be undone.
+              确定要移除 <strong className="text-cyber-white">{containerToRemove.roleName}</strong> 的 Container 吗？
+              此操作不可撤销。
             </p>
             <div className="flex justify-end gap-3">
               <CyberButton variant="ghost" onClick={() => setContainerToRemove(null)}>
-                Cancel
+                取消
               </CyberButton>
               <CyberButton variant="danger" onClick={handleRemoveContainer}>
-                Remove
+                移除
               </CyberButton>
             </div>
           </div>
