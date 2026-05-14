@@ -55,9 +55,9 @@ export function OrganizationDetail() {
   const [isHireModalOpen, setIsHireModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [containerToRemove, setContainerToRemove] = useState<number | null>(null);
+  const [containerToRemove, setContainerToRemove] = useState<string | null>(null);
   const [hireForm, setHireForm] = useState<CreateContainerRequest>({
-    roleId: 0,
+    roleSlug: '',
     roleVersion: '',
   });
 
@@ -71,7 +71,7 @@ export function OrganizationDetail() {
 
   const handleHireContainer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hireForm.roleId || !hireForm.roleVersion) return;
+    if (!hireForm.roleSlug || !hireForm.roleVersion) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
@@ -82,7 +82,7 @@ export function OrganizationDetail() {
         body: JSON.stringify(hireForm),
       });
       setIsHireModalOpen(false);
-      setHireForm({ roleId: 0, roleVersion: '' });
+      setHireForm({ roleSlug: '', roleVersion: '' });
       refetchContainers();
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to hire container');
@@ -105,7 +105,7 @@ export function OrganizationDetail() {
     }
   };
 
-  const selectedRole = roles?.find(r => r.id === hireForm.roleId);
+  const selectedRole = roles?.find(r => r.slug === hireForm.roleSlug);
 
   if (orgLoading) {
     return (
@@ -122,9 +122,9 @@ export function OrganizationDetail() {
       <div className="page-transition">
         <CyberCard>
           <div className="p-8 text-center">
-            <p className="text-cyber-error mb-4">Organization not found</p>
+            <p className="text-cyber-error mb-4">未找到组织</p>
             <CyberButton onClick={() => navigate('/organizations')}>
-              Back to Organizations
+              返回组织管理
             </CyberButton>
           </div>
         </CyberCard>
@@ -141,7 +141,7 @@ export function OrganizationDetail() {
         </CyberButton>
         <div>
           <h1 className="text-3xl font-display font-bold text-cyber-white">{organization.name}</h1>
-          <p className="text-cyber-muted text-sm">Organization Details</p>
+          <p className="text-cyber-muted text-sm">组织详情</p>
         </div>
       </div>
 
@@ -166,7 +166,7 @@ export function OrganizationDetail() {
           </div>
           {organization.description && (
             <div className="mt-6 pt-6 border-t border-cyber-cyan/10">
-              <label className="text-xs font-mono text-cyber-muted uppercase">Description</label>
+              <label className="text-xs font-mono text-cyber-muted uppercase">描述</label>
               <p className="mt-1 text-cyber-white">{organization.description}</p>
             </div>
           )}
@@ -182,7 +182,7 @@ export function OrganizationDetail() {
             icon={<PlusIcon className="w-5 h-5" />}
             size="sm"
           >
-            Hire Container
+            雇佣 Container
           </CyberButton>
         </div>
 
@@ -192,11 +192,11 @@ export function OrganizationDetail() {
               <thead>
                 <tr className="border-b border-cyber-cyan/20">
                   <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Role</th>
-                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Version</th>
-                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Status</th>
-                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Port</th>
+                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">版本</th>
+                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">状态</th>
+                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">端口</th>
                   <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Container ID</th>
-                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Actions</th>
+                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -211,13 +211,13 @@ export function OrganizationDetail() {
                 ) : containersError ? (
                   <tr>
                     <td colSpan={6} className="py-8 px-6 text-center text-cyber-error">
-                      Error loading containers
+                      加载 Container 失败
                     </td>
                   </tr>
                 ) : containers?.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-8 px-6 text-center text-cyber-muted">
-                      No containers hired yet
+                      尚未雇佣 Container
                     </td>
                   </tr>
                 ) : (
@@ -227,7 +227,7 @@ export function OrganizationDetail() {
                       className="border-b border-cyber-cyan/10 hover:bg-cyber-cyan/5 transition-colors"
                     >
                       <td className="py-4 px-6">
-                        <span className="font-medium text-cyber-white">{container.roleName}</span>
+                        <span className="font-medium text-cyber-white">{container.roleSlug}</span>
                       </td>
                       <td className="py-4 px-6">
                         <code className="font-mono text-sm text-cyber-purple">{container.roleVersion}</code>
@@ -240,7 +240,7 @@ export function OrganizationDetail() {
                       </td>
                       <td className="py-4 px-6">
                         <code className="font-mono text-xs text-cyber-muted">
-                          {container.containerId.slice(0, 12)}...
+                          {container.id.slice(0, 16)}
                         </code>
                       </td>
                       <td className="py-4 px-6">
@@ -258,7 +258,7 @@ export function OrganizationDetail() {
                             variant="ghost"
                             size="sm"
                             className="!p-1"
-                            onClick={() => setContainerToRemove(container.id)}
+                            onClick={() => setContainerToRemove(String(container.id))}
                           >
                             <TrashIcon className="w-4 h-4 text-cyber-error" />
                           </CyberButton>
@@ -277,18 +277,18 @@ export function OrganizationDetail() {
       <CyberModal
         isOpen={isHireModalOpen}
         onClose={() => setIsHireModalOpen(false)}
-        title="Hire New Container"
+        title="雇佣新 Container"
         footer={
           <>
             <CyberButton variant="ghost" onClick={() => setIsHireModalOpen(false)}>
-              Cancel
+              取消
             </CyberButton>
             <CyberButton
               type="submit"
               form="hire-form"
-              disabled={isSubmitting || !hireForm.roleId || !hireForm.roleVersion}
+              disabled={isSubmitting || !hireForm.roleSlug || !hireForm.roleVersion}
             >
-              {isSubmitting ? 'Hiring...' : 'Hire Container'}
+              {isSubmitting ? '雇佣中...' : '雇佣 Container'}
             </CyberButton>
           </>
         }
@@ -300,37 +300,37 @@ export function OrganizationDetail() {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-cyber-muted mb-1">Select Role</label>
+            <label className="block text-sm font-medium text-cyber-muted mb-1">选择 Role</label>
             <select
-              value={hireForm.roleId}
+              value={hireForm.roleSlug || ''}
               onChange={(e) => {
-                const roleId = parseInt(e.target.value);
-                const role = roles?.find(r => r.id === roleId);
+                const roleSlug = e.target.value;
+                const role = roles?.find(r => r.slug === roleSlug);
                 setHireForm(prev => ({
                   ...prev,
-                  roleId,
+                  roleSlug,
                   roleVersion: role?.versions[0]?.version || '',
                 }));
               }}
               className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white focus:border-cyber-cyan focus:outline-none"
               required
             >
-              <option value="">Select a role...</option>
+              <option value="">选择 Role...</option>
               {roles?.map(role => (
-                <option key={role.id} value={role.id}>{role.name}</option>
+                <option key={role.id} value={role.slug}>{role.name}</option>
               ))}
             </select>
           </div>
           {selectedRole && (
             <div>
-              <label className="block text-sm font-medium text-cyber-muted mb-1">Version</label>
+              <label className="block text-sm font-medium text-cyber-muted mb-1">版本</label>
               <select
                 value={hireForm.roleVersion}
                 onChange={(e) => setHireForm(prev => ({ ...prev, roleVersion: e.target.value }))}
                 className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white focus:border-cyber-cyan focus:outline-none"
                 required
               >
-                <option value="">Select version...</option>
+                <option value="">选择版本...</option>
                 {selectedRole.versions.map(version => (
                   <option key={version.id} value={version.version}>{version.version}</option>
                 ))}
@@ -344,21 +344,21 @@ export function OrganizationDetail() {
       <CyberModal
         isOpen={!!containerToRemove}
         onClose={() => setContainerToRemove(null)}
-        title="Remove Container"
+        title="移除 Container"
         size="sm"
         footer={
           <>
             <CyberButton variant="ghost" onClick={() => setContainerToRemove(null)}>
-              Cancel
+              取消
             </CyberButton>
             <CyberButton variant="danger" onClick={handleRemoveContainer}>
-              Remove
+              移除
             </CyberButton>
           </>
         }
       >
         <p className="text-cyber-muted">
-          Are you sure you want to remove this container? This action cannot be undone.
+          确定要移除此 Container 吗？此操作不可撤销。
         </p>
       </CyberModal>
     </div>

@@ -49,14 +49,13 @@ export function Containers() {
 
   const filteredContainers = containers?.filter(container => {
     const matchesSearch =
-      container.roleName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      container.organizationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      container.containerId.toLowerCase().includes(searchQuery.toLowerCase());
+      container.roleSlug.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      container.id.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = statusFilter === 'all' || container.status === statusFilter;
-    const matchesOrg = orgFilter === 'all' || container.organizationSlug === orgFilter;
+    // Note: orgFilter not available with current backend response
 
-    return matchesSearch && matchesStatus && matchesOrg;
+    return matchesSearch && matchesStatus;
   });
 
   const handleRemoveContainer = async () => {
@@ -187,13 +186,12 @@ export function Containers() {
                     className="border-b border-cyber-cyan/10 hover:bg-cyber-cyan/5 transition-colors"
                   >
                     <td className="py-4 px-6">
-                      <div>
-                        <span className="font-medium text-cyber-white">{container.organizationName}</span>
-                        <code className="block text-xs text-cyber-muted font-mono">{container.organizationSlug}</code>
-                      </div>
+                      <code className="font-mono text-xs text-cyber-muted">
+                        {container.organizationId.slice(0, 20)}...
+                      </code>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="font-medium text-cyber-white">{container.roleName}</span>
+                      <span className="font-medium text-cyber-white">{container.roleSlug}</span>
                     </td>
                     <td className="py-4 px-6">
                       <code className="font-mono text-sm text-cyber-purple">{container.roleVersion}</code>
@@ -206,7 +204,7 @@ export function Containers() {
                     </td>
                     <td className="py-4 px-6">
                       <code className="font-mono text-xs text-cyber-muted bg-cyber-dark px-2 py-1 rounded">
-                        {container.containerId.slice(0, 12)}...
+                        {container.id.slice(0, 16)}
                       </code>
                     </td>
                     <td className="py-4 px-6">

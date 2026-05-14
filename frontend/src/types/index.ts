@@ -1,5 +1,5 @@
 export interface Organization {
-  id: number;
+  id: string;
   name: string;
   slug: string;
   description: string;
@@ -9,7 +9,7 @@ export interface Organization {
 }
 
 export interface Role {
-  id: number;
+  id: string;
   name: string;
   slug: string;
   description: string;
@@ -19,8 +19,8 @@ export interface Role {
 }
 
 export interface RoleVersion {
-  id: number;
-  roleId: number;
+  id: string;
+  roleId: string;
   version: string;
   imageName: string;
   config: Record<string, unknown>;
@@ -28,20 +28,14 @@ export interface RoleVersion {
 }
 
 export interface Container {
-  id: number;
-  organizationId: number;
-  organizationName: string;
-  organizationSlug: string;
-  roleId: number;
-  roleName: string;
+  id: string;
   roleSlug: string;
-  roleVersionId: number;
   roleVersion: string;
-  containerId: string;
-  port: number;
   status: 'running' | 'stopped' | 'error' | 'pending';
+  port: number;
+  url: string;
+  healthStatus: string;
   createdAt: string;
-  updatedAt: string;
 }
 
 export interface CreateOrganizationRequest {
@@ -57,7 +51,7 @@ export interface CreateRoleRequest {
 }
 
 export interface CreateContainerRequest {
-  roleId: number;
+  roleSlug: string;
   roleVersion: string;
 }
 

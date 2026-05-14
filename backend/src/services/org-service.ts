@@ -2,6 +2,7 @@ import logger from '../lib/logger.js';
 import { organizations, containers } from '../db/index.js';
 import { eq, count } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
+import { getContainersByOrganization } from './container-manager.js';
 
 // Zod schemas for validation
 import { z } from 'zod';
@@ -180,7 +181,7 @@ export async function getOrganizationBySlug(slug: string): Promise<{
   slug: string;
   description?: string;
   createdAt: number;
-  updatedAt: number;
+  containerCount?: number;
 } | null> {
   const database = await getDb();
   const records = await database
@@ -191,13 +192,17 @@ export async function getOrganizationBySlug(slug: string): Promise<{
   if (records.length === 0) {
     return null;
   }
-
   const org = records[0];
+  
+  // Count containers for this organization
+  const orgContainers = getContainersByOrganization(org.id);
+  
   return {
     id: org.id,
     name: org.name,
     slug: org.slug,
     description: org.description || undefined,
+    containerCount: orgContainers.length,
     createdAt: org.createdAt,
     updatedAt: org.updatedAt,
   };

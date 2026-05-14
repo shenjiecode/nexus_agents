@@ -41,7 +41,7 @@ export function Roles() {
   const { data: roles, loading, error, refetch } = useApi<Role[]>('/api/roles');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedRole, setExpandedRole] = useState<number | null>(null);
+  const [expandedRole, setExpandedRole] = useState<string | null>(null);
   const [formData, setFormData] = useState<CreateRoleRequest>({
     name: '',
     slug: '',
