@@ -42,6 +42,7 @@ export const containers = sqliteTable('containers', {
   roleVersion: text('role_version').notNull().default('latest'), // 使用的角色版本
   containerId: text('container_id').notNull(), // Docker/Podman 容器ID
   port: integer('port').notNull(),
+  password: text('password'), // OpenCode server password
   status: text('status').notNull(),
   healthStatus: text('health_status').notNull(),
   memoryPath: text('memory_path'), // 记忆目录路径

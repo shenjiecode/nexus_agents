@@ -256,6 +256,7 @@ export async function createContainer(
         roleVersion: roleVersion,
         containerId: container.id,
         port: containerPort,
+        password: password,
         status: 'running',
         healthStatus: 'unknown',
         memoryPath: memoryPath,
@@ -551,7 +552,7 @@ export async function restoreContainers(): Promise<number> {
           status: info.State.Running ? 'running' : 'stopped',
           port: record.port,
           url: `http://localhost:${record.port}`,
-          password: '', // Password not stored, need to regenerate or store securely
+          password: record.password || '',
           memoryPath: record.memoryPath || '',
           healthStatus: 'unknown',
           createdAt: new Date(record.createdAt),

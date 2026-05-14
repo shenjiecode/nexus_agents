@@ -98,11 +98,13 @@ async function request<T>(
   })
 
   if (!response.ok) {
+    // Read body as text first, then try to parse as JSON
+    const responseText = await response.text()
     let responseBody: unknown
     try {
-      responseBody = await response.json()
+      responseBody = JSON.parse(responseText)
     } catch {
-      responseBody = await response.text()
+      responseBody = responseText
     }
     throw new OpencodeError(
       `OpenCode API error: ${response.statusText}`,

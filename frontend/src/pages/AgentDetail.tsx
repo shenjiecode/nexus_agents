@@ -68,6 +68,18 @@ export function AgentDetail() {
   const { data: roleMcps } =
     useApi<{id: string; name: string; description?: string}[]>(container ? `/api/roles/${container.roleSlug}/mcps` : '');
 
+  // Trigger health check when container loads
+  useEffect(() => {
+    if (container && id) {
+      apiRequest<{ healthStatus: string }>(`/api/containers/${id}/health-check`, { method: 'POST' })
+        .then(result => {
+          if (result.data?.healthStatus) {
+            // Health status updated on backend, container will refetch
+          }
+        })
+        .catch(err => console.error('Health check failed:', err));
+    }
+  }, [container, id]);
 
 
   // Fetch messages when active session changes

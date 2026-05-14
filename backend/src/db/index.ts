@@ -98,6 +98,7 @@ async function initSchema(database: any): Promise<void> {
       role_version TEXT NOT NULL DEFAULT 'latest',
       container_id TEXT NOT NULL,
       port INTEGER NOT NULL,
+      password TEXT,
       status TEXT NOT NULL,
       health_status TEXT NOT NULL,
       memory_path TEXT,
