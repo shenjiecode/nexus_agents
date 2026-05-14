@@ -1,6 +1,6 @@
 import logger from '../lib/logger.js';
-import { organizations } from '../db/index.js';
-import { eq } from 'drizzle-orm';
+import { organizations, containers } from '../db/index.js';
+import { eq, count } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
 
 // Zod schemas for validation
@@ -111,18 +111,32 @@ export async function getAllOrganizations(): Promise<Array<{
   description?: string;
   createdAt: number;
   updatedAt: number;
+  containerCount: number;
 }>> {
   const database = await getDb();
   const orgRecords = await database.select().from(organizations);
 
-  return orgRecords.map((org: any) => ({
-    id: org.id,
-    name: org.name,
-    slug: org.slug,
-    description: org.description || undefined,
-    createdAt: org.createdAt,
-    updatedAt: org.updatedAt,
-  }));
+  // Get container count for each organization
+  const orgsWithCount = await Promise.all(
+    orgRecords.map(async (org: any) => {
+      const containerResult = await database
+        .select({ count: count() })
+        .from(containers)
+        .where(eq(containers.organizationId, org.id));
+      const containerCount = containerResult[0]?.count || 0;
+      return {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        description: org.description || undefined,
+        createdAt: org.createdAt,
+        updatedAt: org.updatedAt,
+        containerCount,
+      };
+    })
+  );
+
+  return orgsWithCount;
 }
 
 /**
