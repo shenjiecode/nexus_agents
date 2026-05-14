@@ -50,3 +50,6 @@ frontend/dist/
 
 # Data directory
 data/
+
+# Role build artifacts
+backend/roles/
