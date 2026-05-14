@@ -190,22 +190,47 @@ export async function getAllRoles(): Promise<Array<{
   description?: string;
   version: string;
   imageName: string;
+  versions: Array<{
+    id: string;
+    version: string;
+    imageName: string;
+    createdAt: number;
+  }>;
   createdAt: number;
   updatedAt: number;
 }>> {
   const database = await getDb();
   const roleRecords = await database.select().from(roles);
 
-  return roleRecords.map((role: any) => ({
-    id: role.id,
-    slug: role.slug,
-    name: role.name,
-    description: role.description || undefined,
-    version: role.version,
-    imageName: role.imageName,
-    createdAt: role.createdAt,
-    updatedAt: role.updatedAt,
-  }));
+  // Fetch versions for each role
+  const rolesWithVersions = await Promise.all(
+    roleRecords.map(async (role: any) => {
+      const versionRecords = await database
+        .select()
+        .from(roleVersions)
+        .where(eq(roleVersions.roleId, role.id))
+        .orderBy(roleVersions.createdAt);
+
+      return {
+        id: role.id,
+        slug: role.slug,
+        name: role.name,
+        description: role.description || undefined,
+        version: role.version,
+        imageName: role.imageName,
+        versions: versionRecords.map((rv: any) => ({
+          id: rv.id,
+          version: rv.version,
+          imageName: rv.imageName,
+          createdAt: rv.createdAt,
+        })),
+        createdAt: role.createdAt,
+        updatedAt: role.updatedAt,
+      };
+    })
+  );
+
+  return rolesWithVersions;
 }
 
 /**
