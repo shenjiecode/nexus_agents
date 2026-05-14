@@ -67,11 +67,11 @@ organizations.get('/api/organizations', async (c) => {
   }
 });
 
-// GET /api/organizations/:id - Get organization by ID
-organizations.get('/api/organizations/:id', async (c) => {
+// GET /api/organizations/:slug - Get organization by slug (primary route)
+organizations.get('/api/organizations/:slug', async (c) => {
   try {
-    const orgId = c.req.param('id');
-    const result = await getOrganizationById(orgId);
+    const slug = c.req.param('slug');
+    const result = await getOrganizationBySlug(slug);
 
     if (!result) {
       return c.json(apiError('Organization not found', 404), 404);
@@ -79,7 +79,7 @@ organizations.get('/api/organizations/:id', async (c) => {
 
     return c.json(apiSuccess(result));
   } catch (error: any) {
-    logger.error(error, "API error");
+    logger.error(error, 'API error');
     return c.json(apiError(error.message || 'Failed to get organization', 500), 500);
   }
 });
