@@ -1,8 +1,9 @@
 import logger from '../lib/logger.js';
 import Docker from 'dockerode';
 import { randomBytes } from 'crypto';
-import { existsSync } from 'fs';
-import { containers as containersTable, initDatabase } from '../db/index.js';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
+import { containers as containersTable, initDatabase, sessions as sessionsTable } from '../db/index.js';
 import { eq } from 'drizzle-orm';
 import { initContainerMemory } from './config-manager.js';
 import { getOrgAuthPath } from './org-service.js';
@@ -545,6 +546,128 @@ export async function restoreContainers(): Promise<number> {
 
   return restored;
 }
+/**
+ * Rebuild all containers for an organization (used when auth config changes)
+ */
+export async function rebuildContainersForOrg(orgSlug: string): Promise<{ rebuilt: number; errors: string[] }> {
+  const db = await initDatabase();
+  const errors: string[] = [];
+  let rebuilt = 0;
+  
+  // Get organization ID from slug
+  const { getOrganizationBySlug } = await import('./org-service.js');
+  const org = await getOrganizationBySlug(orgSlug);
+  if (!org) {
+    throw new Error(`Organization '${orgSlug}' not found`);
+  }
+  
+  // Get all containers for this org
+  const orgContainers = Array.from(containers.values()).filter(
+    (c) => c.organizationId === org.id
+  );
+  
+  if (orgContainers.length === 0) {
+    return { rebuilt: 0, errors: [] };
+  }
+  
+  logger.info({ orgSlug, count: orgContainers.length }, 'Rebuilding containers for organization');
+  
+  for (const instance of orgContainers) {
+    try {
+      // Store container config before removal
+      const containerConfig = {
+        roleSlug: instance.roleSlug,
+        roleVersion: instance.roleVersion,
+        roleId: instance.roleId,
+      };
+      
+      // Stop and remove the container
+      const container = docker.getContainer(instance.containerId);
+      try {
+        await container.stop({ t: 5 });
+      } catch (e) {
+        // Container might already be stopped
+      }
+      await container.remove({ force: true });
+      
+      // Remove from memory
+      containers.delete(instance.id);
+      
+      // Delete from database
+      await db.delete(containersTable).where(eq(containersTable.id, instance.id));
+      
+      // Create new container with same config (will pick up new auth.json)
+      await createContainer(
+        org.id,
+        orgSlug,
+        instance.roleId,
+        instance.roleSlug,
+        instance.roleVersion
+      );
+      
+      rebuilt++;
+      logger.info({ containerId: instance.id, roleSlug: containerConfig.roleSlug }, 'Container rebuilt');
+    } catch (error: any) {
+      errors.push(`Failed to rebuild ${instance.roleSlug}: ${error.message}`);
+      logger.error(error, `Failed to rebuild container ${instance.id}`);
+    }
+  }
+  
+  logger.info({ orgSlug, rebuilt, errors: errors.length }, 'Finished rebuilding containers');
+  return { rebuilt, errors };
+}
 
 // Export types
 export type { ContainerInstance };
+
+/**
+ * Get sessions for a container from database
+ */
+export async function getContainerSessions(containerId: string) {
+  const db = await initDatabase();
+  const result = await db.select().from(containersTable).where(eq(containersTable.id, containerId));
+  if (result.length === 0) {
+    throw new Error('Container not found');
+  }
+  const sessionRecords = await db.select().from(sessionsTable).where(eq(sessionsTable.containerId, containerId));
+  return sessionRecords;
+}
+
+/**
+ * Get container config (opencode.json)
+ */
+export function getContainerConfig(containerId: string): Record<string, unknown> | null {
+  const instance = containers.get(containerId);
+  if (!instance) return null;
+  
+  try {
+    const configPath = join(process.cwd(), 'roles', instance.roleSlug, 'opencode.json');
+    if (!existsSync(configPath)) return null;
+    const content = readFileSync(configPath, 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Update container model (write to opencode.json)
+ */
+export function updateContainerModel(containerId: string, model: string): void {
+  const instance = containers.get(containerId);
+  if (!instance) {
+    throw new Error(`Container ${containerId} not found`);
+  }
+  
+  const configPath = join(process.cwd(), 'roles', instance.roleSlug, 'opencode.json');
+  
+  let config: Record<string, unknown> = {};
+  if (existsSync(configPath)) {
+    const content = readFileSync(configPath, 'utf-8');
+    config = JSON.parse(content);
+  }
+  
+  config.model = model;
+  writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+  logger.info({ containerId, model, roleSlug: instance.roleSlug }, 'Container model updated');
+}

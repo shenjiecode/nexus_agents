@@ -1,20 +1,21 @@
 import { Hono } from 'hono';
 import logger from '../../lib/logger.js';
 import {
-  createOrganization,
-  getAllOrganizations,
-  getOrganizationById,
-  getOrganizationBySlug,
-  updateOrganization,
-  deleteOrganization,
-  slugify,
-  getOrganizationAuth,
-  setOrganizationAuth,
-  deleteOrganizationAuth,
-  regenerateApiKey,
-  revokeApiKey,
-  type AuthConfig,
+createOrganization,
+getAllOrganizations,
+getOrganizationById,
+getOrganizationBySlug,
+updateOrganization,
+deleteOrganization,
+slugify,
+getOrganizationAuth,
+setOrganizationAuth,
+deleteOrganizationAuth,
+regenerateApiKey,
+revokeApiKey,
+type AuthConfig,
 } from '../../services/org-service.js';
+import { rebuildContainersForOrg } from '../../services/container-manager.js';
 // Standard API response helper
 function apiSuccess<T>(data: T) {
   return { success: true, data };
@@ -207,9 +208,14 @@ organizations.put('/api/orgs/:slug/auth', async (c) => {
     
     setOrganizationAuth(slug, body as AuthConfig);
     
+    // Rebuild containers with new auth config
+    const rebuildResult = await rebuildContainersForOrg(slug);
+    
     return c.json(apiSuccess({
       success: true,
       providers: Object.keys(body),
+      containersRebuilt: rebuildResult.rebuilt,
+      rebuildErrors: rebuildResult.errors.length > 0 ? rebuildResult.errors : undefined,
     }));
   } catch (error: any) {
     logger.error(error, "API error");
@@ -238,7 +244,7 @@ organizations.delete('/api/orgs/:slug/auth', async (c) => {
 });
 // ============ API Key Management ============
 
-// GET /api/orgs/:slug/apikey - Get organization's API key status
+// GET /api/orgs/:slug/apikey - Get organization's API key
 organizations.get('/api/orgs/:slug/apikey', async (c) => {
   try {
     const slug = c.req.param('slug');
@@ -254,7 +260,7 @@ organizations.get('/api/orgs/:slug/apikey', async (c) => {
     
     return c.json(apiSuccess({
       hasApiKey: orgById?.apiKey ? true : false,
-      // Never return the actual key for security - only regenerate can give new key
+      apiKey: orgById?.apiKey || null,
     }));
   } catch (error: any) {
     logger.error(error, "API error");

@@ -103,7 +103,7 @@ export function Organizations() {
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">名称</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Slug</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">状态</th>
-                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Container</th>
+                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">智能体</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">创建时间</th>
               </tr>
             </thead>
@@ -151,7 +151,7 @@ export function Organizations() {
                       {org.containerCount && org.containerCount > 0 ? (
                         <StatusDot status="active" showLabel />
                       ) : (
-                        <span className="text-cyber-muted text-sm">无活跃容器</span>
+                        <span className="text-cyber-muted text-sm">无活跃智能体</span>
                       )}
                     </td>
                     <td className="py-4 px-6">

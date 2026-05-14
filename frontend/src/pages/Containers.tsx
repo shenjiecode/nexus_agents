@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CyberCard } from '../components/CyberCard';
 import { CyberButton } from '../components/CyberButton';
 import { StatusDot } from '../components/StatusDot';
@@ -40,6 +41,7 @@ function SearchIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 export function Containers() {
+  const navigate = useNavigate();
   const { data: containers, loading, error, refetch } = useApi<Container[]>('/api/containers');
   const { data: organizations } = useApi<Organization[]>('/api/organizations');
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,7 +70,7 @@ export function Containers() {
       setContainerToRemove(null);
       refetch();
     } catch (err) {
-      console.error('删除 Container 失败:', err);
+      console.error('删除智能体失败:', err);
     }
   };
 
@@ -81,8 +83,8 @@ export function Containers() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="Containers">
-            Containers
+          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="智能体">
+            智能体
           </h1>
           <p className="text-cyber-muted mt-1">管理运行中的 AI 代理实例</p>
         </div>
@@ -109,7 +111,7 @@ export function Containers() {
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-cyber-muted" />
             <input
               type="text"
-              placeholder="搜索 Container..."
+              placeholder="搜索智能体..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none"
@@ -150,11 +152,10 @@ export function Containers() {
             <thead>
               <tr className="border-b border-cyber-cyan/20">
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Role</th>
-                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Role</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">版本</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">状态</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">端口</th>
-                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Container ID</th>
+                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">智能体 ID</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">操作</th>
               </tr>
             </thead>
@@ -170,26 +171,24 @@ export function Containers() {
               ) : error ? (
                 <tr>
                   <td colSpan={7} className="py-8 px-6 text-center text-cyber-error">
-                    加载 Container 失败：{error}
+                    加载智能体失败：{error}
                   </td>
                 </tr>
               ) : filteredContainers?.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 px-6 text-center text-cyber-muted">
-                    未找到 Container
+                    未找到智能体
                   </td>
                 </tr>
               ) : (
                 filteredContainers?.map((container) => (
                   <tr
                     key={container.id}
-                    className="border-b border-cyber-cyan/10 hover:bg-cyber-cyan/5 transition-colors"
+                    className="border-b border-cyber-cyan/10 hover:bg-cyber-cyan/5 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/containers/${container.id}`)}
                   >
                     <td className="py-4 px-6">
-                      <span className="font-medium text-cyber-white">{container.roleSlug}</span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className="font-medium text-cyber-white">{container.roleSlug}</span>
+                      <span className="font-medium text-cyber-cyan hover:text-cyber-white">{container.roleSlug}</span>
                     </td>
                     <td className="py-4 px-6">
                       <code className="font-mono text-sm text-cyber-purple">{container.roleVersion}</code>
@@ -206,7 +205,7 @@ export function Containers() {
                       </code>
                     </td>
                     <td className="py-4 px-6">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         {container.status === 'running' ? (
                           <CyberButton variant="ghost" size="sm" className="!p-1" aria-label="停止">
                             <StopIcon className="w-4 h-4 text-cyber-warning" />
@@ -239,9 +238,9 @@ export function Containers() {
       {containerToRemove && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="w-full max-w-md bg-cyber-dark-card border border-cyber-cyan/30 rounded-xl shadow-2xl p-6">
-            <h3 className="text-xl font-display font-bold text-cyber-white mb-4">移除 Container</h3>
+            <h3 className="text-xl font-display font-bold text-cyber-white mb-4">移除智能体</h3>
             <p className="text-cyber-muted mb-6">
-              确定要移除 <strong className="text-cyber-white">{containerToRemove.roleSlug}</strong> 的 Container 吗？
+              确定要移除 <strong className="text-cyber-white">{containerToRemove.roleSlug}</strong> 的智能体吗？
               此操作不可撤销。
             </p>
             <div className="flex justify-end gap-3">

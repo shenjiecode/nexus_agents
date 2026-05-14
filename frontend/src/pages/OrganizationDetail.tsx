@@ -76,9 +76,15 @@ export function OrganizationDetail() {
     roleSlug: '',
     roleVersion: '',
   });
-  const [apiKey, setApiKey] = useState<string | null>(null);
-  const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
+const [apiKey, setApiKey] = useState<string | null>(null);
+const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [isFetchingKey, setIsFetchingKey] = useState(false);
+  const [authEditText, setAuthEditText] = useState('');
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [isAuthSaving, setIsAuthSaving] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const { data: organization, loading: orgLoading, error: orgError } = 
     useApi<Organization>(`/api/organizations/${slug}`);
@@ -138,9 +144,61 @@ export function OrganizationDetail() {
     } finally {
       setIsRegeneratingKey(false);
     }
+  }
+
+  const handleFetchApiKey = async () => {
+    if (!slug) return;
+    setIsFetchingKey(true);
+    try {
+      const result = await apiRequest<{ hasApiKey: boolean; apiKey: string | null }>(`/api/orgs/${slug}/apikey`);
+      if (result.data.apiKey) {
+        setApiKey(result.data.apiKey);
+      }
+    } catch (err) {
+      console.error('Failed to fetch API key:', err);
+    } finally {
+      setIsFetchingKey(false);
+    }
+  };
+
+  const handleFetchAuth = async () => {
+    if (!slug) return;
+    setIsAuthLoading(true);
+    setAuthError(null);
+    try {
+      const result = await apiRequest<{ auth: Record<string, { type: string; key: string }> }>(`/api/orgs/${slug}/auth`);
+      if (result.data.auth) {
+        setAuthEditText(JSON.stringify(result.data.auth, null, 2));
+      } else {
+        setAuthEditText(JSON.stringify({ anthropic: { type: 'api', key: '' } }, null, 2));
+      }
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : '加载认证配置失败');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleSaveAuth = async () => {
+    if (!slug) return;
+    setIsAuthSaving(true);
+    setAuthError(null);
+    try {
+      JSON.parse(authEditText);
+      await apiRequest(`/api/orgs/${slug}/auth`, {
+        method: 'PUT',
+        body: authEditText,
+      });
+      setAuthError(null);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : '保存认证配置失败');
+    } finally {
+      setIsAuthSaving(false);
+    }
   };
 
   const selectedRole = roles?.find(r => r.slug === hireForm.roleSlug);
+
 
   if (orgLoading) {
     return (
@@ -219,20 +277,93 @@ export function OrganizationDetail() {
                 <p className="text-sm text-cyber-muted">用于 API 请求认证</p>
               </div>
             </div>
-            <CyberButton
-              variant="secondary"
-              size="sm"
-              icon={<RefreshIcon className="w-4 h-4" />}
-              onClick={handleRegenerateApiKey}
-              disabled={isRegeneratingKey}
-            >
-              {isRegeneratingKey ? '重新生成中...' : '重新生成'}
+            <div className="flex items-center gap-2">
+              <CyberButton
+                variant="secondary"
+                size="sm"
+                onClick={handleFetchApiKey}
+                disabled={isFetchingKey}
+              >
+                {isFetchingKey ? '加载中...' : '查看 Key'}
+              </CyberButton>
+              <CyberButton
+                variant="secondary"
+                size="sm"
+                icon={<RefreshIcon className="w-4 h-4" />}
+                onClick={handleRegenerateApiKey}
+                disabled={isRegeneratingKey}
+              >
+                {isRegeneratingKey ? '重新生成中...' : '重新生成'}
+              </CyberButton>
+            </div>
+          </div>
+          {apiKey ? (
+            <div className="mt-4 p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/10">
+              <div className="flex items-center justify-between gap-2">
+                <code className="text-sm font-mono text-cyber-cyan break-all select-all flex-1">
+                  {showApiKey ? apiKey : `${apiKey.slice(0, 12)}${'*'.repeat(20)}`}
+                </code>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <CyberButton variant="ghost" size="sm" className="!p-1 !text-xs" onClick={() => setShowApiKey(!showApiKey)}>
+                    {showApiKey ? '隐藏' : '显示'}
+                  </CyberButton>
+                  <CyberButton variant="ghost" size="sm" className="!p-1 !text-xs" onClick={() => navigator.clipboard.writeText(apiKey)}>
+                    复制
+                  </CyberButton>
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-cyber-muted">
+                使用方式: <code className="text-cyber-cyan">X-Api-Key: {apiKey.slice(0, 8)}...</code> 或 <code className="text-cyber-cyan">Authorization: Bearer {apiKey.slice(0, 8)}...</code>
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/10">
+              <p className="text-sm text-cyber-muted">
+                API Key 用于认证组织级别的 API 请求。点击「查看 Key」获取当前 Key，或「重新生成」创建新 Key。
+              </p>
+            </div>
+          )}
+        </div>
+      </CyberCard>
+
+      {/* Auth Configuration Section */}
+      <CyberCard>
+        <div className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <svg className="w-5 h-5 text-cyber-purple" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <div>
+                <h3 className="font-display font-semibold text-cyber-white">认证配置 (auth.json)</h3>
+                <p className="text-sm text-cyber-muted">智能体使用的 API Keys</p>
+              </div>
+            </div>
+            <CyberButton variant="secondary" size="sm" onClick={handleFetchAuth} disabled={isAuthLoading}>
+              {isAuthLoading ? '加载中...' : '加载配置'}
             </CyberButton>
           </div>
-          <div className="mt-4 p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/10">
-            <p className="text-sm text-cyber-muted">
-              API Key 用于认证组织级别的 API 请求。重新生成后旧 Key 将失效。
+          {authError && (
+            <div className="mt-4 p-3 rounded-lg bg-cyber-error/10 border border-cyber-error/30 text-cyber-error text-sm">
+              {authError}
+            </div>
+          )}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-cyber-muted mb-2">auth.json 内容 (JSON 格式)</label>
+            <textarea
+              value={authEditText}
+              onChange={(e) => setAuthEditText(e.target.value)}
+              rows={6}
+              className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white font-mono text-sm focus:border-cyber-cyan focus:outline-none resize-none"
+            />
+            <p className="mt-2 text-xs text-cyber-muted">
+              修改后点击保存，将自动重建该组织下所有智能体以应用新配置。
             </p>
+            <div className="mt-3 flex gap-2">
+              <CyberButton variant="secondary" size="sm" onClick={handleSaveAuth} disabled={isAuthSaving || !authEditText}>
+                {isAuthSaving ? '保存中...' : '保存配置'}
+              </CyberButton>
+            </div>
           </div>
         </div>
       </CyberCard>

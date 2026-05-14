@@ -6,8 +6,10 @@ import roleRoutes from './api/routes/roles.js'
 import orgContainerRoutes from './api/routes/org-containers.js'
 import containerRoutes from './api/routes/containers.js'
 import sessionRoutes from './api/routes/sessions.js'
+import marketplaceRoutes from './api/routes/marketplace.js'
 import { restoreContainers } from './services/container-manager.js'
 import { initDatabase, closeDatabase } from './db/index.js'
+import { initializeMarketplace } from './services/marketplace-service.js'
 
 const app = new Hono()
 
@@ -39,6 +41,7 @@ app.route('/', roleRoutes)          // Roles are global templates
 app.route('/', orgContainerRoutes)  // /api/orgs/:slug/containers/*
 app.route('/', sessionRoutes)       // /api/orgs/:slug/sessions/*
 app.route('/', containerRoutes)     // /api/containers/*
+app.route('/', marketplaceRoutes)   // /api/skills, /api/mcps, /api/roles/:slug/skills, /api/roles/:slug/mcps
 
 // 404 handler
 app.notFound((c) => {
@@ -56,6 +59,11 @@ async function initialize() {
     const restored = await restoreContainers()
     logger.info(`Restored ${restored} containers from database`)
 
+    // Initialize marketplace with demo data
+    await initializeMarketplace()
+    logger.info('Marketplace initialized')
+
+    // Start server
     // Start server
     const { serve } = await import('@hono/node-server')
     serve({

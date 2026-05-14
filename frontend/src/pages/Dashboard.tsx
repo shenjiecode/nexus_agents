@@ -139,8 +139,8 @@ export function Dashboard() {
 
   const activities = [
     { message: '组织 "TechCorp" 已创建', timestamp: '2 分钟前', type: 'org_created' },
-    { message: '已为 Sales Role 雇佣 Container', timestamp: '15 分钟前', type: 'container_hired' },
-    { message: 'Container 状态已变为运行中', timestamp: '1 小时前', type: 'container_status_changed' },
+    { message: '已为 Sales Role 雇佣智能体', timestamp: '15 分钟前', type: 'container_hired' },
+    { message: '智能体状态已变为运行中', timestamp: '1 小时前', type: 'container_status_changed' },
     { message: '新 Role "Customer Support" 已添加', timestamp: '2 小时前', type: 'role_created' },
   ];
 
@@ -184,7 +184,7 @@ export function Dashboard() {
             color="purple"
           />
           <StatCard
-            title="运行容器"
+            title="运行智能体"
             value={stats.runningContainers}
             subtitle={`共 ${stats.totalContainers} 个`}
             icon={ContainerIcon}
@@ -208,7 +208,7 @@ export function Dashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <QuickActionCard
               title="添加组织"
-              description="创建新组织以管理 Container"
+              description="创建新组织以管理智能体"
               to="/organizations"
               icon={PlusIcon}
             />
@@ -219,7 +219,7 @@ export function Dashboard() {
               icon={UserIcon}
             />
             <QuickActionCard
-              title="查看 Container"
+              title="查看智能体"
               description="管理运行中的 AI 代理实例"
               to="/containers"
               icon={ContainerIcon}

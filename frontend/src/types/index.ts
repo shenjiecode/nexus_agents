@@ -30,6 +30,7 @@ export interface RoleVersion {
 
 export interface Container {
   id: string;
+  organizationId?: string;
   roleSlug: string;
   roleVersion: string;
   status: 'running' | 'stopped' | 'error' | 'pending';
@@ -75,4 +76,26 @@ export interface Activity {
   message: string;
   timestamp: string;
   metadata?: Record<string, unknown>;
+}
+
+export interface Skill {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  category?: string;
+  skillPath: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface Mcp {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  category?: string;
+  serverType: string;
+  command: string[];
+  envTemplate?: Record<string, string>;
+  requiresApiKey: boolean;
 }

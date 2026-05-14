@@ -5,6 +5,8 @@ import { Organizations } from './pages/Organizations';
 import { OrganizationDetail } from './pages/OrganizationDetail';
 import { Roles } from './pages/Roles';
 import { Containers } from './pages/Containers';
+import { Marketplace } from './pages/Marketplace';
+import { AgentDetail } from './pages/AgentDetail';
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -28,6 +30,8 @@ function App() {
         <Route path="/organizations/:slug" element={<Layout><OrganizationDetail /></Layout>} />
         <Route path="/roles" element={<Layout><Roles /></Layout>} />
         <Route path="/containers" element={<Layout><Containers /></Layout>} />
+        <Route path="/containers/:id" element={<Layout><AgentDetail /></Layout>} />
+        <Route path="/marketplace" element={<Layout><Marketplace /></Layout>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

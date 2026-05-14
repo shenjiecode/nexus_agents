@@ -3,7 +3,7 @@ import { CyberCard } from '../components/CyberCard';
 import { CyberButton } from '../components/CyberButton';
 import { CyberModal } from '../components/CyberModal';
 import { useApi, apiRequest } from '../hooks/useApi';
-import type { Role, CreateRoleRequest } from '../types';
+import type { Role, CreateRoleRequest, Skill, Mcp } from '../types';
 
 function UserIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -39,13 +39,17 @@ function SearchIcon(props: React.SVGProps<SVGSVGElement>) {
 
 export function Roles() {
   const { data: roles, loading, error, refetch } = useApi<Role[]>('/api/roles');
+  const { data: skills, loading: skillsLoading } = useApi<Skill[]>('/api/skills');
+  const { data: mcps, loading: mcpsLoading } = useApi<Mcp[]>('/api/mcps');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
-  const [formData, setFormData] = useState<CreateRoleRequest>({
+  const [formData, setFormData] = useState<CreateRoleRequest & { selectedSkills: string[]; selectedMcps: string[] }>({
     name: '',
     slug: '',
     description: '',
+    selectedSkills: [],
+    selectedMcps: [],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -61,12 +65,41 @@ export function Roles() {
     setSubmitError(null);
 
     try {
-      await apiRequest<Role>('/api/roles', {
+      const response = await apiRequest<Role>('/api/roles', {
         method: 'POST',
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          name: formData.name,
+          slug: formData.slug,
+          description: formData.description,
+        }),
       });
+
+      if (!response.success || !response.data) {
+        throw new Error(response.message || '创建 Role 失败');
+      }
+
+      const role = response.data;
+
+      // Associate selected skills
+      if (formData.selectedSkills.length > 0) {
+        for (const skillSlug of formData.selectedSkills) {
+          await apiRequest(`/api/roles/${role.slug}/skills/${skillSlug}`, {
+            method: 'POST',
+          });
+        }
+      }
+
+      // Associate selected MCPs
+      if (formData.selectedMcps.length > 0) {
+        for (const mcpSlug of formData.selectedMcps) {
+          await apiRequest(`/api/roles/${role.slug}/mcps/${mcpSlug}`, {
+            method: 'POST',
+          });
+        }
+      }
+
       setIsModalOpen(false);
-      setFormData({ name: '', slug: '', description: '' });
+      setFormData({ name: '', slug: '', description: '', selectedSkills: [], selectedMcps: [] });
       refetch();
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : '创建 Role 失败');
@@ -254,6 +287,88 @@ export function Roles() {
               rows={3}
               className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none resize-none"
             />
+          </div>
+
+          {/* Skills Section */}
+          <div>
+            <label className="block text-sm font-medium text-cyber-muted mb-2">选择 Skills</label>
+            {skillsLoading ? (
+              <div className="p-4 skeleton h-32 rounded-lg" />
+            ) : skills && skills.length > 0 ? (
+              <div className="max-h-40 overflow-y-auto space-y-2 p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20">
+                {skills.map((skill) => (
+                  <label key={skill.id} className="flex items-start gap-3 cursor-pointer hover:bg-cyber-dark-card/50 p-2 rounded transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={formData.selectedSkills.includes(skill.slug)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormData(prev => ({
+                            ...prev,
+                            selectedSkills: [...prev.selectedSkills, skill.slug]
+                          }));
+                        } else {
+                          setFormData(prev => ({
+                            ...prev,
+                            selectedSkills: prev.selectedSkills.filter(s => s !== skill.slug)
+                          }));
+                        }
+                      }}
+                      className="mt-1 w-4 h-4 rounded border-cyber-cyan/30 bg-cyber-dark text-cyber-cyan focus:ring-cyber-cyan"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-cyber-white">{skill.name}</div>
+                      <div className="text-xs text-cyber-muted truncate">{skill.description}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div className="p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-muted text-sm">
+                暂无可用 Skills
+              </div>
+            )}
+          </div>
+
+          {/* MCPs Section */}
+          <div>
+            <label className="block text-sm font-medium text-cyber-muted mb-2">选择 MCPs</label>
+            {mcpsLoading ? (
+              <div className="p-4 skeleton h-32 rounded-lg" />
+            ) : mcps && mcps.length > 0 ? (
+              <div className="max-h-40 overflow-y-auto space-y-2 p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20">
+                {mcps.map((mcp) => (
+                  <label key={mcp.id} className="flex items-start gap-3 cursor-pointer hover:bg-cyber-dark-card/50 p-2 rounded transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={formData.selectedMcps.includes(mcp.slug)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormData(prev => ({
+                            ...prev,
+                            selectedMcps: [...prev.selectedMcps, mcp.slug]
+                          }));
+                        } else {
+                          setFormData(prev => ({
+                            ...prev,
+                            selectedMcps: prev.selectedMcps.filter(m => m !== mcp.slug)
+                          }));
+                        }
+                      }}
+                      className="mt-1 w-4 h-4 rounded border-cyber-cyan/30 bg-cyber-dark text-cyber-cyan focus:ring-cyber-cyan"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-cyber-white">{mcp.name}</div>
+                      <div className="text-xs text-cyber-muted truncate">{mcp.description}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div className="p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-muted text-sm">
+                暂无可用 MCPs
+              </div>
+            )}
           </div>
         </form>
       </CyberModal>

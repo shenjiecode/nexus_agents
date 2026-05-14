@@ -1,12 +1,16 @@
 import logger from '../lib/logger.js';
 import initSqlJs from 'sql.js';
 import { drizzle } from 'drizzle-orm/sql-js';
-import { 
-  organizations, 
-  roles, 
-  roleVersions, 
-  containers, 
-  sessions 
+import {
+organizations,
+roles,
+roleVersions,
+containers,
+  sessions,
+  skills,
+  mcps,
+  roleSkills,
+  roleMcps
 } from './schema.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -115,6 +119,58 @@ async function initSchema(database: any): Promise<void> {
       FOREIGN KEY (container_id) REFERENCES containers(id)
     );
   `);
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS skills (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL,
+      category TEXT,
+      skill_path TEXT NOT NULL,
+      metadata TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS mcps (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL,
+      category TEXT,
+      server_type TEXT NOT NULL DEFAULT 'local',
+      command TEXT NOT NULL,
+      env_template TEXT,
+      requires_api_key INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS role_skills (
+      id TEXT PRIMARY KEY,
+      role_id TEXT NOT NULL,
+      skill_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (role_id) REFERENCES roles(id),
+      FOREIGN KEY (skill_id) REFERENCES skills(id)
+    );
+  `);
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS role_mcps (
+      id TEXT PRIMARY KEY,
+      role_id TEXT NOT NULL,
+      mcp_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (role_id) REFERENCES roles(id),
+      FOREIGN KEY (mcp_id) REFERENCES mcps(id)
+    );
+  `);
 }
 
 /**
@@ -136,8 +192,9 @@ export async function initDatabase(): Promise<ReturnType<typeof drizzle>> {
     } catch (error) {
       logger.error(error, 'Failed to load database, creating new one');
       sqlDb = new SQL.Database();
-      await initSchema(sqlDb);
     }
+    // Always run schema init to ensure new tables are created (uses IF NOT EXISTS)
+    await initSchema(sqlDb);
   } else {
     // Create new database
     sqlDb = new SQL.Database();
@@ -189,10 +246,14 @@ export function closeDatabase(): void {
 }
 
 // Export tables
-export { 
-  organizations, 
-  roles, 
-  roleVersions, 
-  containers, 
-  sessions 
+export {
+organizations,
+roles,
+roleVersions,
+containers,
+  sessions,
+  skills,
+  mcps,
+  roleSkills,
+  roleMcps
 };

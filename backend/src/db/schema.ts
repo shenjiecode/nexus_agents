@@ -58,6 +58,50 @@ export const sessions = sqliteTable('sessions', {
   createdAt: integer('created_at').notNull(),
 });
 
+// Skills table - Skills 市场技能包
+export const skills = sqliteTable('skills', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  description: text('description').notNull(),
+  category: text('category'), // 分类：development, analysis, writing 等
+  skillPath: text('skill_path').notNull(), // .opencode/skills/{slug}/ 路径
+  metadata: text('metadata'), // JSON: version, license, allowed-tools 等
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+// MCPs table - MCP 市场服务器
+export const mcps = sqliteTable('mcps', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  description: text('description').notNull(),
+  category: text('category'), // 分类：tools, filesystem, database 等
+  serverType: text('server_type').notNull().default('local'), // local 或 remote
+  command: text('command').notNull(), // JSON: 启动命令数组
+  envTemplate: text('env_template'), // JSON: 需要填写的环境变量模板
+  requiresApiKey: integer('requires_api_key').notNull().default(0), // 是否需要 API Key
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+// Role Skills junction - 角色关联的 Skills
+export const roleSkills = sqliteTable('role_skills', {
+  id: text('id').primaryKey(),
+  roleId: text('role_id').notNull().references(() => roles.id),
+  skillId: text('skill_id').notNull().references(() => skills.id),
+  createdAt: integer('created_at').notNull(),
+});
+
+// Role MCPs junction - 角色关联的 MCPs
+export const roleMcps = sqliteTable('role_mcps', {
+  id: text('id').primaryKey(),
+  roleId: text('role_id').notNull().references(() => roles.id),
+  mcpId: text('mcp_id').notNull().references(() => mcps.id),
+  createdAt: integer('created_at').notNull(),
+});
+
 // Type exports
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
@@ -69,3 +113,11 @@ export type Container = typeof containers.$inferSelect;
 export type NewContainer = typeof containers.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
+export type Skill = typeof skills.$inferSelect;
+export type NewSkill = typeof skills.$inferInsert;
+export type Mcp = typeof mcps.$inferSelect;
+export type NewMcp = typeof mcps.$inferInsert;
+export type RoleSkill = typeof roleSkills.$inferSelect;
+export type NewRoleSkill = typeof roleSkills.$inferInsert;
+export type RoleMcp = typeof roleMcps.$inferSelect;
+export type NewRoleMcp = typeof roleMcps.$inferInsert;

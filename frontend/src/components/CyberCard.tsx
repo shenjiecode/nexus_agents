@@ -6,6 +6,7 @@ interface CyberCardProps {
   hoverEffect?: boolean;
   cornerAccent?: boolean;
   gradient?: boolean;
+  onClick?: () => void;
 }
 
 export function CyberCard({ 
@@ -13,7 +14,8 @@ export function CyberCard({
   className = '', 
   hoverEffect = true,
   cornerAccent = false,
-  gradient = true
+  gradient = true,
+  onClick
 }: CyberCardProps) {
   return (
     <div 
@@ -24,6 +26,7 @@ export function CyberCard({
         ${cornerAccent ? 'corner-accent' : ''}
         ${className}
       `}
+      onClick={onClick}
     >
       <div className="relative z-10">
         {children}

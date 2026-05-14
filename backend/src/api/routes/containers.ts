@@ -4,6 +4,9 @@ import {
   getAllContainers,
   getContainer,
   removeContainer,
+  getContainerSessions,
+  getContainerConfig,
+  updateContainerModel,
 } from '../../services/container-manager.js';
 
 // Standard API response helper
@@ -89,6 +92,52 @@ containers.delete('/api/containers/:id', async (c) => {
   } catch (error: any) {
     logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to delete container', 500), 500);
+  }
+});
+
+// GET /api/containers/:id/config - Get container config
+containers.get('/api/containers/:id/config', async (c) => {
+  try {
+    const containerId = c.req.param('id');
+    const config = getContainerConfig(containerId);
+    if (!config) {
+      return c.json(apiError('Container config not found', 404), 404);
+    }
+    return c.json(apiSuccess(config));
+  } catch (error: any) {
+    logger.error(error, "API error");
+    return c.json(apiError(error.message || 'Failed to get container config', 500), 500);
+  }
+});
+
+// GET /api/containers/:id/sessions - Get container sessions
+containers.get('/api/containers/:id/sessions', async (c) => {
+  try {
+    const containerId = c.req.param('id');
+    const sessions = await getContainerSessions(containerId);
+    return c.json(apiSuccess(sessions));
+  } catch (error: any) {
+    logger.error(error, "API error");
+    return c.json(apiError(error.message || 'Failed to get sessions', 500), 500);
+  }
+});
+
+// PUT /api/containers/:id/model - Update container model
+containers.put('/api/containers/:id/model', async (c) => {
+  try {
+    const containerId = c.req.param('id');
+    const body = await c.req.json();
+    const model = body.model;
+    
+    if (!model || typeof model !== 'string') {
+      return c.json(apiError('Missing or invalid model field', 400), 400);
+    }
+    
+    updateContainerModel(containerId, model);
+    return c.json(apiSuccess({ model }));
+  } catch (error: any) {
+    logger.error(error, "API error");
+    return c.json(apiError(error.message || 'Failed to update model', 500), 500);
   }
 });
 
