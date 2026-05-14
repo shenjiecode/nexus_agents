@@ -254,3 +254,101 @@ export async function deleteOrganization(orgId: string): Promise<boolean> {
 
   return true;
 }
+
+// ============ Auth Configuration Management ============
+
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
+
+// Auth config type (matches OpenCode auth.json format)
+export interface AuthProviderConfig {
+  type: 'api';
+  key: string;
+}
+
+export type AuthConfig = Record<string, AuthProviderConfig>;
+
+/**
+ * Get the auth.json file path for an organization
+ */
+export function getOrgAuthPath(orgSlug: string): string {
+  const orgDir = join(process.cwd(), 'data', 'orgs', orgSlug);
+  return join(orgDir, 'auth.json');
+}
+
+/**
+ * Ensure organization directory exists
+ */
+function ensureOrgDir(orgSlug: string): string {
+  const orgDir = join(process.cwd(), 'data', 'orgs', orgSlug);
+  if (!existsSync(orgDir)) {
+    mkdirSync(orgDir, { recursive: true });
+  }
+  return orgDir;
+}
+
+/**
+ * Get organization's auth configuration
+ * Returns null if not configured
+ */
+export function getOrganizationAuth(orgSlug: string): AuthConfig | null {
+  const authPath = getOrgAuthPath(orgSlug);
+  
+  if (!existsSync(authPath)) {
+    return null;
+  }
+  
+  try {
+    const content = readFileSync(authPath, 'utf-8');
+    return JSON.parse(content) as AuthConfig;
+  } catch (error) {
+    console.error(`Failed to read auth.json for org ${orgSlug}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Set organization's auth configuration
+ * Creates the organization directory if it doesn't exist
+ */
+export function setOrganizationAuth(orgSlug: string, authConfig: AuthConfig): void {
+  ensureOrgDir(orgSlug);
+  const authPath = getOrgAuthPath(orgSlug);
+  
+  // Validate auth config
+  for (const [provider, config] of Object.entries(authConfig)) {
+    if (!config.type || !config.key) {
+      throw new Error(`Invalid auth config for provider '${provider}': must have 'type' and 'key'`);
+    }
+  }
+  
+  writeFileSync(authPath, JSON.stringify(authConfig, null, 2), 'utf-8');
+}
+
+/**
+ * Delete organization's auth configuration
+ */
+export function deleteOrganizationAuth(orgSlug: string): boolean {
+  const authPath = getOrgAuthPath(orgSlug);
+  
+  if (!existsSync(authPath)) {
+    return false;
+  }
+  
+  try {
+    const { unlinkSync } = require('fs');
+    unlinkSync(authPath);
+    return true;
+  } catch (error) {
+    console.error(`Failed to delete auth.json for org ${orgSlug}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Check if organization has auth configured
+ */
+export function hasOrganizationAuth(orgSlug: string): boolean {
+  const auth = getOrganizationAuth(orgSlug);
+  return auth !== null && Object.keys(auth).length > 0;
+}

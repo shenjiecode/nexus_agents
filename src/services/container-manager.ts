@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { existsSync } from 'fs';
 import { containers as containersTable, initDatabase } from '../db/index.js';
 import { initContainerMemory } from './config-manager.js';
+import { getOrgAuthPath } from './org-service.js';
 
 // Auto-detect Docker/Podman socket
 function getDockerSocket(): string {
@@ -177,15 +178,31 @@ export async function createContainer(
       `${memoryPath}/docs:/workspace/docs:rw`,
     ];
 
+    // Mount organization auth.json if configured
+    const authPath = getOrgAuthPath(orgSlug);
+    const containerAuthPath = '/app/.opencode/auth.json';
+    
+    if (existsSync(authPath)) {
+      volumes.push(`${authPath}:${containerAuthPath}:ro`);
+    }
+
+    // Prepare environment variables
+    const envVars = [
+      `OPENCODE_SERVER_PORT=4096`,
+      'OPENCODE_SERVER_HOSTNAME=0.0.0.0',
+      `OPENCODE_SERVER_PASSWORD=${password}`,
+    ];
+    
+    // Set auth path if auth.json is mounted
+    if (existsSync(authPath)) {
+      envVars.push(`OPENCODE_AUTH_PATH=${containerAuthPath}`);
+    }
+
     // Create container
     const container = await docker.createContainer({
       Image: image,
       name: containerName,
-      Env: [
-        `OPENCODE_SERVER_PORT=4096`,
-        'OPENCODE_SERVER_HOSTNAME=0.0.0.0',
-        `OPENCODE_SERVER_PASSWORD=${password}`,
-      ],
+      Env: envVars,
       ExposedPorts: {
         '4096/tcp': {},
       },
@@ -206,6 +223,7 @@ export async function createContainer(
         'nexus.role.version': roleVersion,
         'nexus.container.id': containerId,
         'nexus.managed': 'true',
+        'nexus.org.auth': existsSync(authPath) ? 'true' : 'false',
       },
     });
 

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import {
+  import {
   createOrganization,
   getAllOrganizations,
   getOrganizationById,
@@ -7,6 +7,10 @@ import {
   updateOrganization,
   deleteOrganization,
   slugify,
+  getOrganizationAuth,
+  setOrganizationAuth,
+  deleteOrganizationAuth,
+  type AuthConfig,
 } from '../../services/org-service.js';
 
 // Standard API response helper
@@ -134,6 +138,91 @@ organizations.delete('/api/organizations/:id', async (c) => {
     return c.json(apiSuccess({ success: true }));
   } catch (error: any) {
     return c.json(apiError(error.message || 'Failed to delete organization', 500), 500);
+  }
+});
+
+// ============ Auth Configuration Management ============
+
+// GET /api/orgs/:slug/auth - Get organization's auth configuration
+organizations.get('/api/orgs/:slug/auth', async (c) => {
+  try {
+    const slug = c.req.param('slug');
+    
+    // Verify organization exists
+    const org = await getOrganizationBySlug(slug);
+    if (!org) {
+      return c.json(apiError('Organization not found', 404), 404);
+    }
+    
+    const auth = getOrganizationAuth(slug);
+    return c.json(apiSuccess({
+      hasAuth: auth !== null,
+      providers: auth ? Object.keys(auth) : [],
+      auth: auth, // Include full auth for admin use
+    }));
+  } catch (error: any) {
+    return c.json(apiError(error.message || 'Failed to get auth configuration', 500), 500);
+  }
+});
+
+// PUT /api/orgs/:slug/auth - Set organization's auth configuration
+organizations.put('/api/orgs/:slug/auth', async (c) => {
+  try {
+    const slug = c.req.param('slug');
+    const body = await c.req.json();
+    
+    // Verify organization exists
+    const org = await getOrganizationBySlug(slug);
+    if (!org) {
+      return c.json(apiError('Organization not found', 404), 404);
+    }
+    
+    // Validate auth config format
+    if (!body || typeof body !== 'object') {
+      return c.json(apiError('Request body must be an object', 400), 400);
+    }
+    
+    // Each provider must have type and key
+    for (const [provider, config] of Object.entries(body)) {
+      if (typeof config !== 'object' || config === null) {
+        return c.json(apiError(`Invalid config for provider '${provider}': must be an object`, 400), 400);
+      }
+      const cfg = config as Record<string, unknown>;
+      if (!cfg.type || !cfg.key || typeof cfg.type !== 'string' || typeof cfg.key !== 'string') {
+        return c.json(apiError(`Invalid config for provider '${provider}': must have 'type' and 'key' strings`, 400), 400);
+      }
+      if (cfg.type !== 'api') {
+        return c.json(apiError(`Unsupported auth type '${cfg.type}' for provider '${provider}'`, 400), 400);
+      }
+    }
+    
+    setOrganizationAuth(slug, body as AuthConfig);
+    
+    return c.json(apiSuccess({
+      success: true,
+      providers: Object.keys(body),
+    }));
+  } catch (error: any) {
+    return c.json(apiError(error.message || 'Failed to set auth configuration', 500), 500);
+  }
+});
+
+// DELETE /api/orgs/:slug/auth - Delete organization's auth configuration
+organizations.delete('/api/orgs/:slug/auth', async (c) => {
+  try {
+    const slug = c.req.param('slug');
+    
+    // Verify organization exists
+    const org = await getOrganizationBySlug(slug);
+    if (!org) {
+      return c.json(apiError('Organization not found', 404), 404);
+    }
+    
+    const result = deleteOrganizationAuth(slug);
+    
+    return c.json(apiSuccess({ success: result }));
+  } catch (error: any) {
+    return c.json(apiError(error.message || 'Failed to delete auth configuration', 500), 500);
   }
 });
 
