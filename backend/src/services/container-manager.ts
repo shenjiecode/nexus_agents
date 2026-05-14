@@ -6,20 +6,10 @@ import { containers as containersTable, initDatabase } from '../db/index.js';
 import { initContainerMemory } from './config-manager.js';
 import { getOrgAuthPath } from './org-service.js';
 
-// Auto-detect Docker/Podman socket
+// Get Docker socket path
 function getDockerSocket(): string {
   if (process.env.DOCKER_HOST) {
     return process.env.DOCKER_HOST.replace('unix://', '');
-  }
-  // Try common socket paths in order (Docker first)
-  const socketPaths = [
-    '/var/run/docker.sock',
-    '/run/user/1000/podman/podman.sock',
-  ];
-  for (const path of socketPaths) {
-    if (existsSync(path)) {
-      return path;
-    }
   }
   return '/var/run/docker.sock';
 }

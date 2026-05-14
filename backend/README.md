@@ -39,8 +39,7 @@ node dist/index.js
 | `PORT` | 服务端口 | `13207` |
 | `LOG_LEVEL` | 日志级别 | `info` |
 | `NODE_ENV` | 环境 | `development` |
-| `DOCKER_CMD` | 容器构建命令 | `docker` |
-| `DOCKER_HOST` | Docker/Podman socket 路径 | 自动检测 |
+| `DOCKER_HOST` | Docker socket 路径 | `/var/run/docker.sock` |
 
 ## 日志规范
 
@@ -196,7 +195,7 @@ data/
         └── docs/
 ```
 
-## Docker (兼容 Podman)
+## Docker
 
 ### 基础镜像
 
@@ -210,12 +209,13 @@ docker build -t localhost/nexus-base:latest images/base/
 
 创建角色时自动构建: `nexus-role-{slug}:{version}`
 
-### Socket 检测
+### Socket 配置
 
-自动检测 Docker/Podman socket (Docker 优先):
-- `/var/run/docker.sock` (Docker 默认)
-- `/run/user/1000/podman/podman.sock` (Podman rootless)
-- 环境变量 `DOCKER_HOST`
+默认使用 Docker socket: `/var/run/docker.sock`
+
+如需使用 Podman:
+1. 安装 `podman-docker` 包 (提供 docker 命令兼容)
+2. 或设置环境变量: `DOCKER_HOST=unix:///run/user/1000/podman/podman.sock`
 
 ## 开发规范
 
