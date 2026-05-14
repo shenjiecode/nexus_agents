@@ -424,10 +424,15 @@ export async function removeContainer(containerId: string, force: boolean = fals
 /**
  * Check container health
  */
-export async function healthCheck(containerUrl: string): Promise<boolean> {
+export async function healthCheck(containerUrl: string, password?: string): Promise<boolean> {
   try {
+    const headers: Record<string, string> = {};
+    if (password) {
+      headers['Authorization'] = `Basic ${Buffer.from(`admin:${password}`).toString('base64')}`;
+    }
     const response = await fetch(`${containerUrl}/global/health`, {
       method: 'GET',
+      headers,
       signal: AbortSignal.timeout(5000),
     });
     return response.ok;
@@ -436,18 +441,16 @@ export async function healthCheck(containerUrl: string): Promise<boolean> {
   }
 }
 
-/**
- * Wait for container to become healthy
- */
 export async function waitForHealthy(
   containerUrl: string,
+  password?: string,
   timeout: number = 30000
 ): Promise<boolean> {
   const startTime = Date.now();
   const interval = 1000;
 
   while (Date.now() - startTime < timeout) {
-    if (await healthCheck(containerUrl)) {
+    if (await healthCheck(containerUrl, password)) {
       return true;
     }
     await new Promise((resolve) => setTimeout(resolve, interval));
@@ -456,17 +459,35 @@ export async function waitForHealthy(
   return false;
 }
 
-/**
- * Update container health status
- */
 export async function updateHealthStatus(containerId: string): Promise<void> {
   const instance = containers.get(containerId);
   if (!instance || instance.status !== 'running') {
     return;
   }
 
-  const isHealthy = await healthCheck(instance.url);
-  instance.healthStatus = isHealthy ? 'healthy' : 'unhealthy';
+  // Layer 1: Check Docker container status
+  try {
+    const container = docker.getContainer(instance.containerId);
+    const info = await container.inspect();
+    if (!info.State.Running) {
+      instance.healthStatus = 'unhealthy';
+      instance.lastHealthCheck = new Date();
+      return;
+    }
+  } catch {
+    instance.healthStatus = 'unknown';
+    instance.lastHealthCheck = new Date();
+    return;
+  }
+
+  // Layer 2: Check OpenCode serve health endpoint (if password available)
+  if (instance.password) {
+    const isHealthy = await healthCheck(instance.url, instance.password);
+    instance.healthStatus = isHealthy ? 'healthy' : 'unhealthy';
+  } else {
+    // No password (restored from DB) - consider healthy since Docker says running
+    instance.healthStatus = 'healthy';
+  }
   instance.lastHealthCheck = new Date();
 }
 

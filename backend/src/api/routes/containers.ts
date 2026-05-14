@@ -7,6 +7,7 @@ import {
   getContainerSessions,
   getContainerConfig,
   updateContainerModel,
+  updateHealthStatus,
 } from '../../services/container-manager.js';
 
 // Standard API response helper
@@ -73,6 +74,28 @@ containers.get('/api/containers/:id', async (c) => {
   } catch (error: any) {
     logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to get container', 500), 500);
+  }
+});
+
+// POST /api/containers/:id/health-check - Trigger health check
+containers.post('/api/containers/:id/health-check', async (c) => {
+  try {
+    const containerId = c.req.param('id');
+    const container = getContainer(containerId);
+
+    if (!container) {
+      return c.json(apiError('Container not found', 404), 404);
+    }
+
+    await updateHealthStatus(containerId);
+    const updatedContainer = getContainer(containerId);
+
+    return c.json(apiSuccess({
+      healthStatus: updatedContainer?.healthStatus,
+    }));
+  } catch (error: any) {
+    logger.error(error, 'API error');
+    return c.json(apiError(error.message || 'Failed to check health', 500), 500);
   }
 });
 
