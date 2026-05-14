@@ -29,6 +29,14 @@ function TagIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function EditIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+    </svg>
+  );
+}
+
 function SearchIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -44,6 +52,15 @@ export function Roles() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState<{ selectedSkills: string[]; selectedMcps: string[] }>({
+    selectedSkills: [],
+    selectedMcps: [],
+  });
+  const [isEditLoading, setIsEditLoading] = useState(false);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [formData, setFormData] = useState<CreateRoleRequest & { selectedSkills: string[]; selectedMcps: string[] }>({
     name: '',
     slug: '',
@@ -110,6 +127,99 @@ export function Roles() {
 
   const generateSlug = (name: string) => {
     return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  };
+
+  const handleEditOpen = async (role: Role) => {
+    setEditingRole(role);
+    setIsEditModalOpen(true);
+    setIsEditLoading(true);
+    setEditError(null);
+    setEditFormData({ selectedSkills: [], selectedMcps: [] });
+
+    try {
+      // Fetch current skills and mcps for this role
+      const [skillsResponse, mcpsResponse] = await Promise.all([
+        apiRequest<Skill[]>(`/api/roles/${role.slug}/skills`),
+        apiRequest<Mcp[]>(`/api/roles/${role.slug}/mcps`),
+      ]);
+
+      if (skillsResponse.success && skillsResponse.data) {
+        setEditFormData(prev => ({
+          ...prev,
+          selectedSkills: skillsResponse.data!.map(s => s.slug),
+        }));
+      }
+
+      if (mcpsResponse.success && mcpsResponse.data) {
+        setEditFormData(prev => ({
+          ...prev,
+          selectedMcps: mcpsResponse.data!.map(m => m.slug),
+        }));
+      }
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : '加载角色配置失败');
+    } finally {
+      setIsEditLoading(false);
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRole) return;
+
+    setIsEditSubmitting(true);
+    setEditError(null);
+
+    try {
+      // Get current skills and mcps
+      const [currentSkillsRes, currentMcpsRes] = await Promise.all([
+        apiRequest<Skill[]>(`/api/roles/${editingRole.slug}/skills`),
+        apiRequest<Mcp[]>(`/api/roles/${editingRole.slug}/mcps`),
+      ]);
+
+      const currentSkills = currentSkillsRes.success && currentSkillsRes.data
+        ? currentSkillsRes.data.map(s => s.slug)
+        : [];
+      const currentMcps = currentMcpsRes.success && currentMcpsRes.data
+        ? currentMcpsRes.data.map(m => m.slug)
+        : [];
+
+      // Calculate differences for skills
+      const skillsToAdd = editFormData.selectedSkills.filter(s => !currentSkills.includes(s));
+      const skillsToRemove = currentSkills.filter(s => !editFormData.selectedSkills.includes(s));
+
+      // Calculate differences for mcps
+      const mcpsToAdd = editFormData.selectedMcps.filter(m => !currentMcps.includes(m));
+      const mcpsToRemove = currentMcps.filter(m => !editFormData.selectedMcps.includes(m));
+
+      // Apply changes for skills
+      await Promise.all([
+        ...skillsToAdd.map(skillSlug =>
+          apiRequest(`/api/roles/${editingRole.slug}/skills/${skillSlug}`, { method: 'POST' })
+        ),
+        ...skillsToRemove.map(skillSlug =>
+          apiRequest(`/api/roles/${editingRole.slug}/skills/${skillSlug}`, { method: 'DELETE' })
+        ),
+      ]);
+
+      // Apply changes for mcps
+      await Promise.all([
+        ...mcpsToAdd.map(mcpSlug =>
+          apiRequest(`/api/roles/${editingRole.slug}/mcps/${mcpSlug}`, { method: 'POST' })
+        ),
+        ...mcpsToRemove.map(mcpSlug =>
+          apiRequest(`/api/roles/${editingRole.slug}/mcps/${mcpSlug}`, { method: 'DELETE' })
+        ),
+      ]);
+
+      setIsEditModalOpen(false);
+      setEditingRole(null);
+      setEditFormData({ selectedSkills: [], selectedMcps: [] });
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : '更新角色配置失败');
+    } finally {
+      setIsEditSubmitting(false);
+    }
   };
 
   return (
@@ -217,6 +327,17 @@ export function Roles() {
                     )}
                   </div>
                 )}
+
+                {/* Edit Configuration */}
+                <div className="mt-4 pt-4 border-t border-cyber-cyan/10">
+                  <button
+                    onClick={() => handleEditOpen(role)}
+                    className="text-xs text-cyber-purple hover:text-cyber-white transition-colors flex items-center gap-1"
+                  >
+                    <EditIcon className="w-3 h-3" />
+                    编辑配置
+                  </button>
+                </div>
               </div>
             </CyberCard>
           ))}
@@ -370,6 +491,134 @@ export function Roles() {
               </div>
             )}
           </div>
+        </form>
+      </CyberModal>
+
+      {/* Edit Modal */}
+      <CyberModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingRole(null);
+          setEditError(null);
+        }}
+        title={`编辑角色配置${editingRole ? ` - ${editingRole.name}` : ''}`}
+        footer={
+          <>
+            <CyberButton variant="ghost" onClick={() => {
+              setIsEditModalOpen(false);
+              setEditingRole(null);
+              setEditError(null);
+            }}>
+              取消
+            </CyberButton>
+            <CyberButton
+              type="submit"
+              form="edit-role-form"
+              disabled={isEditSubmitting || isEditLoading}
+            >
+              {isEditSubmitting ? '保存中...' : '保存配置'}
+            </CyberButton>
+          </>
+        }
+      >
+        <form id="edit-role-form" onSubmit={handleEditSubmit} className="space-y-4">
+          {editError && (
+            <div className="p-3 rounded-lg bg-cyber-error/10 border border-cyber-error/30 text-cyber-error text-sm">
+              {editError}
+            </div>
+          )}
+
+          {isEditLoading ? (
+            <div className="space-y-4">
+              <div className="p-4 skeleton h-32 rounded-lg" />
+              <div className="p-4 skeleton h-32 rounded-lg" />
+            </div>
+          ) : (
+            <>
+              {/* Skills Section */}
+              <div>
+                <label className="block text-sm font-medium text-cyber-muted mb-2">选择 Skills</label>
+                {skillsLoading ? (
+                  <div className="p-4 skeleton h-32 rounded-lg" />
+                ) : skills && skills.length > 0 ? (
+                  <div className="max-h-40 overflow-y-auto space-y-2 p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20">
+                    {skills.map((skill) => (
+                      <label key={skill.id} className="flex items-start gap-3 cursor-pointer hover:bg-cyber-dark-card/50 p-2 rounded transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={editFormData.selectedSkills.includes(skill.slug)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditFormData(prev => ({
+                                ...prev,
+                                selectedSkills: [...prev.selectedSkills, skill.slug]
+                              }));
+                            } else {
+                              setEditFormData(prev => ({
+                                ...prev,
+                                selectedSkills: prev.selectedSkills.filter(s => s !== skill.slug)
+                              }));
+                            }
+                          }}
+                          className="mt-1 w-4 h-4 rounded border-cyber-cyan/30 bg-cyber-dark text-cyber-cyan focus:ring-cyber-cyan"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-cyber-white">{skill.name}</div>
+                          <div className="text-xs text-cyber-muted truncate">{skill.description}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-muted text-sm">
+                    暂无可用 Skills
+                  </div>
+                )}
+              </div>
+
+              {/* MCPs Section */}
+              <div>
+                <label className="block text-sm font-medium text-cyber-muted mb-2">选择 MCPs</label>
+                {mcpsLoading ? (
+                  <div className="p-4 skeleton h-32 rounded-lg" />
+                ) : mcps && mcps.length > 0 ? (
+                  <div className="max-h-40 overflow-y-auto space-y-2 p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20">
+                    {mcps.map((mcp) => (
+                      <label key={mcp.id} className="flex items-start gap-3 cursor-pointer hover:bg-cyber-dark-card/50 p-2 rounded transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={editFormData.selectedMcps.includes(mcp.slug)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditFormData(prev => ({
+                                ...prev,
+                                selectedMcps: [...prev.selectedMcps, mcp.slug]
+                              }));
+                            } else {
+                              setEditFormData(prev => ({
+                                ...prev,
+                                selectedMcps: prev.selectedMcps.filter(m => m !== mcp.slug)
+                              }));
+                            }
+                          }}
+                          className="mt-1 w-4 h-4 rounded border-cyber-cyan/30 bg-cyber-dark text-cyber-cyan focus:ring-cyber-cyan"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-cyber-white">{mcp.name}</div>
+                          <div className="text-xs text-cyber-muted truncate">{mcp.description}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-muted text-sm">
+                    暂无可用 MCPs
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </form>
       </CyberModal>
     </div>

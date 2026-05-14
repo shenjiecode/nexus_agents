@@ -418,7 +418,8 @@ const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
                   containers?.map((container) => (
                     <tr
                       key={container.id}
-                      className="border-b border-cyber-cyan/10 hover:bg-cyber-cyan/5 transition-colors"
+                      className="border-b border-cyber-cyan/10 hover:bg-cyber-cyan/5 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/agents/${container.id}`)}
                     >
                       <td className="py-4 px-6">
                         <span className="font-medium text-cyber-white">{container.roleSlug}</span>
@@ -438,7 +439,7 @@ const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
                         </code>
                       </td>
                       <td className="py-4 px-6">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                           {container.status === 'running' ? (
                             <CyberButton variant="ghost" size="sm" className="!p-1">
                               <StopIcon className="w-4 h-4 text-cyber-warning" />

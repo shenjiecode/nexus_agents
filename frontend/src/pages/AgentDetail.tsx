@@ -45,14 +45,6 @@ function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-// Available models
-const AVAILABLE_MODELS = [
-  { id: 'tencent-coding-plan/glm-4', name: 'GLM-4 (Tencent)' },
-  { id: 'tencent-coding-plan/glm-5', name: 'GLM-5 (Tencent)' },
-  { id: 'anthropic/claude-3-5-sonnet', name: 'Claude 3.5 Sonnet' },
-  { id: 'openai/gpt-4o', name: 'GPT-4o' },
-  { id: 'openai/gpt-4-turbo', name: 'GPT-4 Turbo' },
-];
 
 export function AgentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -61,25 +53,22 @@ export function AgentDetail() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('');
-  const [isUpdatingModel, setIsUpdatingModel] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: container, loading: containerLoading, error: containerError } = 
     useApi<Container>(`/api/containers/${id}`);
   
-  const { data: config, loading: configLoading } = 
-    useApi<Record<string, unknown>>(`/api/containers/${id}/config`);
-  
-  const { data: sessions, loading: sessionsLoading, refetch: refetchSessions } = 
-    useApi<Session[]>(`/api/containers/${id}/sessions`);
 
-  // Set initial model from config
-  useEffect(() => {
-    if (config && typeof config.model === 'string') {
-      setSelectedModel(config.model);
-    }
-  }, [config]);
+  const { data: sessions, loading: sessionsLoading, refetch: refetchSessions } =
+    useApi<Session[]>(`/api/containers/${id}/sessions`);
+  
+  const { data: roleSkills } =
+    useApi<{id: string; name: string; description?: string}[]>(container ? `/api/roles/${container.roleSlug}/skills` : '');
+  
+  const { data: roleMcps } =
+    useApi<{id: string; name: string; description?: string}[]>(container ? `/api/roles/${container.roleSlug}/mcps` : '');
+
+
 
   // Fetch messages when active session changes
   useEffect(() => {
@@ -156,22 +145,7 @@ export function AgentDetail() {
     }
   };
 
-  const handleModelChange = async (model: string) => {
-    if (!id || model === selectedModel) return;
-    
-    setIsUpdatingModel(true);
-    try {
-      await apiRequest(`/api/containers/${id}/model`, {
-        method: 'PUT',
-        body: JSON.stringify({ model }),
-      });
-      setSelectedModel(model);
-    } catch (err) {
-      console.error('Failed to update model:', err);
-    } finally {
-      setIsUpdatingModel(false);
-    }
-  };
+
 
   if (containerLoading) {
     return (
@@ -240,38 +214,46 @@ export function AgentDetail() {
             </div>
           </CyberCard>
 
-          {/* Model Selection */}
-          <CyberCard>
-            <div className="p-4 space-y-3">
-              <h2 className="text-lg font-display font-semibold text-cyber-cyan">模型配置</h2>
-              <select
-                value={selectedModel}
-                onChange={(e) => handleModelChange(e.target.value)}
-                disabled={isUpdatingModel}
-                className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white focus:border-cyber-cyan focus:outline-none"
-              >
-                <option value="">选择模型...</option>
-                {AVAILABLE_MODELS.map(m => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
-              {isUpdatingModel && <p className="text-xs text-cyber-muted">更新中...</p>}
-            </div>
-          </CyberCard>
+
 
           {/* Config */}
           <CyberCard>
-            <div className="p-4 space-y-3">
-              <h2 className="text-lg font-display font-semibold text-cyber-cyan">配置详情</h2>
-              {configLoading ? (
-                <div className="skeleton h-32 rounded" />
-              ) : config ? (
-                <pre className="text-xs text-cyber-muted bg-cyber-dark p-3 rounded overflow-auto max-h-64">
-                  {JSON.stringify(config, null, 2)}
-                </pre>
-              ) : (
-                <p className="text-cyber-muted text-sm">无法加载配置</p>
-              )}
+            <div className="p-4 space-y-4">
+              <h2 className="text-lg font-display font-semibold text-cyber-cyan">配置</h2>
+              
+              {/* MCPs */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-cyber-white">MCPs</h3>
+                {roleMcps && roleMcps.length > 0 ? (
+                  <div className="space-y-2">
+                    {roleMcps.map(mcp => (
+                      <div key={mcp.id} className="p-2 rounded bg-cyber-dark border border-cyber-cyan/10">
+                        <p className="text-sm text-cyber-white font-medium">{mcp.name}</p>
+                        {mcp.description && <p className="text-xs text-cyber-muted mt-1">{mcp.description}</p>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-cyber-muted italic">暂无 MCP 配置</p>
+                )}
+              </div>
+              
+              {/* Skills */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-cyber-white">Skills</h3>
+                {roleSkills && roleSkills.length > 0 ? (
+                  <div className="space-y-2">
+                    {roleSkills.map(skill => (
+                      <div key={skill.id} className="p-2 rounded bg-cyber-dark border border-cyber-cyan/10">
+                        <p className="text-sm text-cyber-white font-medium">{skill.name}</p>
+                        {skill.description && <p className="text-xs text-cyber-muted mt-1">{skill.description}</p>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-cyber-muted italic">暂无 Skills 配置</p>
+                )}
+              </div>
             </div>
           </CyberCard>
 

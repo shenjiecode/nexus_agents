@@ -426,7 +426,7 @@ export async function removeContainer(containerId: string, force: boolean = fals
  */
 export async function healthCheck(containerUrl: string): Promise<boolean> {
   try {
-    const response = await fetch(`${containerUrl}/health`, {
+    const response = await fetch(`${containerUrl}/global/health`, {
       method: 'GET',
       signal: AbortSignal.timeout(5000),
     });
