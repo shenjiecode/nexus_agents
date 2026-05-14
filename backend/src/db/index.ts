@@ -1,3 +1,4 @@
+import logger from '../lib/logger.js';
 import initSqlJs from 'sql.js';
 import { drizzle } from 'drizzle-orm/sql-js';
 import { 
@@ -39,7 +40,7 @@ function saveDatabaseToFile(database: any): void {
     const buffer = Buffer.from(data);
     writeFileSync(DB_PATH, buffer);
   } catch (error) {
-    console.error('Failed to save database:', error);
+    logger.error(error, 'Failed to save database');
   }
 }
 
@@ -130,9 +131,9 @@ export async function initDatabase(): Promise<ReturnType<typeof drizzle>> {
     try {
       const fileBuffer = readFileSync(DB_PATH);
       sqlDb = new SQL.Database(fileBuffer);
-      console.log('Database loaded from:', DB_PATH);
+      logger.info({ path: DB_PATH }, 'Database loaded from file');
     } catch (error) {
-      console.error('Failed to load database, creating new one:', error);
+      logger.error(error, 'Failed to load database, creating new one');
       sqlDb = new SQL.Database();
       await initSchema(sqlDb);
     }
@@ -140,7 +141,7 @@ export async function initDatabase(): Promise<ReturnType<typeof drizzle>> {
     // Create new database
     sqlDb = new SQL.Database();
     await initSchema(sqlDb);
-    console.log('New database created at:', DB_PATH);
+    logger.info({ path: DB_PATH }, 'New database created');
   }
 
   db = drizzle(sqlDb);

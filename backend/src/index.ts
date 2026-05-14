@@ -1,16 +1,12 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { pino } from 'pino'
+import logger from './lib/logger.js'
 import organizationRoutes from './api/routes/organizations.js'
 import roleRoutes from './api/routes/roles.js'
 import orgContainerRoutes from './api/routes/org-containers.js'
 import sessionRoutes from './api/routes/sessions.js'
 import { restoreContainers } from './services/container-manager.js'
 import { initDatabase, closeDatabase } from './db/index.js'
-
-const logger = pino({
-  level: 'info'
-})
 
 const app = new Hono()
 

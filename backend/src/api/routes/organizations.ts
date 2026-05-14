@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import logger from '../../lib/logger.js';
   import {
   createOrganization,
   getAllOrganizations,
@@ -50,6 +51,7 @@ organizations.post('/api/organizations', async (c) => {
 
     return c.json(apiSuccess(result), 201);
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to create organization', 500), 500);
   }
 });
@@ -60,6 +62,7 @@ organizations.get('/api/organizations', async (c) => {
     const result = await getAllOrganizations();
     return c.json(apiSuccess(result));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to list organizations', 500), 500);
   }
 });
@@ -76,6 +79,7 @@ organizations.get('/api/organizations/:id', async (c) => {
 
     return c.json(apiSuccess(result));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to get organization', 500), 500);
   }
 });
@@ -92,6 +96,7 @@ organizations.get('/api/orgs/:slug', async (c) => {
 
     return c.json(apiSuccess(result));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to get organization', 500), 500);
   }
 });
@@ -120,6 +125,7 @@ organizations.put('/api/organizations/:id', async (c) => {
 
     return c.json(apiSuccess(result));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to update organization', 500), 500);
   }
 });
@@ -137,6 +143,7 @@ organizations.delete('/api/organizations/:id', async (c) => {
 
     return c.json(apiSuccess({ success: true }));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to delete organization', 500), 500);
   }
 });
@@ -161,6 +168,7 @@ organizations.get('/api/orgs/:slug/auth', async (c) => {
       auth: auth, // Include full auth for admin use
     }));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to get auth configuration', 500), 500);
   }
 });
@@ -203,6 +211,7 @@ organizations.put('/api/orgs/:slug/auth', async (c) => {
       providers: Object.keys(body),
     }));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to set auth configuration', 500), 500);
   }
 });
@@ -222,6 +231,7 @@ organizations.delete('/api/orgs/:slug/auth', async (c) => {
     
     return c.json(apiSuccess({ success: result }));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to delete auth configuration', 500), 500);
   }
 });

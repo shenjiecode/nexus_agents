@@ -1,3 +1,4 @@
+import logger from '../lib/logger.js';
 import Docker from 'dockerode';
 import { randomBytes } from 'crypto';
 import { existsSync } from 'fs';
@@ -86,7 +87,7 @@ async function isPortAvailable(port: number): Promise<boolean> {
     }
     return true;
   } catch (error) {
-    console.error('Error checking port availability:', error);
+    logger.error(error, 'Error checking port availability');
     return false;
   }
 }
@@ -246,7 +247,7 @@ export async function createContainer(
         createdAt: Date.now(),
       });
     } catch (dbError) {
-      console.error('Failed to save container to database:', dbError);
+      logger.error(dbError, 'Failed to save container to database');
     }
 
     return instance;
@@ -492,7 +493,7 @@ export async function restoreContainers(): Promise<number> {
         containers.set(record.id, instance);
         restored++;
       } catch (error) {
-        console.error(`Failed to restore container ${record.id}:`, error);
+        logger.error(error, `Failed to restore container ${record.id}:`);
       }
     }
   }

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import logger from '../../lib/logger.js';
 import {
   createRole,
   getAllRoles,
@@ -52,6 +53,7 @@ roles.post('/api/roles', async (c) => {
 
     return c.json(apiSuccess(result), 201);
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to create role', 500), 500);
   }
 });
@@ -62,6 +64,7 @@ roles.get('/api/roles', async (c) => {
     const result = await getAllRoles();
     return c.json(apiSuccess(result));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to list roles', 500), 500);
   }
 });
@@ -78,6 +81,7 @@ roles.get('/api/roles/:slug', async (c) => {
 
     return c.json(apiSuccess(result));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to get role', 500), 500);
   }
 });
@@ -96,6 +100,7 @@ roles.get('/api/roles/:slug/versions', async (c) => {
     const result = await getRoleVersions(role.id);
     return c.json(apiSuccess(result));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to get role versions', 500), 500);
   }
 });
@@ -118,6 +123,7 @@ roles.put('/api/roles/:slug', async (c) => {
 
     return c.json(apiSuccess(result));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to update role', 500), 500);
   }
 });
@@ -135,6 +141,7 @@ roles.delete('/api/roles/:slug', async (c) => {
 
     return c.json(apiSuccess({ success: true }));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to delete role', 500), 500);
   }
 });

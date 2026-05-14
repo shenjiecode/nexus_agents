@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import logger from '../../lib/logger.js';
 import { getOrganizationBySlug } from '../../services/org-service.js';
 import { getRoleBySlug } from '../../services/role-service.js';
 import {
@@ -46,6 +47,7 @@ orgContainers.get('/api/orgs/:orgSlug/containers', async (c) => {
       createdAt: c.createdAt.toISOString(),
     }))));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to list containers', 500), 500);
   }
 });
@@ -102,6 +104,7 @@ orgContainers.post('/api/orgs/:orgSlug/containers', async (c) => {
       createdAt: container.createdAt.toISOString(),
     }), 201);
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to create container', 500), 500);
   }
 });
@@ -135,6 +138,7 @@ orgContainers.get('/api/orgs/:orgSlug/containers/:containerId', async (c) => {
       createdAt: container.createdAt.toISOString(),
     }));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to get container', 500), 500);
   }
 });
@@ -163,6 +167,7 @@ orgContainers.post('/api/orgs/:orgSlug/containers/:containerId/start', async (c)
       status: result.status,
     }));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to start container', 500), 500);
   }
 });
@@ -191,6 +196,7 @@ orgContainers.post('/api/orgs/:orgSlug/containers/:containerId/stop', async (c) 
       status: result.status,
     }));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to stop container', 500), 500);
   }
 });
@@ -216,6 +222,7 @@ orgContainers.delete('/api/orgs/:orgSlug/containers/:containerId', async (c) => 
 
     return c.json(apiSuccess({ success: true }));
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to remove container', 500), 500);
   }
 });

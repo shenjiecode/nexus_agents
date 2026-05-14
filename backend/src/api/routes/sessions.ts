@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import logger from '../../lib/logger.js';
 import { getOrganizationBySlug } from '../../services/org-service.js';
 import { getContainer } from '../../services/container-manager.js';
 import {
@@ -42,6 +43,7 @@ sessions.post('/api/orgs/:orgSlug/containers/:containerId/sessions', async (c) =
 
     return c.json(apiSuccess(result), 201);
   } catch (error: any) {
+    logger.error(error, "API error");
     return c.json(apiError(error.message || 'Failed to create session', 500), 500);
   }
 });
@@ -77,6 +79,7 @@ sessions.post('/api/orgs/:orgSlug/sessions/:sessionId/messages', async (c) => {
 
     return c.json(apiSuccess(result));
   } catch (error: any) {
+    logger.error(error, "API error");
     const message = error.message || 'Failed to send message';
     if (message.includes('not found') || message.includes('closed')) {
       return c.json(apiError(message, 404), 404);
@@ -101,6 +104,7 @@ sessions.get('/api/orgs/:orgSlug/sessions/:sessionId/messages', async (c) => {
 
     return c.json(apiSuccess(history));
   } catch (error: any) {
+    logger.error(error, "API error");
     const message = error.message || 'Failed to get history';
     if (message.includes('not found')) {
       return c.json(apiError(message, 404), 404);
@@ -125,6 +129,7 @@ sessions.delete('/api/orgs/:orgSlug/sessions/:sessionId', async (c) => {
 
     return c.json(apiSuccess(result));
   } catch (error: any) {
+    logger.error(error, "API error");
     const message = error.message || 'Failed to close session';
     if (message.includes('not found')) {
       return c.json(apiError(message, 404), 404);

@@ -1,3 +1,4 @@
+import logger from '../lib/logger.js';
 import { sessions, containers, initDatabase } from '../db/index.js';
 import { eq, and } from 'drizzle-orm';
 import {
@@ -110,7 +111,7 @@ export async function createQASession(
 
   // Store in active memory with timeout
   const timeoutHandle = setTimeout(() => {
-    closeSession(organizationId, sessionId).catch(console.error);
+    closeSession(organizationId, sessionId).catch((err) => logger.error(err, 'Failed to close session'));
   }, SESSION_TIMEOUT_MS);
 
   activeSessions.set(sessionId, {
@@ -166,7 +167,7 @@ export async function sendMessageQA(
     clearTimeout(activeSession.timeoutHandle);
   }
   activeSession.timeoutHandle = setTimeout(() => {
-    closeSession(organizationId, sessionId).catch(console.error);
+    closeSession(organizationId, sessionId).catch((err) => logger.error(err, 'Failed to close session'));
   }, SESSION_TIMEOUT_MS);
 
   // Add user message to history
@@ -254,7 +255,7 @@ export async function closeSession(
   try {
     await deleteSession(activeSession.client, activeSession.opencodeSessionId);
   } catch (error) {
-    console.error('Failed to delete OpenCode session:', error);
+    logger.error(error, 'Failed to delete OpenCode session');
   }
 
   // Update status

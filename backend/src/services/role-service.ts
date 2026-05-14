@@ -1,3 +1,4 @@
+import logger from '../lib/logger.js';
 import { roles, roleVersions } from '../db/index.js';
 import { eq } from 'drizzle-orm';
 import { generateRoleConfig, updateRoleConfigFiles, deleteRoleConfig } from './config-manager.js';
@@ -81,14 +82,13 @@ async function buildRoleImage(slug: string, version: string): Promise<string> {
       { timeout: 300000 } // 5 minute timeout
     );
     
-    console.log(`Built image: ${imageName}`);
-    if (stderr) console.error('Build warnings:', stderr);
+    logger.info(`Built image: ${imageName}`);
+    if (stderr) logger.warn({ stderr }, 'Build warnings');
     
-    console.log(`Built image: ${imageName}`);
     
     return imageName;
   } catch (error) {
-    console.error('Failed to build image:', error);
+    logger.error(error, 'Failed to build image');
     throw new Error(`Failed to build role image: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

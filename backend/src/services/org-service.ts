@@ -1,3 +1,4 @@
+import logger from '../lib/logger.js';
 import { organizations } from '../db/index.js';
 import { eq } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
@@ -302,7 +303,7 @@ export function getOrganizationAuth(orgSlug: string): AuthConfig | null {
     const content = readFileSync(authPath, 'utf-8');
     return JSON.parse(content) as AuthConfig;
   } catch (error) {
-    console.error(`Failed to read auth.json for org ${orgSlug}:`, error);
+    logger.error(error, `Failed to read auth.json for org ${orgSlug}:`);
     return null;
   }
 }
@@ -340,7 +341,7 @@ export function deleteOrganizationAuth(orgSlug: string): boolean {
     unlinkSync(authPath);
     return true;
   } catch (error) {
-    console.error(`Failed to delete auth.json for org ${orgSlug}:`, error);
+    logger.error(error, `Failed to delete auth.json for org ${orgSlug}:`);
     return false;
   }
 }
