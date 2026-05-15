@@ -177,13 +177,20 @@ async function initSchema(database: any): Promise<void> {
   database.run(`
     CREATE TABLE IF NOT EXISTS employees (
       id TEXT PRIMARY KEY,
-      organization_id TEXT NOT NULL,
-      container_id TEXT NOT NULL,
-      matrix_user_id TEXT NOT NULL UNIQUE,
-      matrix_access_token TEXT NOT NULL,
-      matrix_device_id TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      role_id TEXT NOT NULL,
+      organization_id TEXT,
+      container_id TEXT,
+      employee_data_path TEXT,
+      matrix_user_id TEXT UNIQUE,
+      matrix_access_token TEXT,
+      matrix_device_id TEXT,
       matrix_password TEXT,
+      matrix_homeserver_url TEXT,
       created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (role_id) REFERENCES roles(id),
       FOREIGN KEY (organization_id) REFERENCES organizations(id),
       FOREIGN KEY (container_id) REFERENCES containers(id)
     );

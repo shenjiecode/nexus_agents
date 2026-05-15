@@ -5,8 +5,8 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { containers as containersTable, initDatabase, sessions as sessionsTable, employees } from '../db/index.js';
 import { eq } from 'drizzle-orm';
-import { initContainerMemory } from './config-manager.js';
-import { getOrgAuthPath } from './org-service.js';
+import { initEmployeeData } from './config-manager.js';
+import { getOrgAuthPath, getOrgPublicPath } from './org-service.js';
 import { registerMatrixUser, generateMatrixUsername, generateMatrixPassword } from './matrix-service.js';
 
 // Get Docker socket path
@@ -31,12 +31,13 @@ interface ContainerInstance {
   roleId: string;
   roleSlug: string;
   roleVersion: string;
+  employeeId: string; // Employee entity ID
   containerId: string;
   status: 'starting' | 'running' | 'stopping' | 'stopped' | 'error';
   port: number;
   url: string;
   password: string;
-  memoryPath: string;
+  employeeDataPath: string; // data/employees/{empId}
   healthStatus: 'healthy' | 'unhealthy' | 'unknown';
   lastHealthCheck?: Date;
   createdAt: Date;
@@ -124,6 +125,8 @@ export async function createContainer(
   orgSlug: string,
   roleId: string,
   roleSlug: string,
+  employeeId?: string, // Optional: auto-generated if not provided
+  empSlug?: string,
   roleVersion: string = 'latest',
   imageName?: string,
   port?: number
@@ -145,23 +148,27 @@ export async function createContainer(
   // Determine image name
   const image = imageName || `localhost/nexus-role-${roleSlug}:${roleVersion}`;
 
-  // Initialize container memory directory
-  const memoryPath = initContainerMemory(orgSlug, containerId);
+  // Generate employee info if not provided
+  const finalEmployeeId = employeeId || `emp_${Date.now()}_${randomBytes(4).toString('hex')}`;
+  const finalEmpSlug = empSlug || `${roleSlug}-${orgSlug}-${randomBytes(2).toString('hex')}`;
+
+  // Initialize employee data directory (parent-directory mount pattern)
+  const employeeDataPath = initEmployeeData(finalEmployeeId, finalEmpSlug, orgSlug);
 
   // Register Matrix account for this employee
   let matrixAccount;
   let matrixPassword = '';
   try {
-    const matrixUsername = generateMatrixUsername(orgSlug, roleSlug);
+    const matrixUsername = generateMatrixUsername(orgSlug, finalEmpSlug);
     matrixPassword = generateMatrixPassword();
     matrixAccount = await registerMatrixUser(
       matrixUsername,
       matrixPassword,
-      `${roleSlug} agent for ${orgSlug}`
+      `${finalEmpSlug} agent for ${orgSlug}`
     );
-    logger.info({ matrixUserId: matrixAccount.userId, containerId }, 'Matrix account registered');
+    logger.info({ matrixUserId: matrixAccount.userId, employeeId: finalEmployeeId }, 'Matrix account registered');
   } catch (matrixError) {
-    logger.error({ matrixError, containerId }, 'Failed to register Matrix account');
+    logger.error({ matrixError, employeeId: finalEmployeeId }, 'Failed to register Matrix account');
   }
 
   const instance: ContainerInstance = {
@@ -170,45 +177,45 @@ export async function createContainer(
     roleId,
     roleSlug,
     roleVersion,
+    employeeId: finalEmployeeId,
     containerId: '',
     status: 'starting',
     port: containerPort,
     url: `http://localhost:${containerPort}`,
     password,
-    memoryPath,
+    employeeDataPath,
     healthStatus: 'unknown',
     createdAt: new Date(),
   };
 
   try {
-// Prepare volume mounts
-const volumes = [
-// Mount memory directory (read-write)
-`${memoryPath}/AGENTS.md:/workspace/AGENTS.md:rw`,
-`${memoryPath}/memory:/workspace/memory:rw`,
-      `${memoryPath}/docs:/workspace/docs:rw`,
-      `${memoryPath}/assets:/workspace/assets:rw`,
-      `${memoryPath}/.opencode:/workspace/.opencode:rw`,
-      `${memoryPath}/opencode.json:/workspace/opencode.json:rw`,
-];
+    // Prepare volume mounts (parent-directory mount pattern)
+    // Employee data: mount entire parent dir, subdirs can be added dynamically without rebuild
+    const volumes = [
+      `${employeeDataPath}:/workspace/emp:rw`,
+    ];
 
-    // Mount organization auth.json (required)
+    // Mount organization auth.json (required, read-only)
     const authPath = getOrgAuthPath(orgSlug);
-    const containerAuthPath = '/workspace/.opencode/auth.json';
-    
     if (!existsSync(authPath)) {
       throw new Error(`Organization auth.json not found: ${orgSlug}. Please configure auth first.`);
     }
-    
-    volumes.push(`${authPath}:${containerAuthPath}:ro`);
+    volumes.push(`${authPath}:/workspace/auth/auth.json:ro`);
 
+    // Mount organization public directory (read-only)
+    const orgPublicPath = getOrgPublicPath(orgSlug);
+    if (existsSync(orgPublicPath)) {
+      volumes.push(`${orgPublicPath}:/workspace/org:ro`);
+    }
 
     // Prepare environment variables
     const envVars = [
       `OPENCODE_SERVER_PORT=4096`,
       'OPENCODE_SERVER_HOSTNAME=0.0.0.0',
       `OPENCODE_SERVER_PASSWORD=${password}`,
-      `OPENCODE_AUTH_PATH=${containerAuthPath}`,
+      `OPENCODE_AUTH_PATH=/workspace/auth/auth.json`,
+      `EMPLOYEE_ID=${finalEmployeeId}`,
+      `EMPLOYEE_SLUG=${finalEmpSlug}`,
     ];
 
 
@@ -243,6 +250,8 @@ const volumes = [
         'nexus.role.slug': roleSlug,
         'nexus.role.version': roleVersion,
         'nexus.container.id': containerId,
+        'nexus.employee.id': finalEmployeeId,
+        'nexus.employee.slug': finalEmpSlug,
         'nexus.managed': 'true',
         'nexus.org.auth': existsSync(authPath) ? 'true' : 'false',
       },
@@ -264,7 +273,7 @@ const volumes = [
         password: password,
         status: 'running',
         healthStatus: 'unknown',
-        memoryPath: memoryPath,
+        memoryPath: employeeDataPath, // Keep field name for DB compat
         createdAt: Date.now(),
       });
     } catch (dbError) {
@@ -276,14 +285,20 @@ const volumes = [
       try {
         const db = await initDatabase();
         await db.insert(employees).values({
-          id: `emp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          id: finalEmployeeId,
+          slug: finalEmpSlug,
+          name: finalEmpSlug,
+          roleId: roleId,
           organizationId: organizationId,
           containerId: containerId,
+          employeeDataPath: employeeDataPath,
           matrixUserId: matrixAccount.userId,
           matrixAccessToken: matrixAccount.accessToken,
           matrixDeviceId: matrixAccount.deviceId,
           matrixPassword: matrixPassword,
+          matrixHomeserverUrl: process.env.MATRIX_HOMESERVER_URL || 'http://localhost:8008',
           createdAt: Date.now(),
+          updatedAt: Date.now(),
         });
       } catch (empError) {
         logger.error({ empError, containerId }, 'Failed to save employee to database');
@@ -576,12 +591,13 @@ export async function restoreContainers(): Promise<number> {
           roleId: record.roleId,
           roleSlug: info.Config.Labels?.['nexus.role.slug'] || '',
           roleVersion: record.roleVersion,
+          employeeId: info.Config.Labels?.['nexus.employee.id'] || record.id, // Fallback to container ID
           containerId: record.containerId,
           status: info.State.Running ? 'running' : 'stopped',
           port: record.port,
           url: `http://localhost:${record.port}`,
           password: record.password || '',
-          memoryPath: record.memoryPath || '',
+          employeeDataPath: record.memoryPath || '', // DB field is memoryPath for compat
           healthStatus: 'unknown',
           createdAt: new Date(record.createdAt),
         };
@@ -652,6 +668,8 @@ export async function rebuildContainersForOrg(orgSlug: string): Promise<{ rebuil
         orgSlug,
         instance.roleId,
         instance.roleSlug,
+        instance.employeeId,
+        instance.roleSlug + '-' + orgSlug.slice(-4), // fallback slug
         instance.roleVersion
       );
       

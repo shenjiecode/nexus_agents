@@ -100,7 +100,7 @@ orgContainers.post('/api/orgs/:orgSlug/containers', async (c) => {
       port: container.port,
       url: container.url,
       password: container.password,
-      memoryPath: container.memoryPath,
+      employeeDataPath: container.employeeDataPath,
       createdAt: container.createdAt.toISOString(),
     }), 201);
   } catch (error: any) {
@@ -134,7 +134,7 @@ orgContainers.get('/api/orgs/:orgSlug/containers/:containerId', async (c) => {
       port: container.port,
       url: container.url,
       healthStatus: container.healthStatus,
-      memoryPath: container.memoryPath,
+      employeeDataPath: container.employeeDataPath,
       createdAt: container.createdAt.toISOString(),
     }));
   } catch (error: any) {

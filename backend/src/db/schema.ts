@@ -59,19 +59,27 @@ export const sessions = sqliteTable('sessions', {
   createdAt: integer('created_at').notNull(),
 });
 
-// Employees table - 数字员工的 Matrix 账号信息
+// Employees table - 数字员工（独立实体）
 export const employees = sqliteTable('employees', {
   id: text('id').primaryKey(),
-  organizationId: text('organization_id').notNull().references(() => organizations.id),
-  containerId: text('container_id').notNull().references(() => containers.id),
+  slug: text('slug').notNull().unique(), // 员工标识，如 'researcher-acme'
+  name: text('name').notNull(), // 员工名称
+  roleId: text('role_id').notNull().references(() => roles.id), // 角色模板
+  organizationId: text('organization_id').references(() => organizations.id), // 当前所属组织（可转岗，可为空）
+  containerId: text('container_id').references(() => containers.id), // 当前容器实例（0-1，解雇时为空）
   
-  // Matrix 账号信息
-  matrixUserId: text('matrix_user_id').notNull().unique(), // @user:homeserver
-  matrixAccessToken: text('matrix_access_token').notNull(),
-  matrixDeviceId: text('matrix_device_id').notNull(),
+  // 员工数据路径
+  employeeDataPath: text('employee_data_path'), // data/employees/{empId}
+  
+  // Matrix 账号信息（员工级，跨组织保持）
+  matrixUserId: text('matrix_user_id').unique(), // @user:homeserver
+  matrixAccessToken: text('matrix_access_token'),
+  matrixDeviceId: text('matrix_device_id'),
   matrixPassword: text('matrix_password'), // 存储密码以便重新登录
+  matrixHomeserverUrl: text('matrix_homeserver_url'), // Matrix 服务器地址
   
   createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
 });
 
 // Skills table - Skills 市场技能包

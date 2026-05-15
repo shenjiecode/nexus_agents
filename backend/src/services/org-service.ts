@@ -180,6 +180,8 @@ export async function createOrganization(
     logger.info({ orgSlug: validated.slug, providers: Object.keys(finalAuthConfig) }, 'Created auth.json for organization');
   }
 
+  // Initialize organization public directory
+  initOrgPublicDir(validated.slug, validated.name);
   return {
     id: orgId,
     name: validated.name,
@@ -417,6 +419,41 @@ function ensureOrgDir(orgSlug: string): string {
   }
   return orgDir;
 }
+/**
+ * Get the public directory path for an organization
+ */
+export function getOrgPublicPath(orgSlug: string): string {
+  const orgDir = join(process.cwd(), 'data', 'orgs', orgSlug, 'public');
+  return orgDir;
+}
+
+/**
+ * Initialize organization public directory
+ */
+export function initOrgPublicDir(orgSlug: string, orgName: string): void {
+  const publicDir = getOrgPublicPath(orgSlug);
+  if (!existsSync(publicDir)) {
+    mkdirSync(publicDir, { recursive: true });
+  }
+  
+  // Initialize README.md if not exists
+  const readmePath = join(publicDir, 'README.md');
+  if (!existsSync(readmePath)) {
+    const readmeContent = `# ${orgName} Organization
+
+This directory contains organization-level public resources.
+Employees can read these files but cannot modify them.
+
+## Contents
+
+- README.md - Organization overview
+- Any shared resources for employees
+
+`;
+    writeFileSync(readmePath, readmeContent, 'utf-8');
+  }
+}
+
 
 /**
  * Get organization's auth configuration

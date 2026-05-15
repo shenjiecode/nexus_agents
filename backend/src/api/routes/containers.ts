@@ -36,7 +36,7 @@ containers.get('/api/containers', async (c) => {
       port: container.port,
       url: container.url,
       healthStatus: container.healthStatus,
-      memoryPath: container.memoryPath,
+      employeeDataPath: container.employeeDataPath,
       createdAt: container.createdAt.toISOString(),
     }))));
   } catch (error: any) {
@@ -65,7 +65,7 @@ containers.get('/api/containers/:id', async (c) => {
       port: container.port,
       url: container.url,
       healthStatus: container.healthStatus,
-      memoryPath: container.memoryPath,
+      employeeDataPath: container.employeeDataPath,
       createdAt: container.createdAt.toISOString(),
       startedAt: container.startedAt?.toISOString(),
       stoppedAt: container.stoppedAt?.toISOString(),

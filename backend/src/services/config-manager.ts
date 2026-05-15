@@ -220,44 +220,76 @@ export function deleteRoleConfig(slug: string): void {
  * Initialize container memory directory
  */
 /**
- * Initialize container memory directory
+ * Initialize employee data directory
+ * Creates the directory structure for an employee's persistent data
+ * Uses parent-directory mount pattern: all subdirs live under one parent,
+ * so adding new subdirs at runtime doesn't require container rebuild.
  */
-export function initContainerMemory(orgSlug: string, containerId: string): string {
-  const memoryPath = join(process.cwd(), 'data', 'orgs', orgSlug, 'containers', containerId);
+export function initEmployeeData(empId: string, empSlug: string, orgSlug: string): string {
+  const empDataPath = join(process.cwd(), 'data', 'employees', empId);
 
-  // Create directories
-  mkdirSync(join(memoryPath, 'memory'), { recursive: true });
-  mkdirSync(join(memoryPath, 'docs'), { recursive: true });
-  mkdirSync(join(memoryPath, 'assets'), { recursive: true });
-  mkdirSync(join(memoryPath, '.opencode', 'skills'), { recursive: true });
+  // Create employee directory structure
+  mkdirSync(join(empDataPath, 'memory'), { recursive: true });
+  mkdirSync(join(empDataPath, 'docs'), { recursive: true });
+  mkdirSync(join(empDataPath, 'rules'), { recursive: true });
+  mkdirSync(join(empDataPath, '.opencode', 'skills'), { recursive: true });
+  mkdirSync(join(empDataPath, '.opencode', 'sessions'), { recursive: true });
+  mkdirSync(join(empDataPath, '.matrix'), { recursive: true });
 
   // Initialize AGENTS.md template
   const agentsContent = `# Digital Employee Memory
 
 ## Basic Information
-- Container ID: ${containerId}
+- Employee ID: ${empId}
+- Employee Slug: ${empSlug}
 - Organization: ${orgSlug}
 - Created: ${new Date().toISOString()}
+
+## Rules Index
+<!-- Add references to rules/*.md files here -->
 
 ## Work Records
 <!-- AI will automatically append work summaries here -->
 
 `;
 
-  writeFileSync(join(memoryPath, 'AGENTS.md'), agentsContent, 'utf-8');
+  const agentsPath = join(empDataPath, 'AGENTS.md');
+  if (!existsSync(agentsPath)) {
+    writeFileSync(agentsPath, agentsContent, 'utf-8');
+  }
 
-  // Initialize opencode.json for this container
-  const opencodeConfig = {
-    name: `employee-${containerId.slice(-8)}`,
-    version: '1.0.0',
-    model: 'default',
-  workspace: '/workspace',
-  skillsPath: '/workspace/.opencode/skills',
-  assetsPath: '/workspace/assets',
-  memoryPath: '/workspace/memory',
-    docsPath: '/workspace/docs',
-  };
-  writeFileSync(join(memoryPath, 'opencode.json'), JSON.stringify(opencodeConfig, null, 2), 'utf-8');
+  // Initialize opencode.json for this employee
+  const opencodePath = join(empDataPath, 'opencode.json');
+  if (!existsSync(opencodePath)) {
+    const opencodeConfig = {
+      name: empSlug,
+      version: '1.0.0',
+      model: 'default',
+      workspace: '/workspace/emp',
+      skillsPath: '/workspace/emp/.opencode/skills',
+      sessionsPath: '/workspace/emp/.opencode/sessions',
+      memoryPath: '/workspace/emp/memory',
+      docsPath: '/workspace/emp/docs',
+      rulesPath: '/workspace/emp/rules',
+      authPath: '/workspace/auth/auth.json',
+    };
+    writeFileSync(opencodePath, JSON.stringify(opencodeConfig, null, 2), 'utf-8');
+  }
 
-  return memoryPath;
+  return empDataPath;
+}
+
+/**
+ * Get employee data path
+ */
+export function getEmployeeDataPath(empId: string): string {
+  return join(process.cwd(), 'data', 'employees', empId);
+}
+
+/**
+ * @deprecated Use initEmployeeData instead
+ */
+export function initContainerMemory(orgSlug: string, containerId: string): string {
+  // Backward compat: redirect to new employee data structure
+  return initEmployeeData(containerId, `employee-${containerId.slice(-8)}`, orgSlug);
 }
