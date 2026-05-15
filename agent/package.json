@@ -1,0 +1,10 @@
+{
+  "name": "nexus-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Nexus Agent - Matrix client for opencode serve",
+  "dependencies": {
+    "pino": "^8.20.0",
+    "pino-pretty": "^11.0.0"
+  }
+}

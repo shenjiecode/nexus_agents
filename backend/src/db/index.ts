@@ -2,15 +2,16 @@ import logger from '../lib/logger.js';
 import initSqlJs from 'sql.js';
 import { drizzle } from 'drizzle-orm/sql-js';
 import {
-organizations,
-roles,
-roleVersions,
-containers,
+  organizations,
+  roles,
+  roleVersions,
+  containers,
   sessions,
   skills,
   mcps,
   roleSkills,
-  roleMcps
+  roleMcps,
+  employees
 } from './schema.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -172,6 +173,21 @@ async function initSchema(database: any): Promise<void> {
       FOREIGN KEY (mcp_id) REFERENCES mcps(id)
     );
   `);
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS employees (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      container_id TEXT NOT NULL,
+      matrix_user_id TEXT NOT NULL UNIQUE,
+      matrix_access_token TEXT NOT NULL,
+      matrix_device_id TEXT NOT NULL,
+      matrix_password TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id),
+      FOREIGN KEY (container_id) REFERENCES containers(id)
+    );
+  `);
 }
 
 /**
@@ -248,13 +264,14 @@ export function closeDatabase(): void {
 
 // Export tables
 export {
-organizations,
-roles,
-roleVersions,
-containers,
+  organizations,
+  roles,
+  roleVersions,
+  containers,
   sessions,
   skills,
   mcps,
   roleSkills,
-  roleMcps
+  roleMcps,
+  employees
 };

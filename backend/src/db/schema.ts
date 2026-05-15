@@ -59,6 +59,21 @@ export const sessions = sqliteTable('sessions', {
   createdAt: integer('created_at').notNull(),
 });
 
+// Employees table - 数字员工的 Matrix 账号信息
+export const employees = sqliteTable('employees', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull().references(() => organizations.id),
+  containerId: text('container_id').notNull().references(() => containers.id),
+  
+  // Matrix 账号信息
+  matrixUserId: text('matrix_user_id').notNull().unique(), // @user:homeserver
+  matrixAccessToken: text('matrix_access_token').notNull(),
+  matrixDeviceId: text('matrix_device_id').notNull(),
+  matrixPassword: text('matrix_password'), // 存储密码以便重新登录
+  
+  createdAt: integer('created_at').notNull(),
+});
+
 // Skills table - Skills 市场技能包
 export const skills = sqliteTable('skills', {
   id: text('id').primaryKey(),
@@ -122,3 +137,6 @@ export type RoleSkill = typeof roleSkills.$inferSelect;
 export type NewRoleSkill = typeof roleSkills.$inferInsert;
 export type RoleMcp = typeof roleMcps.$inferSelect;
 export type NewRoleMcp = typeof roleMcps.$inferInsert;
+
+export type Employee = typeof employees.$inferSelect;
+export type NewEmployee = typeof employees.$inferInsert;

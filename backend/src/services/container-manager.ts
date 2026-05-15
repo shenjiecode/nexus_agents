@@ -3,10 +3,11 @@ import Docker from 'dockerode';
 import { randomBytes } from 'crypto';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { containers as containersTable, initDatabase, sessions as sessionsTable } from '../db/index.js';
+import { containers as containersTable, initDatabase, sessions as sessionsTable, employees } from '../db/index.js';
 import { eq } from 'drizzle-orm';
 import { initContainerMemory } from './config-manager.js';
 import { getOrgAuthPath } from './org-service.js';
+import { registerMatrixUser, generateMatrixUsername, generateMatrixPassword } from './matrix-service.js';
 
 // Get Docker socket path
 function getDockerSocket(): string {
@@ -42,6 +43,8 @@ interface ContainerInstance {
   startedAt?: Date;
   stoppedAt?: Date;
   errorMessage?: string;
+  matrixUserId?: string;
+  matrixAccessToken?: string;
 }
 
 // In-memory container registry
@@ -145,6 +148,22 @@ export async function createContainer(
   // Initialize container memory directory
   const memoryPath = initContainerMemory(orgSlug, containerId);
 
+  // Register Matrix account for this employee
+  let matrixAccount;
+  let matrixPassword = '';
+  try {
+    const matrixUsername = generateMatrixUsername(orgSlug, roleSlug);
+    matrixPassword = generateMatrixPassword();
+    matrixAccount = await registerMatrixUser(
+      matrixUsername,
+      matrixPassword,
+      `${roleSlug} agent for ${orgSlug}`
+    );
+    logger.info({ matrixUserId: matrixAccount.userId, containerId }, 'Matrix account registered');
+  } catch (matrixError) {
+    logger.error({ matrixError, containerId }, 'Failed to register Matrix account');
+  }
+
   const instance: ContainerInstance = {
     id: containerId,
     organizationId,
@@ -162,13 +181,16 @@ export async function createContainer(
   };
 
   try {
-    // Prepare volume mounts
-    const volumes = [
-      // Mount memory directory (read-write)
-      `${memoryPath}/AGENTS.md:/workspace/AGENTS.md:rw`,
-      `${memoryPath}/memory:/workspace/memory:rw`,
+// Prepare volume mounts
+const volumes = [
+// Mount memory directory (read-write)
+`${memoryPath}/AGENTS.md:/workspace/AGENTS.md:rw`,
+`${memoryPath}/memory:/workspace/memory:rw`,
       `${memoryPath}/docs:/workspace/docs:rw`,
-    ];
+      `${memoryPath}/assets:/workspace/assets:rw`,
+      `${memoryPath}/.opencode:/workspace/.opencode:rw`,
+      `${memoryPath}/opencode.json:/workspace/opencode.json:rw`,
+];
 
     // Mount organization auth.json if configured
     const authPath = getOrgAuthPath(orgSlug);
@@ -212,6 +234,13 @@ export async function createContainer(
     // Set auth path if auth.json is mounted
     if (authMounted) {
       envVars.push(`OPENCODE_AUTH_PATH=${containerAuthPath}`);
+    }
+
+    // Add Matrix config if account was created
+    if (matrixAccount) {
+      envVars.push(`MATRIX_HOMESERVER_URL=${process.env.MATRIX_HOMESERVER_URL || 'http://localhost:8008'}`);
+      envVars.push(`MATRIX_ACCESS_TOKEN=${matrixAccount.accessToken}`);
+      envVars.push(`MATRIX_USER_ID=${matrixAccount.userId}`);
     }
 
     // Create container
@@ -265,6 +294,29 @@ export async function createContainer(
     } catch (dbError) {
       logger.error(dbError, 'Failed to save container to database');
     }
+
+    // Save employee Matrix info to database
+    if (matrixAccount) {
+      try {
+        const db = await initDatabase();
+        await db.insert(employees).values({
+          id: `emp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          organizationId: organizationId,
+          containerId: containerId,
+          matrixUserId: matrixAccount.userId,
+          matrixAccessToken: matrixAccount.accessToken,
+          matrixDeviceId: matrixAccount.deviceId,
+          matrixPassword: matrixPassword,
+          createdAt: Date.now(),
+        });
+      } catch (empError) {
+        logger.error({ empError, containerId }, 'Failed to save employee to database');
+      }
+    }
+
+    // Add Matrix info to instance
+    instance.matrixUserId = matrixAccount?.userId;
+    instance.matrixAccessToken = matrixAccount?.accessToken;
 
     return instance;
   } catch (error) {

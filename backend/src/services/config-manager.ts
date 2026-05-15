@@ -219,12 +219,17 @@ export function deleteRoleConfig(slug: string): void {
 /**
  * Initialize container memory directory
  */
+/**
+ * Initialize container memory directory
+ */
 export function initContainerMemory(orgSlug: string, containerId: string): string {
   const memoryPath = join(process.cwd(), 'data', 'orgs', orgSlug, 'containers', containerId);
-  
+
   // Create directories
   mkdirSync(join(memoryPath, 'memory'), { recursive: true });
   mkdirSync(join(memoryPath, 'docs'), { recursive: true });
+  mkdirSync(join(memoryPath, 'assets'), { recursive: true });
+  mkdirSync(join(memoryPath, '.opencode', 'skills'), { recursive: true });
 
   // Initialize AGENTS.md template
   const agentsContent = `# Digital Employee Memory
@@ -240,6 +245,19 @@ export function initContainerMemory(orgSlug: string, containerId: string): strin
 `;
 
   writeFileSync(join(memoryPath, 'AGENTS.md'), agentsContent, 'utf-8');
+
+  // Initialize opencode.json for this container
+  const opencodeConfig = {
+    name: `employee-${containerId.slice(-8)}`,
+    version: '1.0.0',
+    model: 'default',
+  workspace: '/workspace',
+  skillsPath: '/workspace/.opencode/skills',
+  assetsPath: '/workspace/assets',
+  memoryPath: '/workspace/memory',
+    docsPath: '/workspace/docs',
+  };
+  writeFileSync(join(memoryPath, 'opencode.json'), JSON.stringify(opencodeConfig, null, 2), 'utf-8');
 
   return memoryPath;
 }
