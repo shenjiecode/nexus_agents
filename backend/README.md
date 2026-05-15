@@ -41,11 +41,35 @@ node dist/index.js
 | `NODE_ENV` | 环境 | `development` |
 | `DOCKER_HOST` | Docker socket 路径 | `/var/run/docker.sock` |
 | `MATRIX_HOMESERVER_URL` | Matrix 服务器地址 | `http://localhost:8008` |
-|------|------|--------|
-| `PORT` | 服务端口 | `13207` |
-| `LOG_LEVEL` | 日志级别 | `info` |
-| `NODE_ENV` | 环境 | `development` |
-| `DOCKER_HOST` | Docker socket 路径 | `/var/run/docker.sock` |
+
+## 架构决策
+
+### Matrix 服务使用原生 fetch 而非 SDK
+
+**背景**：初期尝试使用 `matrix-bot-sdk`，但在 Docker 构建时遇到 native 依赖问题（Rust 编译的 crypto 模块）。
+
+**分析**：
+
+| SDK 功能 | 是否需要 |
+|---------|---------|
+| E2EE 加密 | ❌ Phase 1 不做 |
+| 复杂事件解析 | ❌ 只处理 register/login |
+| 状态管理 | ❌ 一次性操作 |
+
+SDK 的核心价值是 E2EE，但我们只需要 register 和 login 两个 API。
+
+**实际使用的 API**：
+
+```
+POST /_matrix/client/v3/register  - 注册账户
+POST /_matrix/client/v3/login     - 登录获取 token
+```
+
+**收益**：
+- 无 native 依赖，构建简单
+- 完全可控，调试方便
+
+**详见**: `src/services/matrix-service.ts`
 
 ## 日志规范
 

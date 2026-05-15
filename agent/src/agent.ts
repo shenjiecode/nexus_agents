@@ -18,25 +18,64 @@ let currentSessionId: string | null = null;
 let nextBatch: string | null = null;
 
 // Matrix API helpers
-const matrixGet = (path: string, params?: Record<string, string>) => {
+const matrixGet = async (path: string, params?: Record<string, string>) => {
   const url = new URL(`/_matrix/client/v3${path}`, config.matrix.homeserverUrl);
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
-  return fetch(url, {
+  const response = await fetch(url, {
     headers: { 'Authorization': `Bearer ${config.matrix.accessToken}` }
-  }).then(r => r.json());
+  });
+  if (!response.ok) {
+    const error = await response.json() as { error?: string };
+    throw new Error(`Matrix API error: ${error.error || response.statusText}`);
+  }
+  return response.json();
 };
 
-const matrixPut = (path: string, body: object) =>
-  fetch(new URL(`/_matrix/client/v3${path}`, config.matrix.homeserverUrl), {
+const matrixPut = async (path: string, body: object) => {
+  const response = await fetch(new URL(`/_matrix/client/v3${path}`, config.matrix.homeserverUrl), {
     method: 'PUT',
     headers: {
       'Authorization': `Bearer ${config.matrix.accessToken}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
-  }).then(r => r.json());
+  });
+  if (!response.ok) {
+    const error = await response.json() as { error?: string };
+    throw new Error(`Matrix API error: ${error.error || response.statusText}`);
+  }
+  return response.json();
+};
+
+const matrixPost = async (path: string, body?: object) => {
+  const response = await fetch(new URL(`/_matrix/client/v3${path}`, config.matrix.homeserverUrl), {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${config.matrix.accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!response.ok) {
+    const error = await response.json() as { error?: string };
+    throw new Error(`Matrix API error: ${error.error || response.statusText}`);
+  }
+  return response.json();
+};
+
+/**
+ * Join a room by accepting an invite
+ */
+async function joinRoom(roomId: string): Promise<void> {
+  try {
+    await matrixPost(`/rooms/${encodeURIComponent(roomId)}/join`);
+    logger.info({ roomId }, 'Joined room');
+  } catch (error) {
+    logger.error({ error, roomId }, 'Failed to join room');
+  }
+}
 
 /**
  * Check if message is a simple greeting (skip AI)
@@ -141,7 +180,19 @@ async function handleMessage(roomId: string, event: any): Promise<void> {
 }
 
 /**
- * Sync loop - poll for new messages
+ * Handle invite events - auto-accept invitations
+ */
+async function handleInvite(roomId: string, event: any): Promise<void> {
+  // Check if this is an invite for us
+  if (event.content?.membership !== 'invite') return;
+  if (event.state_key !== config.matrix.userId) return;
+  
+  logger.info({ roomId, sender: event.sender }, 'Received room invite, joining...');
+  await joinRoom(roomId);
+}
+
+/**
+ * Sync loop - poll for new messages and invites
  */
 async function syncLoop(): Promise<void> {
   while (true) {
@@ -152,7 +203,18 @@ async function syncLoop(): Promise<void> {
       const data = await matrixGet('/sync', params);
       nextBatch = data.next_batch;
 
-      // Process rooms
+      // Process invites (rooms we're invited to)
+      const invitedRooms = data.rooms?.invite || {};
+      for (const [roomId, roomData] of Object.entries(invitedRooms)) {
+        const events = (roomData as any).invite_state?.events || [];
+        for (const event of events) {
+          if (event.type === 'm.room.member') {
+            await handleInvite(roomId, event);
+          }
+        }
+      }
+
+      // Process joined rooms - messages
       const rooms = data.rooms?.join || {};
       for (const [roomId, roomData] of Object.entries(rooms)) {
         const events = (roomData as any).timeline?.events || [];
