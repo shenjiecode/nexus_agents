@@ -53,9 +53,12 @@ export async function createQASession(
   organizationId: string,
   containerId: string
 ): Promise<{
+  id: string;
   sessionId: string;
   opencodeSessionId: string;
   containerId: string;
+  organizationId: string;
+  status: string;
   createdAt: number;
 }> {
   const database = await getDb();
@@ -130,9 +133,12 @@ export async function createQASession(
   });
 
   return {
+    id: sessionId,
     sessionId: sessionId,
     opencodeSessionId: opencodeSessionId,
     containerId: containerId,
+    organizationId: organizationId,
+    status: 'active',
     createdAt: now,
   };
 }
