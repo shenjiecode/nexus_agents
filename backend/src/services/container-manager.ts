@@ -429,7 +429,7 @@ export async function healthCheck(containerUrl: string, password?: string): Prom
   try {
     const headers: Record<string, string> = {};
     if (password) {
-      headers['Authorization'] = `Basic ${Buffer.from(`admin:${password}`).toString('base64')}`;
+      headers['Authorization'] = `Basic ${Buffer.from(`opencode:${password}`).toString('base64')}`;
     }
     const response = await fetch(`${containerUrl}/global/health`, {
       method: 'GET',
