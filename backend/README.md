@@ -40,6 +40,12 @@ node dist/index.js
 | `LOG_LEVEL` | 日志级别 | `info` |
 | `NODE_ENV` | 环境 | `development` |
 | `DOCKER_HOST` | Docker socket 路径 | `/var/run/docker.sock` |
+| `MATRIX_HOMESERVER_URL` | Matrix 服务器地址 | `http://localhost:8008` |
+|------|------|--------|
+| `PORT` | 服务端口 | `13207` |
+| `LOG_LEVEL` | 日志级别 | `info` |
+| `NODE_ENV` | 环境 | `development` |
+| `DOCKER_HOST` | Docker socket 路径 | `/var/run/docker.sock` |
 
 ## 日志规范
 
