@@ -45,11 +45,17 @@ organizations.post('/api/organizations', async (c) => {
     // Auto-generate slug if not provided
     const slug = body.slug || slugify(body.name);
 
-    const result = await createOrganization({
-      name: body.name.trim(),
-      slug: slug,
-      description: body.description?.trim(),
-    });
+    // Extract optional auth config
+    const authConfig: AuthConfig | undefined = body.auth;
+
+    const result = await createOrganization(
+      {
+        name: body.name.trim(),
+        slug: slug,
+        description: body.description?.trim(),
+      },
+      authConfig
+    );
 
     return c.json(apiSuccess(result), 201);
   } catch (error: any) {

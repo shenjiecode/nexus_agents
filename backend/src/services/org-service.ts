@@ -139,7 +139,10 @@ export async function isSlugAvailable(slug: string): Promise<boolean> {
 /**
  * Create a new organization
  */
-export async function createOrganization(input: CreateOrgInput): Promise<{
+export async function createOrganization(
+  input: CreateOrgInput,
+  authConfig?: AuthConfig
+): Promise<{
   id: string;
   name: string;
   slug: string;
@@ -170,6 +173,13 @@ export async function createOrganization(input: CreateOrgInput): Promise<{
     updatedAt: now,
   });
 
+  // Create auth.json for the organization
+  const finalAuthConfig = authConfig || getDefaultAuthConfig();
+  if (finalAuthConfig && Object.keys(finalAuthConfig).length > 0) {
+    setOrganizationAuth(validated.slug, finalAuthConfig);
+    logger.info({ orgSlug: validated.slug, providers: Object.keys(finalAuthConfig) }, 'Created auth.json for organization');
+  }
+
   return {
     id: orgId,
     name: validated.name,
@@ -178,6 +188,25 @@ export async function createOrganization(input: CreateOrgInput): Promise<{
     apiKey: apiKey,
     createdAt: now,
     updatedAt: now,
+  };
+}
+
+/**
+ * Get default auth config from environment variables
+ */
+function getDefaultAuthConfig(): AuthConfig | null {
+  const providerName = process.env.OPENCODE_PROVIDER_NAME || 'tencent-coding-plan';
+  const apiKey = process.env.OPENCODE_API_KEY || process.env.ANTHROPIC_API_KEY;
+  
+  if (!apiKey) {
+    return null;
+  }
+  
+  return {
+    [providerName]: {
+      type: 'api',
+      key: apiKey,
+    },
   };
 }
 

@@ -192,49 +192,25 @@ const volumes = [
       `${memoryPath}/opencode.json:/workspace/opencode.json:rw`,
 ];
 
-    // Mount organization auth.json if configured
+    // Mount organization auth.json (required)
     const authPath = getOrgAuthPath(orgSlug);
-    const containerAuthPath = '/app/.opencode/auth.json';
-    let authMounted = false;
+    const containerAuthPath = '/workspace/.opencode/auth.json';
     
-    if (existsSync(authPath)) {
-      volumes.push(`${authPath}:${containerAuthPath}:ro`);
-      authMounted = true;
-    } else {
-      // Fallback: generate auth.json from .env if ANTHROPIC_API_KEY is set
-      const anthropicKey = process.env.ANTHROPIC_API_KEY;
-      if (anthropicKey) {
-        const { writeFileSync, mkdirSync } = await import('fs');
-        const { join } = await import('path');
-        const tempAuthDir = join(process.cwd(), 'data', 'orgs', orgSlug);
-        if (!existsSync(tempAuthDir)) {
-          mkdirSync(tempAuthDir, { recursive: true });
-        }
-        const tempAuthPath = join(tempAuthDir, 'auth.json');
-        const authConfig = {
-          anthropic: {
-            type: 'api',
-            key: anthropicKey,
-          },
-        };
-        writeFileSync(tempAuthPath, JSON.stringify(authConfig, null, 2), 'utf-8');
-        volumes.push(`${tempAuthPath}:${containerAuthPath}:ro`);
-        authMounted = true;
-        logger.info({ orgSlug }, 'Generated auth.json from .env fallback');
-      }
+    if (!existsSync(authPath)) {
+      throw new Error(`Organization auth.json not found: ${orgSlug}. Please configure auth first.`);
     }
+    
+    volumes.push(`${authPath}:${containerAuthPath}:ro`);
+
 
     // Prepare environment variables
     const envVars = [
       `OPENCODE_SERVER_PORT=4096`,
       'OPENCODE_SERVER_HOSTNAME=0.0.0.0',
       `OPENCODE_SERVER_PASSWORD=${password}`,
+      `OPENCODE_AUTH_PATH=${containerAuthPath}`,
     ];
-    
-    // Set auth path if auth.json is mounted
-    if (authMounted) {
-      envVars.push(`OPENCODE_AUTH_PATH=${containerAuthPath}`);
-    }
+
 
     // Add Matrix config if account was created
     if (matrixAccount) {

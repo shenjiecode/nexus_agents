@@ -35,7 +35,7 @@ RUN npm config set registry https://registry.npmmirror.com
 # Install global tools
 RUN npm install -g opencode-ai tsx
 
-# Create directories
+RUN mkdir -p /workspace /data/matrix /workspace/.opencode/skills
 RUN mkdir -p /workspace /data/matrix /workspace/.opencode/skills
 
 # Copy entrypoint
