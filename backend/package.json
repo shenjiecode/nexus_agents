@@ -16,6 +16,7 @@
   "dependencies": {
     "@hono/node-server": "^2.0.2",
     "dockerode": "^4.0.0",
+    "dotenv": "^17.4.2",
     "drizzle-kit": "^0.28.0",
     "drizzle-orm": "^0.36.0",
     "hono": "^4.0.0",
