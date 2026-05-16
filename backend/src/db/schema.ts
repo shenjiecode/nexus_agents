@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, bigint, boolean } from 'drizzle-orm/pg-core';
 
 // Organizations table
 export const organizations = pgTable('organizations', {
@@ -10,8 +10,8 @@ export const organizations = pgTable('organizations', {
   matrixAdminUserId: text('matrix_admin_user_id'),        // @nexus-admin-{slug}:localhost
   matrixAdminAccessToken: text('matrix_admin_access_token'), // Org admin's Matrix token
   matrixAdminPassword: text('matrix_admin_password'),       // Stored for re-login
-  createdAt: integer('created_at').notNull(),
-  updatedAt: integer('updated_at').notNull(),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });
 
 // Roles table - 角色定义（模板）
@@ -23,8 +23,8 @@ export const roles = pgTable('roles', {
   version: text('version').notNull().default('1.0.0'), // 当前版本
   imageName: text('image_name'), // 镜像名称，如 "nexus-role-researcher"
   config: text('config'), // JSON string - 角色完整配置
-  createdAt: integer('created_at').notNull(),
-  updatedAt: integer('updated_at').notNull(),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });
 
 // Role versions table - 角色版本历史
@@ -34,7 +34,7 @@ export const roleVersions = pgTable('role_versions', {
   version: text('version').notNull(),
   imageName: text('image_name').notNull(), // 该版本的镜像名
   config: text('config'), // 该版本的配置快照
-  createdAt: integer('created_at').notNull(),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
 });
 
 // Employees table - 数字员工（独立实体）
@@ -62,8 +62,8 @@ export const employees = pgTable('employees', {
   matrixPassword: text('matrix_password'), // 存储密码以便重新登录
   matrixHomeserverUrl: text('matrix_homeserver_url'), // Matrix 服务器地址
   
-  createdAt: integer('created_at').notNull(),
-  updatedAt: integer('updated_at').notNull(),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });
 
 // Skills table - Skills 市场技能包
@@ -75,8 +75,8 @@ export const skills = pgTable('skills', {
   category: text('category'), // 分类：development, analysis, writing 等
   skillPath: text('skill_path').notNull(), // .opencode/skills/{slug}/ 路径
   metadata: text('metadata'), // JSON: version, license, allowed-tools 等
-  createdAt: integer('created_at').notNull(),
-  updatedAt: integer('updated_at').notNull(),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });
 
 // MCPs table - MCP 市场服务器
@@ -90,8 +90,8 @@ export const mcps = pgTable('mcps', {
   command: text('command').notNull(), // JSON: 启动命令数组
   envTemplate: text('env_template'), // JSON: 需要填写的环境变量模板
   requiresApiKey: boolean('requires_api_key').notNull().default(false), // 是否需要 API Key
-  createdAt: integer('created_at').notNull(),
-  updatedAt: integer('updated_at').notNull(),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });
 
 // Role Skills junction - 角色关联的 Skills
@@ -99,7 +99,7 @@ export const roleSkills = pgTable('role_skills', {
   id: text('id').primaryKey(),
   roleId: text('role_id').notNull().references(() => roles.id),
   skillId: text('skill_id').notNull().references(() => skills.id),
-  createdAt: integer('created_at').notNull(),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
 });
 
 // Role MCPs junction - 角色关联的 MCPs
@@ -107,7 +107,7 @@ export const roleMcps = pgTable('role_mcps', {
   id: text('id').primaryKey(),
   roleId: text('role_id').notNull().references(() => roles.id),
   mcpId: text('mcp_id').notNull().references(() => mcps.id),
-  createdAt: integer('created_at').notNull(),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
 });
 
 // Type exports
