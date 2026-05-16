@@ -3,11 +3,11 @@ import { cors } from 'hono/cors'
 import logger from './lib/logger.js'
 import organizationRoutes from './api/routes/organizations.js'
 import roleRoutes from './api/routes/roles.js'
-import orgContainerRoutes from './api/routes/org-containers.js'
-import containerRoutes from './api/routes/containers.js'
+import orgEmployeeRoutes from './api/routes/org-employees.js'
+import employeeRoutes from './api/routes/employees.js'
 import sessionRoutes from './api/routes/sessions.js'
 import marketplaceRoutes from './api/routes/marketplace.js'
-import { restoreContainers } from './services/container-manager.js'
+import { restoreEmployees } from './services/employee-manager.js'
 import { initDatabase, closeDatabase } from './db/index.js'
 import { initializeMarketplace } from './services/marketplace-service.js'
 
@@ -38,9 +38,9 @@ app.get('/health', (c) => {
 // All routes accessible (auth middleware available for future external API use)
 app.route('/', organizationRoutes)  // Organization CRUD + Auth config + API Key management
 app.route('/', roleRoutes)          // Roles are global templates
-app.route('/', orgContainerRoutes)  // /api/orgs/:slug/containers/*
+app.route('/', orgEmployeeRoutes)  // /api/orgs/:slug/employees/*
 app.route('/', sessionRoutes)       // /api/orgs/:slug/sessions/*
-app.route('/', containerRoutes)     // /api/containers/*
+app.route('/', employeeRoutes)     // /api/employees/*
 app.route('/', marketplaceRoutes)   // /api/skills, /api/mcps, /api/roles/:slug/skills, /api/roles/:slug/mcps
 
 // 404 handler
@@ -55,15 +55,14 @@ async function initialize() {
     await initDatabase()
     logger.info('Database initialized')
 
-    // Restore containers from database
-    const restored = await restoreContainers()
-    logger.info(`Restored ${restored} containers from database`)
+    // Restore employees from database
+    const restored = await restoreEmployees()
+    logger.info(`Restored ${restored} employees from database`)
 
     // Initialize marketplace with demo data
     await initializeMarketplace()
     logger.info('Marketplace initialized')
 
-    // Start server
     // Start server
     const { serve } = await import('@hono/node-server')
     serve({

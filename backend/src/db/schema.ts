@@ -1,18 +1,21 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, boolean } from 'drizzle-orm/pg-core';
 
 // Organizations table
-export const organizations = sqliteTable('organizations', {
+export const organizations = pgTable('organizations', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
   description: text('description'),
   apiKey: text('api_key').unique(), // Organization API key for authentication
+  matrixAdminUserId: text('matrix_admin_user_id'),        // @nexus-admin-{slug}:localhost
+  matrixAdminAccessToken: text('matrix_admin_access_token'), // Org admin's Matrix token
+  matrixAdminPassword: text('matrix_admin_password'),       // Stored for re-login
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });
 
 // Roles table - 角色定义（模板）
-export const roles = sqliteTable('roles', {
+export const roles = pgTable('roles', {
   id: text('id').primaryKey(),
   slug: text('slug').notNull().unique(), // 简短标识符，如 "researcher"
   name: text('name').notNull(),
@@ -25,7 +28,7 @@ export const roles = sqliteTable('roles', {
 });
 
 // Role versions table - 角色版本历史
-export const roleVersions = sqliteTable('role_versions', {
+export const roleVersions = pgTable('role_versions', {
   id: text('id').primaryKey(),
   roleId: text('role_id').notNull().references(() => roles.id),
   version: text('version').notNull(),
@@ -34,39 +37,20 @@ export const roleVersions = sqliteTable('role_versions', {
   createdAt: integer('created_at').notNull(),
 });
 
-// Containers table - 组织雇佣的角色实例（数字员工）
-export const containers = sqliteTable('containers', {
-  id: text('id').primaryKey(),
-  organizationId: text('organization_id').notNull().references(() => organizations.id),
-  roleId: text('role_id').notNull().references(() => roles.id),
-  roleVersion: text('role_version').notNull().default('latest'), // 使用的角色版本
-  containerId: text('container_id').notNull(), // Docker/Podman 容器ID
-  port: integer('port').notNull(),
-  password: text('password'), // OpenCode server password
-  status: text('status').notNull(),
-  healthStatus: text('health_status').notNull(),
-  memoryPath: text('memory_path'), // 记忆目录路径
-  createdAt: integer('created_at').notNull(),
-});
-
-// Sessions table - 会话
-export const sessions = sqliteTable('sessions', {
-  id: text('id').primaryKey(),
-  organizationId: text('organization_id').notNull().references(() => organizations.id),
-  containerId: text('container_id').notNull().references(() => containers.id),
-  opencodeSessionId: text('opencode_session_id').notNull(),
-  status: text('status').notNull(),
-  createdAt: integer('created_at').notNull(),
-});
-
 // Employees table - 数字员工（独立实体）
-export const employees = sqliteTable('employees', {
+export const employees = pgTable('employees', {
   id: text('id').primaryKey(),
   slug: text('slug').notNull().unique(), // 员工标识，如 'researcher-acme'
   name: text('name').notNull(), // 员工名称
   roleId: text('role_id').notNull().references(() => roles.id), // 角色模板
   organizationId: text('organization_id').references(() => organizations.id), // 当前所属组织（可转岗，可为空）
-  containerId: text('container_id').references(() => containers.id), // 当前容器实例（0-1，解雇时为空）
+  containerId: text('container_id'), // 当前容器实例（0-1，解雇时为空）
+  port: integer('port'), // 容器端口
+  password: text('password'), // 容器密码
+  status: text('status').notNull().default('stopped'), // 容器状态
+  healthStatus: text('health_status').notNull().default('unknown'), // 健康状态
+  memoryPath: text('memory_path'), // 记忆目录路径
+  roleVersion: text('role_version').notNull().default('latest'), // 角色版本
   
   // 员工数据路径
   employeeDataPath: text('employee_data_path'), // data/employees/{empId}
@@ -83,7 +67,7 @@ export const employees = sqliteTable('employees', {
 });
 
 // Skills table - Skills 市场技能包
-export const skills = sqliteTable('skills', {
+export const skills = pgTable('skills', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
@@ -96,7 +80,7 @@ export const skills = sqliteTable('skills', {
 });
 
 // MCPs table - MCP 市场服务器
-export const mcps = sqliteTable('mcps', {
+export const mcps = pgTable('mcps', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
@@ -105,13 +89,13 @@ export const mcps = sqliteTable('mcps', {
   serverType: text('server_type').notNull().default('local'), // local 或 remote
   command: text('command').notNull(), // JSON: 启动命令数组
   envTemplate: text('env_template'), // JSON: 需要填写的环境变量模板
-  requiresApiKey: integer('requires_api_key').notNull().default(0), // 是否需要 API Key
+  requiresApiKey: boolean('requires_api_key').notNull().default(false), // 是否需要 API Key
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });
 
 // Role Skills junction - 角色关联的 Skills
-export const roleSkills = sqliteTable('role_skills', {
+export const roleSkills = pgTable('role_skills', {
   id: text('id').primaryKey(),
   roleId: text('role_id').notNull().references(() => roles.id),
   skillId: text('skill_id').notNull().references(() => skills.id),
@@ -119,7 +103,7 @@ export const roleSkills = sqliteTable('role_skills', {
 });
 
 // Role MCPs junction - 角色关联的 MCPs
-export const roleMcps = sqliteTable('role_mcps', {
+export const roleMcps = pgTable('role_mcps', {
   id: text('id').primaryKey(),
   roleId: text('role_id').notNull().references(() => roles.id),
   mcpId: text('mcp_id').notNull().references(() => mcps.id),
@@ -133,10 +117,6 @@ export type Role = typeof roles.$inferSelect;
 export type NewRole = typeof roles.$inferInsert;
 export type RoleVersion = typeof roleVersions.$inferSelect;
 export type NewRoleVersion = typeof roleVersions.$inferInsert;
-export type Container = typeof containers.$inferSelect;
-export type NewContainer = typeof containers.$inferInsert;
-export type Session = typeof sessions.$inferSelect;
-export type NewSession = typeof sessions.$inferInsert;
 export type Skill = typeof skills.$inferSelect;
 export type NewSkill = typeof skills.$inferInsert;
 export type Mcp = typeof mcps.$inferSelect;

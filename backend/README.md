@@ -5,7 +5,7 @@ Role Container Management System - Backend API Service
 ## 技术栈
 
 - **框架**: Hono (轻量级 Web 框架)
-- **数据库**: sql.js (SQLite in-memory, 持久化到文件)
+- **数据库**: PostgreSQL (postgres.js 驱动)
 - **ORM**: Drizzle ORM
 - **日志**: Pino (结构化日志)
 - **容器**: Dockerode (Docker/Podman API)
@@ -31,7 +31,6 @@ node dist/index.js
 
 - 默认端口: `13207`
 - 环境变量: `PORT`
-
 ## 环境变量
 
 | 变量 | 说明 | 默认值 |
@@ -41,11 +40,9 @@ node dist/index.js
 | `NODE_ENV` | 环境 | `development` |
 | `DOCKER_HOST` | Docker socket 路径 | `/var/run/docker.sock` |
 | `MATRIX_HOMESERVER_URL` | Matrix 服务器地址 | `http://localhost:8008` |
+| `DATABASE_URL` | PostgreSQL 连接字符串 | `postgres://postgres:postgres@localhost:5432/nexus` |
 
 ## 架构决策
-
-### Matrix 服务使用原生 fetch 而非 SDK
-
 **背景**：初期尝试使用 `matrix-bot-sdk`，但在 Docker 构建时遇到 native 依赖问题（Rust 编译的 crypto 模块）。
 
 **分析**：
@@ -167,7 +164,25 @@ try {
 | DELETE | `/api/roles/:slug` | 删除角色 |
 | GET | `/api/roles/:slug/versions` | 版本历史 |
 
-### Containers
+QB|
+NH|### Employees
+BT|
+KT|| 方法 | 端点 | 说明
+TW||------|------|------|
+NK|| GET | `/api/orgs/:slug/employees` | 组织员工列表 |
+ST|| POST | `/api/orgs/:slug/employees` | 雇佣员工 |
+JT|| GET | `/api/employees/:id` | 员工详情 |
+WV|| POST | `/api/employees/:id/start` | 启动员工 |
+KP|| POST | `/api/employees/:id/stop` | 停止员工 |
+PQ|| DELETE | `/api/employees/:id` | 删除员工 |
+HM|
+PS|### Sessions
+JZ|
+KT|| 方法 | 端点 | 说明
+JT||------|------|------|
+JS|| GET | `/api/orgs/:slug/employees/:employeeId/sessions` | 会话列表 |
+XY|| POST | `/api/orgs/:slug/employees/:employeeId/sessions` | 创建会话 |
+TQ|| POST | `/api/sessions/:id/messages` | 发送消息 |
 
 | 方法 | 端点 | 说明 |
 |------|------|------|
@@ -185,7 +200,6 @@ try {
 | GET | `/api/containers/:id/sessions` | 会话列表 |
 | POST | `/api/containers/:id/sessions` | 创建会话 |
 | POST | `/api/sessions/:id/messages` | 发送消息 |
-
 ## 目录结构
 
 ```
@@ -197,7 +211,6 @@ backend/
 │   ├── services/       # 业务逻辑
 │   └── integrations/   # 外部集成
 ├── data/               # 数据存储 (gitignore)
-│   ├── database.db     # SQLite 数据库
 │   └── orgs/           # 组织数据
 └── dist/               # 构建输出
 ```
@@ -205,18 +218,10 @@ backend/
 ## 数据存储
 
 ### 三层存储架构
-
-| 层 | 内容 | 职责 |
-|---|------|------|
-| 数据库 | 业务对象 + 关联关系 | 查询、权限、版本追踪 |
-| 文件系统 | 配置 + 记忆 + Auth | 持久化、可编辑 |
-| Docker/Podman | 镜像 + 容器运行时 | 执行、隔离 |
-
 ### 存储路径
 
 ```
 data/
-├── database.db              # SQLite 数据库
 └── orgs/{orgSlug}/
     ├── auth.json            # 组织 API Keys
     └── containers/{id}/     # 容器记忆

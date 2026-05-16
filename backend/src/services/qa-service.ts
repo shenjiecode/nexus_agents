@@ -1,5 +1,5 @@
 import logger from '../lib/logger.js';
-import { sessions, containers, initDatabase } from '../db/index.js';
+import { employees, initDatabase } from '../db/index.js';
 import { eq, and } from 'drizzle-orm';
 import {
   createClient,
@@ -47,7 +47,7 @@ async function getDb() {
 }
 
 /**
- * Creates a new QA session for an organization's container
+ * Creates a new QA session for an organization's employee
  */
 export async function createQASession(
   organizationId: string,
@@ -61,37 +61,36 @@ export async function createQASession(
   status: string;
   createdAt: number;
 }> {
+  // Verify employee belongs to organization
   const database = await getDb();
-
-  // Verify container belongs to organization
-  const containerRecords = await database
+  const employeeRecords = await database
     .select()
-    .from(containers)
+    .from(employees)
     .where(and(
-      eq(containers.id, containerId),
-      eq(containers.organizationId, organizationId)
+      eq(employees.containerId, containerId),
+      eq(employees.organizationId, organizationId)
     ));
 
-  if (containerRecords.length === 0) {
-    throw new Error('Container not found or does not belong to organization');
+  if (employeeRecords.length === 0) {
+    throw new Error('Employee not found or does not belong to organization');
   }
 
-  // Get container instance from container-manager
-  const { getContainer } = await import('./container-manager.js');
-  const containerInstance = getContainer(containerId);
+  // Get employee instance from employee-manager
+  const { getEmployee } = await import('./employee-manager.js');
+  const employeeInstance = getEmployee(containerId);
 
-  if (!containerInstance) {
-    throw new Error('Container instance not found in memory');
+  if (!employeeInstance) {
+    throw new Error('Employee instance not found in memory');
   }
 
-  if (containerInstance.status !== 'running') {
-    throw new Error('Container is not running');
+  if (employeeInstance.status !== 'running') {
+    throw new Error('Employee is not running');
   }
 
-  // Create OpenCode client for this container
+  // Create OpenCode client for this employee
   const client = createClient(
-    containerInstance.url,
-    containerInstance.password,
+    employeeInstance.url,
+    employeeInstance.password,
     'opencode'
   );
 
@@ -102,15 +101,7 @@ export async function createQASession(
   const sessionId = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   const now = Date.now();
 
-  // Store session in database
-  await database.insert(sessions).values({
-    id: sessionId,
-    organizationId: organizationId,
-    containerId: containerId,
-    opencodeSessionId: opencodeSessionId,
-    status: 'active',
-    createdAt: now,
-  });
+  // Note: no longer writing session to database; in-memory only
 
   // Store in active memory with timeout
   const timeoutHandle = setTimeout(() => {
@@ -122,8 +113,8 @@ export async function createQASession(
     organizationId: organizationId,
     containerId: containerId,
     opencodeSessionId: opencodeSessionId,
-    containerUrl: containerInstance.url,
-    containerPassword: containerInstance.password,
+    containerUrl: employeeInstance.url,
+    containerPassword: employeeInstance.password,
     client: client,
     status: 'active',
     createdAt: now,
@@ -267,12 +258,7 @@ export async function closeSession(
   // Update status
   activeSession.status = 'closed';
 
-  // Update in database
-  const database = await getDb();
-  await database
-    .update(sessions)
-    .set({ status: 'closed' })
-    .where(eq(sessions.id, sessionId));
+  // Note: no longer updating session in database; in-memory only
 
   // Remove from active sessions
   activeSessions.delete(sessionId);

@@ -1,8 +1,8 @@
 import logger from '../lib/logger.js';
-import { organizations, containers } from '../db/index.js';
+import { organizations, employees } from '../db/index.js';
 import { eq, count } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
-import { getContainersByOrganization } from './container-manager.js';
+import { getEmployeesByOrganization } from './employee-manager.js';
 
 // Zod schemas for validation
 import { z } from 'zod';
@@ -173,6 +173,9 @@ export async function createOrganization(
     updatedAt: now,
   });
 
+  // Skip Matrix room creation - not implemented in new schema
+  // This requires database schema update
+
   // Create auth.json for the organization
   const finalAuthConfig = authConfig || getDefaultAuthConfig();
   if (finalAuthConfig && Object.keys(finalAuthConfig).length > 0) {
@@ -182,6 +185,7 @@ export async function createOrganization(
 
   // Initialize organization public directory
   initOrgPublicDir(validated.slug, validated.name);
+
   return {
     id: orgId,
     name: validated.name,
@@ -222,19 +226,19 @@ export async function getAllOrganizations(): Promise<Array<{
   description?: string;
   createdAt: number;
   updatedAt: number;
-  containerCount: number;
+  employeeCount: number;
 }>> {
-  const database = await getDb();
-  const orgRecords = await database.select().from(organizations);
+const database = await getDb();
+const orgRecords = await database.select().from(organizations);
 
-  // Get container count for each organization
+  // Get employee count for each organization
   const orgsWithCount = await Promise.all(
     orgRecords.map(async (org: any) => {
-      const containerResult = await database
+      const employeeResult = await database
         .select({ count: count() })
-        .from(containers)
-        .where(eq(containers.organizationId, org.id));
-      const containerCount = containerResult[0]?.count || 0;
+        .from(employees)
+        .where(eq(employees.organizationId, org.id));
+      const employeeCount = employeeResult[0]?.count || 0;
       return {
         id: org.id,
         name: org.name,
@@ -242,7 +246,7 @@ export async function getAllOrganizations(): Promise<Array<{
         description: org.description || undefined,
         createdAt: org.createdAt,
         updatedAt: org.updatedAt,
-        containerCount,
+        employeeCount,
       };
     })
   );
@@ -294,7 +298,7 @@ export async function getOrganizationBySlug(slug: string): Promise<{
   description?: string;
   createdAt: number;
   updatedAt: number;
-  containerCount?: number;
+  employeeCount?: number;
 } | null> {
   const database = await getDb();
   const records = await database
@@ -307,15 +311,15 @@ export async function getOrganizationBySlug(slug: string): Promise<{
   }
   const org = records[0];
   
-  // Count containers for this organization
-  const orgContainers = getContainersByOrganization(org.id);
+  // Count employees for this organization
+  const orgEmployees = getEmployeesByOrganization(org.id);
   
   return {
     id: org.id,
     name: org.name,
     slug: org.slug,
     description: org.description || undefined,
-    containerCount: orgContainers.length,
+    employeeCount: orgEmployees.length,
     createdAt: org.createdAt,
     updatedAt: org.updatedAt,
   };

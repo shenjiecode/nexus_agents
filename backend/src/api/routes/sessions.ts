@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import logger from '../../lib/logger.js';
 import { getOrganizationBySlug } from '../../services/org-service.js';
-import { getContainer } from '../../services/container-manager.js';
+import { getEmployee } from '../../services/employee-manager.js';
 import {
   createQASession,
   sendMessageQA,
@@ -21,11 +21,11 @@ function apiError(message: string, status = 400) {
 // Create sessions router
 const sessions = new Hono();
 
-// POST /api/orgs/:orgSlug/containers/:containerId/sessions - Create session
-sessions.post('/api/orgs/:orgSlug/containers/:containerId/sessions', async (c) => {
+// POST /api/orgs/:orgSlug/employees/:employeeId/sessions - Create session
+sessions.post('/api/orgs/:orgSlug/employees/:employeeId/sessions', async (c) => {
   try {
     const orgSlug = c.req.param('orgSlug');
-    const containerId = c.req.param('containerId');
+    const employeeId = c.req.param('employeeId');
 
     // Verify organization exists
     const org = await getOrganizationBySlug(orgSlug);
@@ -33,13 +33,13 @@ sessions.post('/api/orgs/:orgSlug/containers/:containerId/sessions', async (c) =
       return c.json(apiError('Organization not found', 404), 404);
     }
 
-    // Verify container belongs to organization
-    const container = getContainer(containerId);
-    if (!container || container.organizationId !== org.id) {
-      return c.json(apiError('Container not found', 404), 404);
+    // Verify employee belongs to organization
+    const employee = getEmployee(employeeId);
+    if (!employee || employee.organizationId !== org.id) {
+      return c.json(apiError('Employee not found', 404), 404);
     }
 
-    const result = await createQASession(org.id, containerId);
+    const result = await createQASession(org.id, employeeId);
 
     return c.json(apiSuccess(result), 201);
   } catch (error: any) {

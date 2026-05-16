@@ -4,7 +4,7 @@ import { CyberCard } from '../components/CyberCard';
 import { CyberButton } from '../components/CyberButton';
 import { StatusDot } from '../components/StatusDot';
 import { useApi, apiRequest } from '../hooks/useApi';
-import type { Container } from '../types';
+import type { Employee } from '../types';
 
 interface Session {
   id: string;
@@ -55,31 +55,31 @@ export function AgentDetail() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: container, loading: containerLoading, error: containerError } = 
-    useApi<Container>(`/api/containers/${id}`);
+  const { data: employee, loading: employeeLoading, error: employeeError } = 
+    useApi<Employee>(`/api/employees/${id}`);
   
 
   const { data: sessions, loading: sessionsLoading, refetch: refetchSessions } =
-    useApi<Session[]>(`/api/containers/${id}/sessions`);
+    useApi<Session[]>(`/api/employees/${id}/sessions`);
   
   const { data: roleSkills } =
-    useApi<{id: string; name: string; description?: string}[]>(container ? `/api/roles/${container.roleSlug}/skills` : '');
+    useApi<{id: string; name: string; description?: string}[]>(employee ? `/api/roles/${employee.roleSlug}/skills` : '');
   
   const { data: roleMcps } =
-    useApi<{id: string; name: string; description?: string}[]>(container ? `/api/roles/${container.roleSlug}/mcps` : '');
+    useApi<{id: string; name: string; description?: string}[]>(employee ? `/api/roles/${employee.roleSlug}/mcps` : '');
 
-  // Trigger health check when container loads
+  // Trigger health check when employee loads
   useEffect(() => {
-    if (container && id) {
-      apiRequest<{ healthStatus: string }>(`/api/containers/${id}/health-check`, { method: 'POST' })
+    if (employee && id) {
+      apiRequest<{ healthStatus: string }>(`/api/employees/${id}/health-check`, { method: 'POST' })
         .then(result => {
           if (result.data?.healthStatus) {
-            // Health status updated on backend, container will refetch
+            // Health status updated on backend, employee will refetch
           }
         })
         .catch(err => console.error('Health check failed:', err));
     }
-  }, [container, id]);
+  }, [employee, id]);
 
 
   // Fetch messages when active session changes
@@ -96,9 +96,9 @@ export function AgentDetail() {
 
   const fetchMessages = async (sessionId: string) => {
     try {
-      if (!container) return;
+      if (!employee) return;
       const orgsResult = await apiRequest<{ id: string; slug: string }[]>(`/api/organizations`);
-      const org = orgsResult.data.find((o: any) => container.organizationId === o.id);
+      const org = orgsResult.data.find((o: any) => employee.organizationId === o.id);
       if (!org) return;
 
       const result = await apiRequest<Message[]>(
@@ -111,15 +111,15 @@ export function AgentDetail() {
   };
 
   const handleCreateSession = async () => {
-    if (!container) return;
+    if (!employee) return;
     
     try {
       const orgsResult = await apiRequest<{ id: string; slug: string }[]>(`/api/organizations`);
-      const org = orgsResult.data.find((o: any) => o.id === container.organizationId);
+      const org = orgsResult.data.find((o: any) => o.id === employee.organizationId);
       if (!org) return;
 
       const result = await apiRequest<Session>(
-        `/api/orgs/${org.slug}/containers/${id}/sessions`,
+        `/api/orgs/${org.slug}/employees/${id}/sessions`,
         { method: 'POST' }
       );
       setActiveSession(result.data);
@@ -131,7 +131,7 @@ export function AgentDetail() {
   };
 
   const handleSendMessage = async () => {
-    if (!inputText.trim() || !activeSession || !container) return;
+    if (!inputText.trim() || !activeSession || !employee) return;
 
     const userMessage = inputText.trim();
     setInputText('');
@@ -140,7 +140,7 @@ export function AgentDetail() {
 
     try {
       const orgsResult = await apiRequest<{ id: string; slug: string }[]>(`/api/organizations`);
-      const org = orgsResult.data.find((o: any) => o.id === container.organizationId);
+      const org = orgsResult.data.find((o: any) => o.id === employee.organizationId);
       if (!org) return;
 
       const result = await apiRequest<{ response: string; sessionId: string }>(
@@ -158,8 +158,7 @@ export function AgentDetail() {
   };
 
 
-
-  if (containerLoading) {
+  if (employeeLoading) {
     return (
       <div className="page-transition space-y-6">
         <CyberCard className="h-40">
@@ -169,13 +168,13 @@ export function AgentDetail() {
     );
   }
 
-  if (containerError || !container) {
+  if (employeeError || !employee) {
     return (
       <div className="page-transition">
         <CyberCard>
           <div className="p-8 text-center">
             <p className="text-cyber-error mb-4">未找到智能体</p>
-            <CyberButton onClick={() => navigate('/containers')}>
+            <CyberButton onClick={() => navigate('/employees')}>
               返回智能体列表
             </CyberButton>
           </div>
@@ -188,14 +187,14 @@ export function AgentDetail() {
     <div className="page-transition space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <CyberButton variant="ghost" onClick={() => navigate('/containers')} className="!p-2">
+        <CyberButton variant="ghost" onClick={() => navigate('/employees')} className="!p-2">
           <ArrowLeftIcon className="w-5 h-5" />
         </CyberButton>
         <div className="flex-1">
-          <h1 className="text-2xl font-display font-bold text-cyber-white">{container.roleSlug}</h1>
+          <h1 className="text-2xl font-display font-bold text-cyber-white">{employee.roleSlug}</h1>
           <p className="text-cyber-muted text-sm">智能体详情</p>
         </div>
-        <StatusDot status={container.status} showLabel />
+        <StatusDot status={employee.status} showLabel />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -208,24 +207,23 @@ export function AgentDetail() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-cyber-muted">ID</span>
-                  <code className="text-cyber-white">{container.id.slice(0, 16)}</code>
+                  <code className="text-cyber-white">{employee.id.slice(0, 16)}</code>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-cyber-muted">版本</span>
-                  <code className="text-cyber-purple">{container.roleVersion}</code>
+                  <code className="text-cyber-purple">{employee.roleVersion}</code>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-cyber-muted">端口</span>
-                  <span className="text-cyber-white">{container.port}</span>
+                  <span className="text-cyber-white">{employee.port}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-cyber-muted">健康状态</span>
-                  <StatusDot status={container.healthStatus === 'healthy' ? 'running' : 'error'} showLabel />
+                  <StatusDot status={employee.healthStatus === 'healthy' ? 'running' : 'error'} showLabel />
                 </div>
               </div>
             </div>
           </CyberCard>
-
 
 
           {/* Config */}

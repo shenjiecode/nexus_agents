@@ -53,3 +53,9 @@ data/
 
 # Role build artifacts
 backend/roles/
+
+# Matrix sensitive files
+matrix/config/matrix_key.pem
+matrix/.env
+matrix/data/
+matrix/logs/

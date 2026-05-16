@@ -5,7 +5,7 @@ const navItems = [
   { path: '/', label: '控制台', icon: LayoutDashboardIcon },
   { path: '/organizations', label: '组织管理', icon: BuildingIcon },
   { path: '/roles', label: '角色管理', icon: UserCogIcon },
-  { path: '/containers', label: '智能体', icon: ContainerIcon },
+  { path: '/employees', label: '智能体', icon: ContainerIcon },
   { path: '/marketplace', label: '市场', icon: MarketplaceIcon },
 ];
 

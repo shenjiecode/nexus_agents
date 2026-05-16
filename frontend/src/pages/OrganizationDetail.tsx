@@ -5,7 +5,7 @@ import { CyberButton } from '../components/CyberButton';
 import { CyberModal } from '../components/CyberModal';
 import { StatusDot } from '../components/StatusDot';
 import { useApi, apiRequest } from '../hooks/useApi';
-import type { Organization, Container, Role, CreateContainerRequest } from '../types';
+import type { Organization, Employee, Role, CreateEmployeeRequest } from '../types';
 
 function ArrowLeftIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -48,6 +48,7 @@ function StopIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
 function KeyIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -71,13 +72,13 @@ export function OrganizationDetail() {
   const [isHireModalOpen, setIsHireModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [containerToRemove, setContainerToRemove] = useState<string | null>(null);
-  const [hireForm, setHireForm] = useState<CreateContainerRequest>({
+  const [employeeToRemove, setEmployeeToRemove] = useState<string | null>(null);
+  const [hireForm, setHireForm] = useState<CreateEmployeeRequest>({
     roleSlug: '',
     roleVersion: '',
   });
-const [apiKey, setApiKey] = useState<string | null>(null);
-const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [isFetchingKey, setIsFetchingKey] = useState(false);
@@ -89,12 +90,12 @@ const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
   const { data: organization, loading: orgLoading, error: orgError } = 
     useApi<Organization>(`/api/organizations/${slug}`);
   
-  const { data: containers, loading: containersLoading, error: containersError, refetch: refetchContainers } = 
-    useApi<Container[]>(`/api/orgs/${slug}/containers`);
+  const { data: employees, loading: employeesLoading, error: employeesError, refetch: refetchEmployees } = 
+    useApi<Employee[]>(`/api/orgs/${slug}/employees`);
   
   const { data: roles } = useApi<Role[]>('/api/roles');
 
-  const handleHireContainer = async (e: React.FormEvent) => {
+  const handleHireEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hireForm.roleSlug || !hireForm.roleVersion) return;
 
@@ -102,31 +103,31 @@ const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
     setSubmitError(null);
 
     try {
-      await apiRequest<Container>(`/api/orgs/${slug}/containers`, {
+      await apiRequest<Employee>(`/api/orgs/${slug}/employees`, {
         method: 'POST',
         body: JSON.stringify(hireForm),
       });
       setIsHireModalOpen(false);
       setHireForm({ roleSlug: '', roleVersion: '' });
-      refetchContainers();
+      refetchEmployees();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to hire container');
+      setSubmitError(err instanceof Error ? err.message : 'Failed to hire employee');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleRemoveContainer = async () => {
-    if (!containerToRemove) return;
+  const handleRemoveEmployee = async () => {
+    if (!employeeToRemove) return;
 
     try {
-      await apiRequest<void>(`/api/containers/${containerToRemove}`, {
+      await apiRequest<void>(`/api/employees/${employeeToRemove}`, {
         method: 'DELETE',
       });
-      setContainerToRemove(null);
-      refetchContainers();
+      setEmployeeToRemove(null);
+      refetchEmployees();
     } catch (err) {
-      console.error('Failed to remove container:', err);
+      console.error('Failed to remove employee:', err);
     }
   };
 
@@ -247,12 +248,12 @@ const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
               <code className="block mt-1 text-cyber-cyan font-mono">{organization.slug}</code>
             </div>
             <div>
-              <label className="text-xs font-mono text-cyber-muted uppercase">容器数量</label>
+              <label className="text-xs font-mono text-cyber-muted uppercase">员工数量</label>
               <div className="mt-1">
                 {organization.containerCount && organization.containerCount > 0 ? (
                   <StatusDot status="active" showLabel />
                 ) : (
-                  <span className="text-cyber-muted">无活跃容器</span>
+                  <span className="text-cyber-muted">无活跃员工</span>
                 )}
               </div>
             </div>
@@ -370,13 +371,13 @@ const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-display font-semibold text-cyber-white">Containers</h2>
+          <h2 className="text-xl font-display font-semibold text-cyber-white">Employees</h2>
           <CyberButton
             onClick={() => setIsHireModalOpen(true)}
             icon={<PlusIcon className="w-5 h-5" />}
             size="sm"
           >
-            雇佣 Container
+            雇佣 Employee
           </CyberButton>
         </div>
 
@@ -389,12 +390,12 @@ const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
                   <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">版本</th>
                   <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">状态</th>
                   <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">端口</th>
-                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Container ID</th>
+                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Employee ID</th>
                   <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">操作</th>
                 </tr>
               </thead>
               <tbody>
-                {containersLoading ? (
+                {employeesLoading ? (
                   [...Array(3)].map((_, i) => (
                     <tr key={i} className="border-b border-cyber-cyan/10">
                       <td colSpan={6} className="py-4 px-6">
@@ -402,45 +403,45 @@ const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
                       </td>
                     </tr>
                   ))
-                ) : containersError ? (
+                ) : employeesError ? (
                   <tr>
                     <td colSpan={6} className="py-8 px-6 text-center text-cyber-error">
-                      加载 Container 失败
+                      加载 Employee 失败
                     </td>
                   </tr>
-                ) : containers?.length === 0 ? (
+                ) : employees?.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-8 px-6 text-center text-cyber-muted">
-                      尚未雇佣 Container
+                      尚未雇佣 Employee
                     </td>
                   </tr>
                 ) : (
-                  containers?.map((container) => (
+                  employees?.map((employee) => (
                     <tr
-                      key={container.id}
+                      key={employee.id}
                       className="border-b border-cyber-cyan/10 hover:bg-cyber-cyan/5 transition-colors cursor-pointer"
-                      onClick={() => navigate(`/containers/${container.id}`)}
+                      onClick={() => navigate(`/employees/${employee.id}`)}
                     >
                       <td className="py-4 px-6">
-                        <span className="font-medium text-cyber-white">{container.roleSlug}</span>
+                        <span className="font-medium text-cyber-white">{employee.roleSlug}</span>
                       </td>
                       <td className="py-4 px-6">
-                        <code className="font-mono text-sm text-cyber-purple">{container.roleVersion}</code>
+                        <code className="font-mono text-sm text-cyber-purple">{employee.roleVersion}</code>
                       </td>
                       <td className="py-4 px-6">
-                        <StatusDot status={container.status} showLabel />
+                        <StatusDot status={employee.status} showLabel />
                       </td>
                       <td className="py-4 px-6">
-                        <span className="font-mono text-cyber-white">{container.port}</span>
+                        <span className="font-mono text-cyber-white">{employee.port}</span>
                       </td>
                       <td className="py-4 px-6">
                         <code className="font-mono text-xs text-cyber-muted">
-                          {container.id.slice(0, 16)}
+                          {employee.id.slice(0, 16)}
                         </code>
                       </td>
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                          {container.status === 'running' ? (
+                          {employee.status === 'running' ? (
                             <CyberButton variant="ghost" size="sm" className="!p-1">
                               <StopIcon className="w-4 h-4 text-cyber-warning" />
                             </CyberButton>
@@ -453,7 +454,7 @@ const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
                             variant="ghost"
                             size="sm"
                             className="!p-1"
-                            onClick={() => setContainerToRemove(String(container.id))}
+                            onClick={() => setEmployeeToRemove(String(employee.id))}
                           >
                             <TrashIcon className="w-4 h-4 text-cyber-error" />
                           </CyberButton>
@@ -468,11 +469,11 @@ const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
         </CyberCard>
       </div>
 
-      {/* Hire Container Modal */}
+      {/* Hire Employee Modal */}
       <CyberModal
         isOpen={isHireModalOpen}
         onClose={() => setIsHireModalOpen(false)}
-        title="雇佣新 Container"
+        title="雇佣新 Employee"
         footer={
           <>
             <CyberButton variant="ghost" onClick={() => setIsHireModalOpen(false)}>
@@ -483,12 +484,12 @@ const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
               form="hire-form"
               disabled={isSubmitting || !hireForm.roleSlug || !hireForm.roleVersion}
             >
-              {isSubmitting ? '雇佣中...' : '雇佣 Container'}
+              {isSubmitting ? '雇佣中...' : '雇佣 Employee'}
             </CyberButton>
           </>
         }
       >
-        <form id="hire-form" onSubmit={handleHireContainer} className="space-y-4">
+        <form id="hire-form" onSubmit={handleHireEmployee} className="space-y-4">
           {submitError && (
             <div className="p-3 rounded-lg bg-cyber-error/10 border border-cyber-error/30 text-cyber-error text-sm">
               {submitError}
@@ -537,23 +538,23 @@ const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
 
       {/* Remove Confirmation Modal */}
       <CyberModal
-        isOpen={!!containerToRemove}
-        onClose={() => setContainerToRemove(null)}
-        title="移除 Container"
+        isOpen={!!employeeToRemove}
+        onClose={() => setEmployeeToRemove(null)}
+        title="移除 Employee"
         size="sm"
         footer={
           <>
-            <CyberButton variant="ghost" onClick={() => setContainerToRemove(null)}>
+            <CyberButton variant="ghost" onClick={() => setEmployeeToRemove(null)}>
               取消
             </CyberButton>
-            <CyberButton variant="danger" onClick={handleRemoveContainer}>
+            <CyberButton variant="danger" onClick={handleRemoveEmployee}>
               移除
             </CyberButton>
           </>
         }
       >
         <p className="text-cyber-muted">
-          确定要移除此 Container 吗？此操作不可撤销。
+          确定要移除此 Employee 吗？此操作不可撤销。
         </p>
       </CyberModal>
 

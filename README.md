@@ -15,7 +15,7 @@
 │         ▼                 ▼                    ▼            │
 │  ┌─────────────┐   ┌─────────────┐   ┌─────────────────┐    │
 │  │  Database   │   │   Docker    │   │ Matrix Homeserver│    │
-│  │  (SQLite)   │   │  /Podman    │   │   (external)     │    │
+│  │  (PostgreSQL)│   │  /Podman    │   │   (external)     │    │
 │  └─────────────┘   └─────────────┘   └─────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -91,13 +91,11 @@ PUT  /rooms/.../send    - 发送消息
 - 需要长期维护的大型项目
 
 ---
-
 ## 技术栈
 
 | 层级 | 技术 |
 |------|------|
-| Frontend | React + TypeScript, shadcn/ui + Tailwind |
-| Backend | Hono + Drizzle ORM + SQLite |
+| Backend | Hono + Drizzle ORM + PostgreSQL |
 | Agent Container | Node.js 24 + TypeScript |
 | Container Runtime | Docker / Podman |
 | Messaging | Matrix (Synapse/Dendrite/Conduit) |

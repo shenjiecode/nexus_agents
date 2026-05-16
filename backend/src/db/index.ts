@@ -1,271 +1,54 @@
 import logger from '../lib/logger.js';
-import initSqlJs from 'sql.js';
-import { drizzle } from 'drizzle-orm/sql-js';
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
 import {
   organizations,
   roles,
   roleVersions,
-  containers,
-  sessions,
   skills,
   mcps,
   roleSkills,
   roleMcps,
-  employees
+  employees,
 } from './schema.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const schema = {
+  organizations,
+  roles,
+  roleVersions,
+  skills,
+  mcps,
+  roleSkills,
+  roleMcps,
+  employees,
+};
 
-// Database file path
-const DATA_DIR = path.join(process.cwd(), 'data');
-const DB_PATH = path.join(DATA_DIR, 'database.db');
+const connectionString = process.env.DATABASE_URL || (() => { throw new Error('DATABASE_URL environment variable is required'); })();
 
-// Ensure data directory exists
-if (!existsSync(DATA_DIR)) {
-  mkdirSync(DATA_DIR, { recursive: true });
-}
-
-// Database instance
+// Database instances
+const client = postgres(connectionString);
 let db: ReturnType<typeof drizzle> | null = null;
-let sqlDb: any = null;
-
-// Auto-save interval (30 seconds)
-const AUTO_SAVE_INTERVAL = 30000;
-let saveInterval: ReturnType<typeof setInterval> | null = null;
 
 /**
- * Save database to file
- */
-function saveDatabaseToFile(database: any): void {
-  try {
-    const data = database.export();
-    const buffer = Buffer.from(data);
-    writeFileSync(DB_PATH, buffer);
-  } catch (error) {
-    logger.error(error, 'Failed to save database');
-  }
-}
-
-/**
- * Initialize database with schema
- */
-async function initSchema(database: any): Promise<void> {
-  database.run(`
-    CREATE TABLE IF NOT EXISTS organizations (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      slug TEXT NOT NULL UNIQUE,
-      description TEXT,
-      api_key TEXT UNIQUE,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-  `);
-
-  database.run(`
-    CREATE TABLE IF NOT EXISTS roles (
-      id TEXT PRIMARY KEY,
-      slug TEXT NOT NULL UNIQUE,
-      name TEXT NOT NULL,
-      description TEXT,
-      version TEXT NOT NULL DEFAULT '1.0.0',
-      image_name TEXT,
-      config TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-  `);
-
-  database.run(`
-    CREATE TABLE IF NOT EXISTS role_versions (
-      id TEXT PRIMARY KEY,
-      role_id TEXT NOT NULL,
-      version TEXT NOT NULL,
-      image_name TEXT NOT NULL,
-      config TEXT,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (role_id) REFERENCES roles(id)
-    );
-  `);
-
-  database.run(`
-    CREATE TABLE IF NOT EXISTS containers (
-      id TEXT PRIMARY KEY,
-      organization_id TEXT NOT NULL,
-      role_id TEXT NOT NULL,
-      role_version TEXT NOT NULL DEFAULT 'latest',
-      container_id TEXT NOT NULL,
-      port INTEGER NOT NULL,
-      password TEXT,
-      status TEXT NOT NULL,
-      health_status TEXT NOT NULL,
-      memory_path TEXT,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (organization_id) REFERENCES organizations(id),
-      FOREIGN KEY (role_id) REFERENCES roles(id)
-    );
-  `);
-
-  database.run(`
-    CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY,
-      organization_id TEXT NOT NULL,
-      container_id TEXT NOT NULL,
-      opencode_session_id TEXT NOT NULL,
-      status TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (organization_id) REFERENCES organizations(id),
-      FOREIGN KEY (container_id) REFERENCES containers(id)
-    );
-  `);
-
-  database.run(`
-    CREATE TABLE IF NOT EXISTS skills (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      slug TEXT NOT NULL UNIQUE,
-      description TEXT NOT NULL,
-      category TEXT,
-      skill_path TEXT NOT NULL,
-      metadata TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-  `);
-
-  database.run(`
-    CREATE TABLE IF NOT EXISTS mcps (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      slug TEXT NOT NULL UNIQUE,
-      description TEXT NOT NULL,
-      category TEXT,
-      server_type TEXT NOT NULL DEFAULT 'local',
-      command TEXT NOT NULL,
-      env_template TEXT,
-      requires_api_key INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-  `);
-
-  database.run(`
-    CREATE TABLE IF NOT EXISTS role_skills (
-      id TEXT PRIMARY KEY,
-      role_id TEXT NOT NULL,
-      skill_id TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (role_id) REFERENCES roles(id),
-      FOREIGN KEY (skill_id) REFERENCES skills(id)
-    );
-  `);
-
-  database.run(`
-    CREATE TABLE IF NOT EXISTS role_mcps (
-      id TEXT PRIMARY KEY,
-      role_id TEXT NOT NULL,
-      mcp_id TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (role_id) REFERENCES roles(id),
-      FOREIGN KEY (mcp_id) REFERENCES mcps(id)
-    );
-  `);
-
-  database.run(`
-    CREATE TABLE IF NOT EXISTS employees (
-      id TEXT PRIMARY KEY,
-      slug TEXT NOT NULL UNIQUE,
-      name TEXT NOT NULL,
-      role_id TEXT NOT NULL,
-      organization_id TEXT,
-      container_id TEXT,
-      employee_data_path TEXT,
-      matrix_user_id TEXT UNIQUE,
-      matrix_access_token TEXT,
-      matrix_device_id TEXT,
-      matrix_password TEXT,
-      matrix_homeserver_url TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      FOREIGN KEY (role_id) REFERENCES roles(id),
-      FOREIGN KEY (organization_id) REFERENCES organizations(id),
-      FOREIGN KEY (container_id) REFERENCES containers(id)
-    );
-  `);
-}
-
-/**
- * Initialize database - load from file or create new
+ * Initialize database connection
  */
 export async function initDatabase(): Promise<ReturnType<typeof drizzle>> {
   if (db) return db;
 
-  const SQL = await initSqlJs({
-    locateFile: (file: string) => path.join(__dirname, '../../node_modules/sql.js/dist', file),
-  });
-
-  // Try to load existing database
-  if (existsSync(DB_PATH)) {
-    try {
-      const fileBuffer = readFileSync(DB_PATH);
-      sqlDb = new SQL.Database(fileBuffer);
-      logger.info({ path: DB_PATH }, 'Database loaded from file');
-    } catch (error) {
-      logger.error(error, 'Failed to load database, creating new one');
-      sqlDb = new SQL.Database();
-    }
-    // Always run schema init to ensure new tables are created (uses IF NOT EXISTS)
-    await initSchema(sqlDb);
-  } else {
-    // Create new database
-    sqlDb = new SQL.Database();
-    await initSchema(sqlDb);
-    logger.info({ path: DB_PATH }, 'New database created');
-  }
-
-  db = drizzle(sqlDb);
-
-  // Setup auto-save
-  saveInterval = setInterval(() => {
-    if (sqlDb) {
-      saveDatabaseToFile(sqlDb);
-    }
-  }, AUTO_SAVE_INTERVAL);
-
-  // Save on process exit
-  process.on('beforeExit', () => {
-    if (sqlDb) {
-      saveDatabaseToFile(sqlDb);
-    }
-  });
+  db = drizzle(client, { schema });
+  logger.info({ connectionString: connectionString.replace(/:([^@]+)@/, ':****@') }, 'Connected to PostgreSQL');
 
   return db;
 }
 
 /**
- * Force save database to file
- */
-export function saveDatabase(): void {
-  if (sqlDb) {
-    saveDatabaseToFile(sqlDb);
-  }
-}
-
-/**
  * Close database connection
  */
-export function closeDatabase(): void {
-  if (saveInterval) {
-    clearInterval(saveInterval);
-  }
-  if (sqlDb) {
-    saveDatabaseToFile(sqlDb);
-    sqlDb.close();
-    sqlDb = null;
+export async function closeDatabase(): Promise<void> {
+  if (client) {
+    await client.end();
     db = null;
+    logger.info('Database connection closed');
   }
 }
 
@@ -274,11 +57,9 @@ export {
   organizations,
   roles,
   roleVersions,
-  containers,
-  sessions,
   skills,
   mcps,
   roleSkills,
   roleMcps,
-  employees
+  employees,
 };

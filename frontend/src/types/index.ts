@@ -28,7 +28,7 @@ export interface RoleVersion {
   createdAt: string;
 }
 
-export interface Container {
+export interface Employee {
   id: string;
   organizationId?: string;
   roleSlug: string;
@@ -52,7 +52,7 @@ export interface CreateRoleRequest {
   description: string;
 }
 
-export interface CreateContainerRequest {
+export interface CreateEmployeeRequest {
   roleSlug: string;
   roleVersion: string;
 }
@@ -66,13 +66,13 @@ export interface ApiResponse<T> {
 export interface SystemStats {
   totalOrganizations: number;
   totalRoles: number;
-  runningContainers: number;
-  totalContainers: number;
+  runningEmployees: number;
+  totalEmployees: number;
 }
 
 export interface Activity {
   id: number;
-  type: 'org_created' | 'role_created' | 'container_hired' | 'container_removed' | 'container_status_changed';
+  type: 'org_created' | 'role_created' | 'employee_hired' | 'employee_removed' | 'employee_status_changed';
   message: string;
   timestamp: string;
   metadata?: Record<string, unknown>;

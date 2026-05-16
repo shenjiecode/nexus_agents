@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CyberCard } from '../components/CyberCard';
 import { useApi } from '../hooks/useApi';
-import type { Organization, Role, Container, SystemStats } from '../types';
+import type { Organization, Role, Employee, SystemStats } from '../types';
 
 function StatCard({ title, value, subtitle, icon: Icon, color }: {
   title: string;
@@ -39,9 +39,9 @@ function ActivityItem({ activity }: { activity: { message: string; timestamp: st
   const typeIcons: Record<string, string> = {
     org_created: '🏢',
     role_created: '👤',
-    container_hired: '🚀',
-    container_removed: '🗑️',
-    container_status_changed: '🔄',
+    employee_hired: '🚀',
+    employee_removed: '🗑️',
+    employee_status_changed: '🔄',
   };
 
   return (
@@ -116,31 +116,31 @@ function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
 export function Dashboard() {
   const { data: organizations, loading: orgsLoading } = useApi<Organization[]>('/api/organizations');
   const { data: roles, loading: rolesLoading } = useApi<Role[]>('/api/roles');
-  const { data: containers, loading: containersLoading } = useApi<Container[]>('/api/containers');
+  const { data: employees, loading: employeesLoading } = useApi<Employee[]>('/api/employees');
   const [stats, setStats] = useState<SystemStats>({
     totalOrganizations: 0,
     totalRoles: 0,
-    runningContainers: 0,
-    totalContainers: 0,
+    runningEmployees: 0,
+    totalEmployees: 0,
   });
 
   useEffect(() => {
-    if (organizations && roles && containers) {
+    if (organizations && roles && employees) {
       setStats({
         totalOrganizations: organizations.length,
         totalRoles: roles.length,
-        runningContainers: containers.filter(c => c.status === 'running').length,
-        totalContainers: containers.length,
+        runningEmployees: employees.filter(c => c.status === 'running').length,
+        totalEmployees: employees.length,
       });
     }
-  }, [organizations, roles, containers]);
+  }, [organizations, roles, employees]);
 
-  const loading = orgsLoading || rolesLoading || containersLoading;
+  const loading = orgsLoading || rolesLoading || employeesLoading;
 
   const activities = [
     { message: '组织 "TechCorp" 已创建', timestamp: '2 分钟前', type: 'org_created' },
-    { message: '已为 Sales Role 雇佣智能体', timestamp: '15 分钟前', type: 'container_hired' },
-    { message: '智能体状态已变为运行中', timestamp: '1 小时前', type: 'container_status_changed' },
+    { message: '已为 Sales Role 雇佣智能体', timestamp: '15 分钟前', type: 'employee_hired' },
+    { message: '智能体状态已变为运行中', timestamp: '1 小时前', type: 'employee_status_changed' },
     { message: '新 Role "Customer Support" 已添加', timestamp: '2 小时前', type: 'role_created' },
   ];
 
@@ -185,8 +185,8 @@ export function Dashboard() {
           />
           <StatCard
             title="运行智能体"
-            value={stats.runningContainers}
-            subtitle={`共 ${stats.totalContainers} 个`}
+            value={stats.runningEmployees}
+            subtitle={`共 ${stats.totalEmployees} 个`}
             icon={ContainerIcon}
             color="success"
           />
@@ -221,7 +221,7 @@ export function Dashboard() {
             <QuickActionCard
               title="查看智能体"
               description="管理运行中的 AI 代理实例"
-              to="/containers"
+              to="/employees"
               icon={ContainerIcon}
             />
             <QuickActionCard

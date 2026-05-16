@@ -15,7 +15,7 @@ regenerateApiKey,
 revokeApiKey,
 type AuthConfig,
 } from '../../services/org-service.js';
-import { rebuildContainersForOrg } from '../../services/container-manager.js';
+import { rebuildEmployeesForOrg } from '../../services/employee-manager.js';
 // Standard API response helper
 function apiSuccess<T>(data: T) {
   return { success: true, data };
@@ -215,7 +215,7 @@ organizations.put('/api/orgs/:slug/auth', async (c) => {
     setOrganizationAuth(slug, body as AuthConfig);
     
     // Rebuild containers with new auth config
-    const rebuildResult = await rebuildContainersForOrg(slug);
+    const rebuildResult = await rebuildEmployeesForOrg(slug);
     
     return c.json(apiSuccess({
       success: true,
