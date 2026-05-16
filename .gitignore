@@ -59,3 +59,9 @@ matrix/config/matrix_key.pem
 matrix/.env
 matrix/data/
 matrix/logs/
+
+# Docker data
+docker-data/
+
+# Backup files
+*_bak.*

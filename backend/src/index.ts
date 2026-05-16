@@ -10,7 +10,6 @@ import sessionRoutes from './api/routes/sessions.js'
 import marketplaceRoutes from './api/routes/marketplace.js'
 import { restoreEmployees } from './services/employee-manager.js'
 import { initDatabase, closeDatabase } from './db/index.js'
-import { initializeMarketplace } from './services/marketplace-service.js'
 
 const app = new Hono()
 
@@ -60,17 +59,14 @@ async function initialize() {
     const restored = await restoreEmployees()
     logger.info(`Restored ${restored} employees from database`)
 
-    // Initialize marketplace with demo data
-    await initializeMarketplace()
-    logger.info('Marketplace initialized')
-
     // Start server
     const { serve } = await import('@hono/node-server')
+    const port = parseInt(process.env.PORT || '13207', 10)
     serve({
       fetch: app.fetch,
-      port: 13207
+      port,
     })
-    logger.info('Server started on port 13207')
+    logger.info(`Server started on port ${port}`)
   } catch (error) {
     logger.error(error, 'Failed to initialize')
     process.exit(1)
