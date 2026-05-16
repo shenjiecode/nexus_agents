@@ -1,6 +1,6 @@
 # Matrix Stack - Dendrite Homeserver + Element Web
 # Independent of Business stack - no internal network communication
-# nexus-postgres moved to business stack (docker-compose.business.yml)
+# Run from project root: docker-compose -f docker-compose.matrix.yml up -d
 
 services:
   # Matrix database
@@ -14,7 +14,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-itsasecret}
       POSTGRES_DB: dendrite
     volumes:
-      - ./data/matrix-postgres:/var/lib/postgresql/data
+      - ./matrix/data/matrix-postgres:/var/lib/postgresql/data
     networks:
       - matrix-net
     healthcheck:
@@ -32,9 +32,9 @@ services:
       - "8008:8008"
       - "8448:8448"
     volumes:
-      - ./config:/etc/dendrite
-      - ./data/media:/var/dendrite/media
-      - ./data/jetstream:/var/dendrite/jetstream
+      - ./matrix/config:/etc/dendrite
+      - ./matrix/data/media:/var/dendrite/media
+      - ./matrix/data/jetstream:/var/dendrite/jetstream
     networks:
       - matrix-net
     depends_on:
@@ -53,7 +53,7 @@ services:
     depends_on:
       - dendrite
     volumes:
-      - ./config/element-config.json:/app/config.json:ro
+      - ./matrix/config/element-config.json:/app/config.json:ro
     restart: unless-stopped
 
 networks:
