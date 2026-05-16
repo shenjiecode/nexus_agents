@@ -1,0 +1,7 @@
+# Matrix Stack - moved to root directory
+# Use: docker-compose -f docker-compose.matrix.yml up -d
+# See: ../docker-compose.matrix.yml for the actual configuration
+
+# This file is kept for reference. The canonical docker-compose files are now:
+# - ../docker-compose.business.yml (backend + frontend + nexus-postgres)
+# - ../docker-compose.matrix.yml (dendrite + matrix-postgres + element-web)

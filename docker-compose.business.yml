@@ -1,0 +1,90 @@
+# Business Stack - Nexus Agents Platform
+# backend + frontend + nexus-postgres
+# Independent of Matrix stack - communicates via public URLs
+
+services:
+  # Business database
+  nexus-postgres:
+    image: postgres:15-alpine
+    container_name: nexus-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexussecret}
+      POSTGRES_DB: nexus
+    volumes:
+      - ./docker-data/nexus-postgres:/var/lib/postgresql/data
+    networks:
+      - business-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexus-backend
+    ports:
+      - "13207:13207"
+    environment:
+      NODE_ENV: production
+      PORT: 13207
+      # Database connection (internal to business stack)
+      DATABASE_URL: postgresql://nexus:${POSTGRES_PASSWORD:-nexussecret}@nexus-postgres:5432/nexus
+      # Matrix connection (external - point to Matrix stack)
+      MATRIX_HOMESERVER_URL: ${MATRIX_HOMESERVER_URL:-http://localhost:8008}
+      MATRIX_REGISTRATION_SECRET: ${MATRIX_REGISTRATION_SECRET:-dev-secret-change-in-production}
+      # OpenCode configuration
+      OPENCODE_PROVIDER_NAME: ${OPENCODE_PROVIDER_NAME:-tencent-coding-plan}
+      OPENCODE_API_KEY: ${OPENCODE_API_KEY}
+      # Docker socket for container management
+      DOCKER_HOST: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+    volumes:
+      # Docker socket for managing containers
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Agent data persistence
+      - ./backend/data:/app/data
+    networks:
+      - business-net
+    depends_on:
+      nexus-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:13207/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Frontend Web UI
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nexus-frontend
+    ports:
+      - "13208:80"
+    environment:
+      # Backend URL for API proxy (internal to business stack)
+      BACKEND_URL: http://backend:13207
+    networks:
+      - business-net
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+networks:
+  business-net:
+    driver: bridge

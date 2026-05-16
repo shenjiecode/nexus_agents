@@ -1,0 +1,61 @@
+# Matrix Stack - Dendrite Homeserver + Element Web
+# Independent of Business stack - no internal network communication
+# nexus-postgres moved to business stack (docker-compose.business.yml)
+
+services:
+  # Matrix database
+  matrix-postgres:
+    image: postgres:15-alpine
+    container_name: matrix-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: dendrite
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-itsasecret}
+      POSTGRES_DB: dendrite
+    volumes:
+      - ./data/matrix-postgres:/var/lib/postgresql/data
+    networks:
+      - matrix-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dendrite"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Dendrite Homeserver
+  dendrite:
+    image: matrixdotorg/dendrite-monolith:latest
+    container_name: matrix-dendrite
+    ports:
+      - "8008:8008"
+      - "8448:8448"
+    volumes:
+      - ./config:/etc/dendrite
+      - ./data/media:/var/dendrite/media
+      - ./data/jetstream:/var/dendrite/jetstream
+    networks:
+      - matrix-net
+    depends_on:
+      matrix-postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Element Web Client
+  element-web:
+    image: vectorim/element-web:latest
+    container_name: matrix-element-web
+    ports:
+      - "8080:80"
+    networks:
+      - matrix-net
+    depends_on:
+      - dendrite
+    volumes:
+      - ./config/element-config.json:/app/config.json:ro
+    restart: unless-stopped
+
+networks:
+  matrix-net:
+    driver: bridge
