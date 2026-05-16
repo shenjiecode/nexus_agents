@@ -3,10 +3,11 @@ export interface Organization {
   name: string;
   slug: string;
   description: string;
-  apiKey?: string; // Only returned on creation
+  matrixAdminUserId?: string;
+  matrixAdminPassword?: string;
   createdAt: string;
   updatedAt: string;
-  containerCount?: number;
+  employeeCount?: number;
 }
 
 export interface Role {
@@ -43,6 +44,7 @@ export interface Employee {
 export interface CreateOrganizationRequest {
   name: string;
   slug: string;
+  password: string;
   description: string;
 }
 
@@ -83,9 +85,11 @@ export interface Skill {
   name: string;
   slug: string;
   description: string;
-  category?: string;
-  skillPath: string;
-  metadata?: Record<string, unknown>;
+  category?: string | null;
+  storageKey: string;
+  organizationId?: string | null;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Mcp {
@@ -93,9 +97,24 @@ export interface Mcp {
   name: string;
   slug: string;
   description: string;
-  category?: string;
-  serverType: string;
-  command: string[];
-  envTemplate?: Record<string, string>;
-  requiresApiKey: boolean;
+  category?: string | null;
+  storageKey: string;
+  organizationId?: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface MarketplaceRole {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  organizationId: string | null;
+  config: {
+    mcpIds: string[];
+    skillIds: string[];
+    agentsMd: string;
+  };
+  createdAt: number;
+  updatedAt: number;
 }

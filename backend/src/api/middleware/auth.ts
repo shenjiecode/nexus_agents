@@ -1,93 +1,67 @@
-import { Context, Next } from 'hono';
-import { verifyApiKey } from '../../services/org-service.js';
+import type { Context, Next } from 'hono';
+
+export interface UserContext {
+  role: 'admin' | 'org';
+  id: string; // admin ID or organization ID
+  orgId?: string; // only for org role
+}
 
 /**
- * Auth middleware for organization-level API key authentication
+ * Auth middleware - extracts user info from headers
+ * Frontend should send X-User-Role and X-User-Id headers
  * 
- * Supports two header formats:
- * - X-Api-Key: nexus_live_xxx
- * - Authorization: Bearer nexus_live_xxx
- * 
- * Attaches org context to request: c.set('org', { id, name, slug })
+ * For org role, also sends X-User-OrgId header
  */
 export async function authMiddleware(c: Context, next: Next) {
-  // Get API key from headers
-  const apiKeyFromHeader = c.req.header('X-Api-Key');
-  const authHeader = c.req.header('Authorization');
-  
-  let apiKey: string | undefined;
-  
-  if (apiKeyFromHeader) {
-    apiKey = apiKeyFromHeader;
-  } else if (authHeader && authHeader.startsWith('Bearer ')) {
-    apiKey = authHeader.slice(7);
+  const role = c.req.header('X-User-Role') as 'admin' | 'org' | null;
+  const userId = c.req.header('X-User-Id');
+  const orgId = c.req.header('X-User-OrgId');
+
+  if (!role || !userId) {
+    // No auth info - treat as unauthenticated
+    // Allow read-only operations to proceed without auth
+    c.set('user', null);
+    await next();
+    return;
   }
-  
-  if (!apiKey) {
-    return c.json({
-      success: false,
-      error: 'Missing API key. Provide X-Api-Key header or Authorization: Bearer <key>',
-    }, 401);
+
+  if (role !== 'admin' && role !== 'org') {
+    c.set('user', null);
+    await next();
+    return;
   }
-  
-  // Verify API key
-  const org = await verifyApiKey(apiKey);
-  
-  if (!org) {
-    return c.json({
-      success: false,
-      error: 'Invalid or revoked API key',
-    }, 401);
-  }
-  
-  // Verify URL slug matches API key's organization
-  const urlSlug = c.req.param('slug') || c.req.param('orgSlug');
-  if (urlSlug && org.slug !== urlSlug) {
-    return c.json({
-      success: false,
-      error: 'API key does not match organization in URL',
-    }, 403);
-  }
-  
-  // Attach org context to request
-  c.set('org', org);
-  
+
+  const user: UserContext = {
+    role,
+    id: userId,
+    ...(role === 'org' && orgId ? { orgId } : {}),
+  };
+
+  c.set('user', user);
   await next();
 }
 
 /**
- * Get organization context from request (after auth middleware)
+ * Get user context from context
  */
-export function getOrgContext(c: Context): { id: string; name: string; slug: string } {
-  const org = c.get('org');
-  if (!org) {
-    throw new Error('Organization context not found - auth middleware may not be applied');
-  }
-  return org;
+export function getUser(c: Context): UserContext | null {
+  return c.get('user') as UserContext | null;
 }
 
 /**
- * Optional auth middleware - allows requests without API key for certain routes
- * (e.g., organization creation which doesn't require auth)
+ * Check if user is admin
  */
-export async function optionalAuthMiddleware(c: Context, next: Next) {
-  const apiKeyFromHeader = c.req.header('X-Api-Key');
-  const authHeader = c.req.header('Authorization');
-  
-  let apiKey: string | undefined;
-  
-  if (apiKeyFromHeader) {
-    apiKey = apiKeyFromHeader;
-  } else if (authHeader && authHeader.startsWith('Bearer ')) {
-    apiKey = authHeader.slice(7);
-  }
-  
-  if (apiKey) {
-    const org = await verifyApiKey(apiKey);
-    if (org) {
-      c.set('org', org);
-    }
-  }
-  
-  await next();
+export function isAdmin(c: Context): boolean {
+  const user = getUser(c);
+  return user?.role === 'admin';
+}
+
+/**
+ * Check if user owns the resource (orgId matches)
+ */
+export function isOwner(c: Context, resourceOrgId: string | null | undefined): boolean {
+  const user = getUser(c);
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  return user.orgId === resourceOrgId;
 }

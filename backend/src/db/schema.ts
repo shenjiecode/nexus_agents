@@ -1,4 +1,4 @@
-import { pgTable, text, integer, bigint, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, bigint } from 'drizzle-orm/pg-core';
 
 // Organizations table
 export const organizations = pgTable('organizations', {
@@ -6,7 +6,7 @@ export const organizations = pgTable('organizations', {
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
   description: text('description'),
-  apiKey: text('api_key').unique(), // Organization API key for authentication
+  password: text('password').notNull(), // bcrypt hashed login password
   matrixAdminUserId: text('matrix_admin_user_id'),        // @nexus-admin-{slug}:localhost
   matrixAdminAccessToken: text('matrix_admin_access_token'), // Org admin's Matrix token
   matrixAdminPassword: text('matrix_admin_password'),       // Stored for re-login
@@ -73,8 +73,8 @@ export const skills = pgTable('skills', {
   slug: text('slug').notNull().unique(),
   description: text('description').notNull(),
   category: text('category'), // 分类：development, analysis, writing 等
-  skillPath: text('skill_path').notNull(), // .opencode/skills/{slug}/ 路径
-  metadata: text('metadata'), // JSON: version, license, allowed-tools 等
+  storageKey: text('storage_key').notNull(), // OSS 对象键，如 skills/{slug}.zip
+  organizationId: text('organization_id').references(() => organizations.id), // null=公共
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });
@@ -86,13 +86,24 @@ export const mcps = pgTable('mcps', {
   slug: text('slug').notNull().unique(),
   description: text('description').notNull(),
   category: text('category'), // 分类：tools, filesystem, database 等
-  serverType: text('server_type').notNull().default('local'), // local 或 remote
-  command: text('command').notNull(), // JSON: 启动命令数组
-  envTemplate: text('env_template'), // JSON: 需要填写的环境变量模板
-  requiresApiKey: boolean('requires_api_key').notNull().default(false), // 是否需要 API Key
+  storageKey: text('storage_key').notNull(), // OSS 对象键，如 mcps/{slug}.json
+  organizationId: text('organization_id').references(() => organizations.id), // null=公共
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });
+// Marketplace Roles table - 角色模板（市场）
+export const marketplaceRoles = pgTable('marketplace_roles', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull().unique(), // 全局唯一
+  slug: text('slug').notNull().unique(),
+  description: text('description').notNull(),
+  organizationId: text('organization_id').references(() => organizations.id), // null=公共
+  config: text('config'), // JSON: { mcpIds: string[], skillIds: string[], agentsMd: string }
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+});
+
+
 
 // Role Skills junction - 角色关联的 Skills
 export const roleSkills = pgTable('role_skills', {
@@ -125,6 +136,8 @@ export type RoleSkill = typeof roleSkills.$inferSelect;
 export type NewRoleSkill = typeof roleSkills.$inferInsert;
 export type RoleMcp = typeof roleMcps.$inferSelect;
 export type NewRoleMcp = typeof roleMcps.$inferInsert;
+export type MarketplaceRole = typeof marketplaceRoles.$inferSelect;
+export type NewMarketplaceRole = typeof marketplaceRoles.$inferInsert;
 
 export type Employee = typeof employees.$inferSelect;
 export type NewEmployee = typeof employees.$inferInsert;

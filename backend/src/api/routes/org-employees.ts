@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import logger from '../../lib/logger.js';
+import { handleError } from '../../lib/format-error.js';
 import { getOrganizationBySlug } from '../../services/org-service.js';
 import { getRoleBySlug } from '../../services/role-service.js';
 import {
@@ -17,7 +18,7 @@ function apiSuccess<T>(data: T) {
 }
 
 function apiError(message: string, status = 400) {
-  return { success: false, error: message, status };
+  return { success: false, message, status };
 }
 
 // Create org employees router
@@ -48,7 +49,7 @@ orgEmployees.get('/api/orgs/:orgSlug/employees', async (c) => {
     }))));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to list employees', 500), 500);
+    return handleError(c, error, 'Failed to list employees');
   }
 });
 
@@ -107,7 +108,7 @@ orgEmployees.post('/api/orgs/:orgSlug/employees', async (c) => {
     }), 201);
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to create employee', 500), 500);
+    return handleError(c, error, 'Failed to create employee');
   }
 });
 
@@ -141,7 +142,7 @@ orgEmployees.get('/api/orgs/:orgSlug/employees/:employeeId', async (c) => {
     }));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to get employee', 500), 500);
+    return handleError(c, error, 'Failed to get employee');
   }
 });
 
@@ -170,7 +171,7 @@ orgEmployees.post('/api/orgs/:orgSlug/employees/:employeeId/start', async (c) =>
     }));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to start employee', 500), 500);
+    return handleError(c, error, 'Failed to start employee');
   }
 });
 
@@ -199,7 +200,7 @@ orgEmployees.post('/api/orgs/:orgSlug/employees/:employeeId/stop', async (c) => 
     }));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to stop employee', 500), 500);
+    return handleError(c, error, 'Failed to stop employee');
   }
 });
 
@@ -225,7 +226,7 @@ orgEmployees.delete('/api/orgs/:orgSlug/employees/:employeeId', async (c) => {
     return c.json(apiSuccess({ success: true }));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to remove employee', 500), 500);
+    return handleError(c, error, 'Failed to remove employee');
   }
 });
 

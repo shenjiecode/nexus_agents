@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import logger from '../../lib/logger.js';
+import { handleError } from '../../lib/format-error.js';
 import { getOrganizationBySlug } from '../../services/org-service.js';
 import { getEmployee } from '../../services/employee-manager.js';
 import {
@@ -15,7 +16,7 @@ function apiSuccess<T>(data: T) {
 }
 
 function apiError(message: string, status = 400) {
-  return { success: false, error: message, status };
+  return { success: false, message, status };
 }
 
 // Create sessions router
@@ -44,7 +45,7 @@ sessions.post('/api/orgs/:orgSlug/employees/:employeeId/sessions', async (c) => 
     return c.json(apiSuccess(result), 201);
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to create session', 500), 500);
+    return handleError(c, error, 'Failed to create session');
   }
 });
 

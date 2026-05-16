@@ -30,6 +30,7 @@ export function Organizations() {
   const [formData, setFormData] = useState<CreateOrganizationRequest>({
     name: '',
     slug: '',
+    password: '',
     description: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,7 +52,7 @@ export function Organizations() {
         body: JSON.stringify(formData),
       });
       setIsModalOpen(false);
-      setFormData({ name: '', slug: '', description: '' });
+      setFormData({ name: '', slug: '', password: '', description: '' });
       refetch();
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to create organization');
@@ -61,7 +62,8 @@ export function Organizations() {
   };
 
   const generateSlug = (name: string) => {
-    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    return slug || 'org-' + Date.now().toString(36);
   };
 
   return (
@@ -104,6 +106,7 @@ export function Organizations() {
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Slug</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">状态</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">智能体</th>
+                <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Matrix 账户</th>
                 <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">创建时间</th>
               </tr>
             </thead>
@@ -111,20 +114,20 @@ export function Organizations() {
               {loading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i} className="border-b border-cyber-cyan/10">
-                    <td colSpan={5} className="py-4 px-6">
+                    <td colSpan={6} className="py-4 px-6">
                       <div className="skeleton h-8 rounded" />
                     </td>
                   </tr>
                 ))
               ) : error ? (
                 <tr>
-                  <td colSpan={5} className="py-8 px-6 text-center text-cyber-error">
+                  <td colSpan={6} className="py-8 px-6 text-center text-cyber-error">
                     加载组织失败：{error}
                   </td>
                 </tr>
               ) : filteredOrgs?.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 px-6 text-center text-cyber-muted">
+                  <td colSpan={6} className="py-8 px-6 text-center text-cyber-muted">
                     未找到组织
                   </td>
                 </tr>
@@ -148,14 +151,24 @@ export function Organizations() {
                       </code>
                     </td>
                     <td className="py-4 px-6">
-                      {org.containerCount && org.containerCount > 0 ? (
+                      {org.employeeCount && org.employeeCount > 0 ? (
                         <StatusDot status="active" showLabel />
                       ) : (
                         <span className="text-cyber-muted text-sm">无活跃智能体</span>
                       )}
                     </td>
                     <td className="py-4 px-6">
-                      <span className="text-cyber-white font-mono">{org.containerCount || 0}</span>
+                      <span className="text-cyber-white font-mono">{org.employeeCount || 0}</span>
+                    </td>
+                    <td className="py-4 px-6">
+                      {org.matrixAdminUserId ? (
+                        <div className="space-y-1">
+                          <div className="font-mono text-xs text-cyber-white break-all">{org.matrixAdminUserId}</div>
+                          <div className="font-mono text-xs text-cyber-muted break-all">{org.matrixAdminPassword}</div>
+                        </div>
+                      ) : (
+                        <span className="text-cyber-muted text-sm">未注册</span>
+                      )}
                     </td>
                     <td className="py-4 px-6 text-cyber-muted text-sm">
                       {new Date(org.createdAt).toLocaleDateString()}
@@ -181,7 +194,7 @@ export function Organizations() {
             <CyberButton
               type="submit"
               form="org-form"
-              disabled={isSubmitting || !formData.name || !formData.slug}
+              disabled={isSubmitting || !formData.name || !formData.slug || !formData.password}
             >
               {isSubmitting ? '创建中...' : '创建组织'}
             </CyberButton>
@@ -233,6 +246,19 @@ export function Organizations() {
               rows={3}
               className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none resize-none"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-cyber-muted mb-1">登录密码</label>
+            <input
+              type="password"
+              value={formData.password}
+              onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+              placeholder="至少 6 位"
+              className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none"
+              required
+              minLength={6}
+            />
+            <p className="text-xs text-cyber-muted mt-1">用于组织管理员登录</p>
           </div>
         </form>
       </CyberModal>

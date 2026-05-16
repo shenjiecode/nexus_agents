@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import logger from '../../lib/logger.js';
+import { handleError } from '../../lib/format-error.js';
 import {
   getAllEmployees,
   getEmployee,
@@ -15,7 +16,7 @@ function apiSuccess<T>(data: T) {
 }
 
 function apiError(message: string, status = 400) {
-  return { success: false, error: message, status };
+  return { success: false, message, status };
 }
 
 // Create global employees router
@@ -40,7 +41,7 @@ employees.get('/api/employees', async (c) => {
     }))));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to list employees', 500), 500);
+    return handleError(c, error, 'Failed to list employees');
   }
 });
 
@@ -72,7 +73,7 @@ employees.get('/api/employees/:id', async (c) => {
     }));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to get employee', 500), 500);
+    return handleError(c, error, 'Failed to get employee');
   }
 });
 
@@ -94,7 +95,7 @@ employees.post('/api/employees/:id/health-check', async (c) => {
     }));
   } catch (error: any) {
     logger.error(error, 'API error');
-    return c.json(apiError(error.message || 'Failed to check health', 500), 500);
+    return handleError(c, error, 'Failed to check health');
   }
 });
 
@@ -113,7 +114,7 @@ employees.delete('/api/employees/:id', async (c) => {
     return c.json(apiSuccess({ success: true }));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to delete employee', 500), 500);
+    return handleError(c, error, 'Failed to delete employee');
   }
 });
 
@@ -128,7 +129,7 @@ employees.get('/api/employees/:id/config', async (c) => {
     return c.json(apiSuccess(config));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to get employee config', 500), 500);
+    return handleError(c, error, 'Failed to get employee config');
   }
 });
 
@@ -147,7 +148,7 @@ employees.put('/api/employees/:id/model', async (c) => {
     return c.json(apiSuccess({ model }));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to update model', 500), 500);
+    return handleError(c, error, 'Failed to update model');
   }
 });
 

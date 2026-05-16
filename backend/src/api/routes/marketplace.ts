@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import logger from '../../lib/logger.js';
+import { logger } from '../../lib/logger.js';
+import { handleError, apiSuccess, apiError } from '../../lib/format-error.js';
 import {
-  initializeMarketplace,
   getAllSkills,
   getSkillBySlug,
   createSkill,
@@ -16,252 +16,257 @@ import {
   addMcpToRole,
   removeSkillFromRole,
   removeMcpFromRole,
+  getAllRoles,
+  getRoleBySlug,
+  createRole,
+  updateRole,
+  deleteRole,
 } from '../../services/marketplace-service.js';
-
-// Standard API response helper
-function apiSuccess<T>(data: T) {
-  return { success: true, data };
-}
-
-function apiError(message: string, status = 400) {
-  return { success: false, error: message, status };
-}
+import { getUser, isOwner } from '../middleware/auth.js';
 
 const marketplace = new Hono();
 
-/**
- * Initialize marketplace on first request
- */
-let initialized = false;
-
-async function ensureInitialized() {
-  if (!initialized) {
-    await initializeMarketplace();
-    initialized = true;
-  }
-}
-
-// ============== Skills Routes ==============
-
-/**
- * GET /api/skills - List all skills
- */
 marketplace.get('/api/skills', async (c) => {
   try {
-    await ensureInitialized();
-    const skills = await getAllSkills();
-    return c.json(apiSuccess(skills));
+    const user = getUser(c);
+    const orgQuery = c.req.query('org');
+    let orgId = orgQuery;
+    if (!orgId && user?.role === 'org' && user.orgId) orgId = user.orgId;
+    return c.json(apiSuccess(await getAllSkills(orgId || undefined)));
   } catch (error: any) {
     logger.error(error, 'Failed to get skills');
-    return c.json(apiError(error.message), 500);
+    return handleError(c, error);
   }
 });
 
-/**
- * GET /api/skills/:slug - Get skill by slug
- */
 marketplace.get('/api/skills/:slug', async (c) => {
   try {
-    await ensureInitialized();
-    const slug = c.req.param('slug');
-    const skill = await getSkillBySlug(slug);
-    if (!skill) {
-      return c.json(apiError('Skill not found'), 404);
-    }
+    const skill = await getSkillBySlug(c.req.param('slug'));
+    if (!skill) return c.json(apiError('Skill not found', 404), 404);
     return c.json(apiSuccess(skill));
   } catch (error: any) {
     logger.error(error, 'Failed to get skill');
-    return c.json(apiError(error.message), 500);
+    return handleError(c, error);
   }
 });
 
-/**
- * POST /api/skills - Create new skill
- */
 marketplace.post('/api/skills', async (c) => {
   try {
-    await ensureInitialized();
-    const body = await c.req.json();
-    const skill = await createSkill(body);
-    return c.json(apiSuccess(skill), 201);
+    const user = getUser(c);
+    if (!user) return c.json(apiError('Unauthorized', 401), 401);
+
+    const body = await c.req.parseBody();
+    const name = body.name as string;
+    const slug = body.slug as string;
+    const description = body.description as string;
+    const category = body.category as string | undefined;
+    const file = body.file as File | undefined;
+
+    if (!file) return c.json(apiError('File is required', 400), 400);
+
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const orgId = user.role === 'admin' ? null : (user.orgId || null);
+
+    return c.json(apiSuccess(await createSkill(
+      { name, slug, description, category },
+      fileBuffer,
+      orgId
+    )), 201);
   } catch (error: any) {
     logger.error(error, 'Failed to create skill');
-    return c.json(apiError(error.message), 400);
+    return handleError(c, error);
   }
 });
 
-/**
- * DELETE /api/skills/:slug - Delete skill
- */
 marketplace.delete('/api/skills/:slug', async (c) => {
   try {
-    await ensureInitialized();
-    const slug = c.req.param('slug');
-    await deleteSkill(slug);
+    const user = getUser(c);
+    if (!user) return c.json(apiError('Unauthorized', 401), 401);
+    const skill = await getSkillBySlug(c.req.param('slug'));
+    if (!skill) return c.json(apiError('Skill not found', 404), 404);
+    if (!isOwner(c, skill.organizationId)) return c.json(apiError('Forbidden', 403), 403);
+    await deleteSkill(c.req.param('slug'));
     return c.json(apiSuccess({ deleted: true }));
   } catch (error: any) {
     logger.error(error, 'Failed to delete skill');
-    return c.json(apiError(error.message), 400);
+    return handleError(c, error);
   }
 });
 
-// ============== MCPs Routes ==============
-
-/**
- * GET /api/mcps - List all MCPs
- */
 marketplace.get('/api/mcps', async (c) => {
   try {
-    await ensureInitialized();
-    const mcps = await getAllMcps();
-    return c.json(apiSuccess(mcps));
+    const user = getUser(c);
+    const orgQuery = c.req.query('org');
+    let orgId = orgQuery;
+    if (!orgId && user?.role === 'org' && user.orgId) orgId = user.orgId;
+    return c.json(apiSuccess(await getAllMcps(orgId || undefined)));
   } catch (error: any) {
     logger.error(error, 'Failed to get MCPs');
-    return c.json(apiError(error.message), 500);
+    return handleError(c, error);
   }
 });
 
-/**
- * GET /api/mcps/:slug - Get MCP by slug
- */
 marketplace.get('/api/mcps/:slug', async (c) => {
   try {
-    await ensureInitialized();
-    const slug = c.req.param('slug');
-    const mcp = await getMcpBySlug(slug);
-    if (!mcp) {
-      return c.json(apiError('MCP not found'), 404);
-    }
+    const mcp = await getMcpBySlug(c.req.param('slug'));
+    if (!mcp) return c.json(apiError('MCP not found', 404), 404);
     return c.json(apiSuccess(mcp));
   } catch (error: any) {
     logger.error(error, 'Failed to get MCP');
-    return c.json(apiError(error.message), 500);
+    return handleError(c, error);
   }
 });
 
-/**
- * POST /api/mcps - Create new MCP
- */
 marketplace.post('/api/mcps', async (c) => {
   try {
-    await ensureInitialized();
-    const body = await c.req.json();
-    const mcp = await createMcp(body);
-    return c.json(apiSuccess(mcp), 201);
+    const user = getUser(c);
+    if (!user) return c.json(apiError('Unauthorized', 401), 401);
+
+    const body = await c.req.parseBody();
+    const name = body.name as string;
+    const slug = body.slug as string;
+    const description = body.description as string;
+    const category = body.category as string | undefined;
+    const file = body.file as File | undefined;
+
+    if (!file) return c.json(apiError('File is required', 400), 400);
+
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const orgId = user.role === 'admin' ? null : (user.orgId || null);
+
+    return c.json(apiSuccess(await createMcp(
+      { name, slug, description, category },
+      fileBuffer,
+      orgId
+    )), 201);
   } catch (error: any) {
     logger.error(error, 'Failed to create MCP');
-    return c.json(apiError(error.message), 400);
+    return handleError(c, error);
   }
 });
 
-/**
- * DELETE /api/mcps/:slug - Delete MCP
- */
 marketplace.delete('/api/mcps/:slug', async (c) => {
   try {
-    await ensureInitialized();
-    const slug = c.req.param('slug');
-    await deleteMcp(slug);
+    const user = getUser(c);
+    if (!user) return c.json(apiError('Unauthorized', 401), 401);
+    const mcp = await getMcpBySlug(c.req.param('slug'));
+    if (!mcp) return c.json(apiError('MCP not found', 404), 404);
+    if (!isOwner(c, mcp.organizationId)) return c.json(apiError('Forbidden', 403), 403);
+    await deleteMcp(c.req.param('slug'));
     return c.json(apiSuccess({ deleted: true }));
   } catch (error: any) {
     logger.error(error, 'Failed to delete MCP');
-    return c.json(apiError(error.message), 400);
+    return handleError(c, error);
   }
 });
 
-// ============== Role Association Routes ==============
+// Role association routes
+marketplace.get('/api/roles/:slug/skills', async (c) =>
+  c.json(apiSuccess(await getSkillsForRole(c.req.param('slug')))));
 
-/**
- * GET /api/roles/:slug/skills - Get skills for a role
- */
-marketplace.get('/api/roles/:slug/skills', async (c) => {
-  try {
-    await ensureInitialized();
-    const roleSlug = c.req.param('slug');
-    const skills = await getSkillsForRole(roleSlug);
-    return c.json(apiSuccess(skills));
-  } catch (error: any) {
-    logger.error(error, 'Failed to get role skills');
-    return c.json(apiError(error.message), 500);
-  }
-});
+marketplace.get('/api/roles/:slug/mcps', async (c) =>
+  c.json(apiSuccess(await getMcpsForRole(c.req.param('slug')))));
 
-/**
- * GET /api/roles/:slug/mcps - Get MCPs for a role
- */
-marketplace.get('/api/roles/:slug/mcps', async (c) => {
-  try {
-    await ensureInitialized();
-    const roleSlug = c.req.param('slug');
-    const mcps = await getMcpsForRole(roleSlug);
-    return c.json(apiSuccess(mcps));
-  } catch (error: any) {
-    logger.error(error, 'Failed to get role MCPs');
-    return c.json(apiError(error.message), 500);
-  }
-});
-
-/**
- * POST /api/roles/:slug/skills/:skillSlug - Add skill to role
- */
 marketplace.post('/api/roles/:slug/skills/:skillSlug', async (c) => {
-  try {
-    await ensureInitialized();
-    const roleSlug = c.req.param('slug');
-    const skillSlug = c.req.param('skillSlug');
-    await addSkillToRole(roleSlug, skillSlug);
-    return c.json(apiSuccess({ added: true }));
-  } catch (error: any) {
-    logger.error(error, 'Failed to add skill to role');
-    return c.json(apiError(error.message), 400);
-  }
+  await addSkillToRole(c.req.param('slug'), c.req.param('skillSlug'));
+  return c.json(apiSuccess({ added: true }));
 });
 
-/**
- * DELETE /api/roles/:slug/skills/:skillSlug - Remove skill from role
- */
 marketplace.delete('/api/roles/:slug/skills/:skillSlug', async (c) => {
-  try {
-    await ensureInitialized();
-    const roleSlug = c.req.param('slug');
-    const skillSlug = c.req.param('skillSlug');
-    await removeSkillFromRole(roleSlug, skillSlug);
-    return c.json(apiSuccess({ removed: true }));
-  } catch (error: any) {
-    logger.error(error, 'Failed to remove skill from role');
-    return c.json(apiError(error.message), 400);
-  }
+  await removeSkillFromRole(c.req.param('slug'), c.req.param('skillSlug'));
+  return c.json(apiSuccess({ removed: true }));
 });
 
-/**
- * POST /api/roles/:slug/mcps/:mcpSlug - Add MCP to role
- */
 marketplace.post('/api/roles/:slug/mcps/:mcpSlug', async (c) => {
+  await addMcpToRole(c.req.param('slug'), c.req.param('mcpSlug'));
+  return c.json(apiSuccess({ added: true }));
+});
+
+marketplace.delete('/api/roles/:slug/mcps/:mcpSlug', async (c) => {
+  await removeMcpFromRole(c.req.param('slug'), c.req.param('mcpSlug'));
+  return c.json(apiSuccess({ removed: true }));
+});
+
+// ============== Marketplace Roles Routes ==============
+
+marketplace.get('/api/marketplace-roles', async (c) => {
   try {
-    await ensureInitialized();
-    const roleSlug = c.req.param('slug');
-    const mcpSlug = c.req.param('mcpSlug');
-    await addMcpToRole(roleSlug, mcpSlug);
-    return c.json(apiSuccess({ added: true }));
+    const user = getUser(c);
+    const orgQuery = c.req.query('org');
+    let orgId = orgQuery;
+    if (!orgId && user?.role === 'org' && user.orgId) orgId = user.orgId;
+    return c.json(apiSuccess(await getAllRoles(orgId || undefined)));
   } catch (error: any) {
-    logger.error(error, 'Failed to add MCP to role');
-    return c.json(apiError(error.message), 400);
+    logger.error(error, 'Failed to get marketplace roles');
+    return handleError(c, error);
   }
 });
 
-/**
- * DELETE /api/roles/:slug/mcps/:mcpSlug - Remove MCP from role
- */
-marketplace.delete('/api/roles/:slug/mcps/:mcpSlug', async (c) => {
+marketplace.get('/api/marketplace-roles/:slug', async (c) => {
   try {
-    await ensureInitialized();
-    const roleSlug = c.req.param('slug');
-    const mcpSlug = c.req.param('mcpSlug');
-    await removeMcpFromRole(roleSlug, mcpSlug);
-    return c.json(apiSuccess({ removed: true }));
+    const role = await getRoleBySlug(c.req.param('slug'));
+    if (!role) return c.json(apiError('Role not found', 404), 404);
+    return c.json(apiSuccess(role));
   } catch (error: any) {
-    logger.error(error, 'Failed to remove MCP from role');
-    return c.json(apiError(error.message), 400);
+    logger.error(error, 'Failed to get marketplace role');
+    return handleError(c, error);
+  }
+});
+
+marketplace.post('/api/marketplace-roles', async (c) => {
+  try {
+    const user = getUser(c);
+    if (!user) return c.json(apiError('Unauthorized', 401), 401);
+
+    const body = await c.req.json();
+    const { name, slug, description, mcpIds, skillIds, agentsMd } = body as any;
+
+    if (!name || !slug || !description) {
+      return c.json(apiError('name, slug, and description are required', 400), 400);
+    }
+
+    const orgId = user.role === 'admin' ? null : (user.orgId || null);
+
+    return c.json(apiSuccess(await createRole(
+      { name, slug, description, mcpIds, skillIds, agentsMd },
+      orgId
+    )), 201);
+  } catch (error: any) {
+    logger.error(error, 'Failed to create marketplace role');
+    return handleError(c, error);
+  }
+});
+
+marketplace.put('/api/marketplace-roles/:slug', async (c) => {
+  try {
+    const user = getUser(c);
+    if (!user) return c.json(apiError('Unauthorized', 401), 401);
+    const role = await getRoleBySlug(c.req.param('slug'));
+    if (!role) return c.json(apiError('Role not found', 404), 404);
+    if (!isOwner(c, role.organizationId)) return c.json(apiError('Forbidden', 403), 403);
+
+    const body = await c.req.json();
+    const { name, description, mcpIds, skillIds, agentsMd } = body as any;
+
+    return c.json(apiSuccess(await updateRole(c.req.param('slug'), { name, description, mcpIds, skillIds, agentsMd })));
+  } catch (error: any) {
+    logger.error(error, 'Failed to update marketplace role');
+    return handleError(c, error);
+  }
+});
+
+marketplace.delete('/api/marketplace-roles/:slug', async (c) => {
+  try {
+    const user = getUser(c);
+    if (!user) return c.json(apiError('Unauthorized', 401), 401);
+    const role = await getRoleBySlug(c.req.param('slug'));
+    if (!role) return c.json(apiError('Role not found', 404), 404);
+    if (!isOwner(c, role.organizationId)) return c.json(apiError('Forbidden', 403), 403);
+    await deleteRole(c.req.param('slug'));
+    return c.json(apiSuccess({ deleted: true }));
+  } catch (error: any) {
+    logger.error(error, 'Failed to delete marketplace role');
+    return handleError(c, error);
   }
 });
 

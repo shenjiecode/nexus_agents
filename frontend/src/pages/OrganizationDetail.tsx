@@ -6,7 +6,6 @@ import { CyberModal } from '../components/CyberModal';
 import { StatusDot } from '../components/StatusDot';
 import { useApi, apiRequest } from '../hooks/useApi';
 import type { Organization, Employee, Role, CreateEmployeeRequest } from '../types';
-
 function ArrowLeftIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -49,21 +48,6 @@ function StopIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-function KeyIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-    </svg>
-  );
-}
-
-function RefreshIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-    </svg>
-  );
-}
 
 
 export function OrganizationDetail() {
@@ -77,11 +61,6 @@ export function OrganizationDetail() {
     roleSlug: '',
     roleVersion: '',
   });
-  const [apiKey, setApiKey] = useState<string | null>(null);
-  const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [isFetchingKey, setIsFetchingKey] = useState(false);
   const [authEditText, setAuthEditText] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [isAuthSaving, setIsAuthSaving] = useState(false);
@@ -131,36 +110,7 @@ export function OrganizationDetail() {
     }
   };
 
-  const handleRegenerateApiKey = async () => {
-    if (!slug) return;
-    setIsRegeneratingKey(true);
-    try {
-      const result = await apiRequest<{ apiKey: string }>(`/api/orgs/${slug}/apikey`, {
-        method: 'POST',
-      });
-      setApiKey(result.data.apiKey);
-      setShowApiKeyModal(true);
-    } catch (err) {
-      console.error('Failed to regenerate API key:', err);
-    } finally {
-      setIsRegeneratingKey(false);
-    }
-  }
 
-  const handleFetchApiKey = async () => {
-    if (!slug) return;
-    setIsFetchingKey(true);
-    try {
-      const result = await apiRequest<{ hasApiKey: boolean; apiKey: string | null }>(`/api/orgs/${slug}/apikey`);
-      if (result.data.apiKey) {
-        setApiKey(result.data.apiKey);
-      }
-    } catch (err) {
-      console.error('Failed to fetch API key:', err);
-    } finally {
-      setIsFetchingKey(false);
-    }
-  };
 
   const handleFetchAuth = async () => {
     if (!slug) return;
@@ -250,7 +200,7 @@ export function OrganizationDetail() {
             <div>
               <label className="text-xs font-mono text-cyber-muted uppercase">员工数量</label>
               <div className="mt-1">
-                {organization.containerCount && organization.containerCount > 0 ? (
+                {organization.employeeCount && organization.employeeCount > 0 ? (
                   <StatusDot status="active" showLabel />
                 ) : (
                   <span className="text-cyber-muted">无活跃员工</span>
@@ -267,65 +217,6 @@ export function OrganizationDetail() {
         </div>
       </CyberCard>
 
-      {/* API Key Section */}
-      <CyberCard>
-        <div className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <KeyIcon className="w-5 h-5 text-cyber-purple" />
-              <div>
-                <h3 className="font-display font-semibold text-cyber-white">API Key</h3>
-                <p className="text-sm text-cyber-muted">用于 API 请求认证</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <CyberButton
-                variant="secondary"
-                size="sm"
-                onClick={handleFetchApiKey}
-                disabled={isFetchingKey}
-              >
-                {isFetchingKey ? '加载中...' : '查看 Key'}
-              </CyberButton>
-              <CyberButton
-                variant="secondary"
-                size="sm"
-                icon={<RefreshIcon className="w-4 h-4" />}
-                onClick={handleRegenerateApiKey}
-                disabled={isRegeneratingKey}
-              >
-                {isRegeneratingKey ? '重新生成中...' : '重新生成'}
-              </CyberButton>
-            </div>
-          </div>
-          {apiKey ? (
-            <div className="mt-4 p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/10">
-              <div className="flex items-center justify-between gap-2">
-                <code className="text-sm font-mono text-cyber-cyan break-all select-all flex-1">
-                  {showApiKey ? apiKey : `${apiKey.slice(0, 12)}${'*'.repeat(20)}`}
-                </code>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <CyberButton variant="ghost" size="sm" className="!p-1 !text-xs" onClick={() => setShowApiKey(!showApiKey)}>
-                    {showApiKey ? '隐藏' : '显示'}
-                  </CyberButton>
-                  <CyberButton variant="ghost" size="sm" className="!p-1 !text-xs" onClick={() => navigator.clipboard.writeText(apiKey)}>
-                    复制
-                  </CyberButton>
-                </div>
-              </div>
-              <p className="mt-2 text-xs text-cyber-muted">
-                使用方式: <code className="text-cyber-cyan">X-Api-Key: {apiKey.slice(0, 8)}...</code> 或 <code className="text-cyber-cyan">Authorization: Bearer {apiKey.slice(0, 8)}...</code>
-              </p>
-            </div>
-          ) : (
-            <div className="mt-4 p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/10">
-              <p className="text-sm text-cyber-muted">
-                API Key 用于认证组织级别的 API 请求。点击「查看 Key」获取当前 Key，或「重新生成」创建新 Key。
-              </p>
-            </div>
-          )}
-        </div>
-      </CyberCard>
 
       {/* Auth Configuration Section */}
       <CyberCard>
@@ -558,39 +449,6 @@ export function OrganizationDetail() {
         </p>
       </CyberModal>
 
-      {/* API Key Display Modal */}
-      <CyberModal
-        isOpen={showApiKeyModal && !!apiKey}
-        onClose={() => { setShowApiKeyModal(false); setApiKey(null); }}
-        title="API Key 已生成"
-        size="sm"
-        footer={
-          <>
-            <CyberButton variant="ghost" onClick={() => { setShowApiKeyModal(false); setApiKey(null); }}>
-              关闭
-            </CyberButton>
-            <CyberButton
-              onClick={() => {
-                navigator.clipboard.writeText(apiKey!);
-              }}
-            >
-              复制 Key
-            </CyberButton>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div className="p-3 rounded-lg bg-cyber-dark border border-cyber-warning/30">
-            <p className="text-sm text-cyber-warning mb-2">⚠️ 请妥善保管此 Key，关闭后将无法再次查看。</p>
-            <code className="block text-sm font-mono text-cyber-cyan break-all select-all">
-              {apiKey}
-            </code>
-          </div>
-          <p className="text-sm text-cyber-muted">
-            使用方式: 在 API 请求头中添加 <code className="text-cyber-cyan">X-Api-Key: {apiKey?.slice(0, 12)}...</code> 或 <code className="text-cyber-cyan">Authorization: Bearer {apiKey?.slice(0, 12)}...</code>
-          </p>
-        </div>
-      </CyberModal>
     </div>
   );
 }

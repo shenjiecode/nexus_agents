@@ -1,19 +1,17 @@
 import { Hono } from 'hono';
 import logger from '../../lib/logger.js';
+import { handleError } from '../../lib/format-error.js';
 import {
-createOrganization,
-getAllOrganizations,
-getOrganizationById,
-getOrganizationBySlug,
-updateOrganization,
-deleteOrganization,
-slugify,
-getOrganizationAuth,
-setOrganizationAuth,
-deleteOrganizationAuth,
-regenerateApiKey,
-revokeApiKey,
-type AuthConfig,
+  createOrganization,
+  getAllOrganizations,
+  getOrganizationBySlug,
+  updateOrganization,
+  deleteOrganization,
+  slugify,
+  getOrganizationAuth,
+  setOrganizationAuth,
+  deleteOrganizationAuth,
+  type AuthConfig,
 } from '../../services/org-service.js';
 import { rebuildEmployeesForOrg } from '../../services/employee-manager.js';
 // Standard API response helper
@@ -22,7 +20,7 @@ function apiSuccess<T>(data: T) {
 }
 
 function apiError(message: string, status = 400) {
-  return { success: false, error: message, status };
+  return { success: false, message, status };
 }
 
 // Create organizations router
@@ -41,6 +39,11 @@ organizations.post('/api/organizations', async (c) => {
     if (!body.name || typeof body.name !== 'string') {
       return c.json(apiError('name is required and must be a string', 400), 400);
     }
+    if (!body.password || typeof body.password !== 'string' || body.password.length < 6) {
+      return c.json(apiError('password is required and must be at least 6 characters', 400), 400);
+    }
+
+    // Auto-generate slug if not provided
 
     // Auto-generate slug if not provided
     const slug = body.slug || slugify(body.name);
@@ -52,6 +55,7 @@ organizations.post('/api/organizations', async (c) => {
       {
         name: body.name.trim(),
         slug: slug,
+        password: body.password,
         description: body.description?.trim(),
       },
       authConfig
@@ -60,7 +64,7 @@ organizations.post('/api/organizations', async (c) => {
     return c.json(apiSuccess(result), 201);
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to create organization', 500), 500);
+    return handleError(c, error, 'Failed to create organization');
   }
 });
 
@@ -71,7 +75,7 @@ organizations.get('/api/organizations', async (c) => {
     return c.json(apiSuccess(result));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to list organizations', 500), 500);
+    return handleError(c, error, 'Failed to list organizations');
   }
 });
 
@@ -88,7 +92,7 @@ organizations.get('/api/organizations/:slug', async (c) => {
     return c.json(apiSuccess(result));
   } catch (error: any) {
     logger.error(error, 'API error');
-    return c.json(apiError(error.message || 'Failed to get organization', 500), 500);
+    return handleError(c, error, 'Failed to get organization');
   }
 });
 
@@ -105,7 +109,7 @@ organizations.get('/api/orgs/:slug', async (c) => {
     return c.json(apiSuccess(result));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to get organization', 500), 500);
+    return handleError(c, error, 'Failed to get organization');
   }
 });
 
@@ -134,7 +138,7 @@ organizations.put('/api/organizations/:id', async (c) => {
     return c.json(apiSuccess(result));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to update organization', 500), 500);
+    return handleError(c, error, 'Failed to update organization');
   }
 });
 
@@ -152,7 +156,7 @@ organizations.delete('/api/organizations/:id', async (c) => {
     return c.json(apiSuccess({ success: true }));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to delete organization', 500), 500);
+    return handleError(c, error, 'Failed to delete organization');
   }
 });
 
@@ -177,7 +181,7 @@ organizations.get('/api/orgs/:slug/auth', async (c) => {
     }));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to get auth configuration', 500), 500);
+    return handleError(c, error, 'Failed to get auth configuration');
   }
 });
 
@@ -225,7 +229,7 @@ organizations.put('/api/orgs/:slug/auth', async (c) => {
     }));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to set auth configuration', 500), 500);
+    return handleError(c, error, 'Failed to set auth configuration');
   }
 });
 
@@ -245,87 +249,7 @@ organizations.delete('/api/orgs/:slug/auth', async (c) => {
     return c.json(apiSuccess({ success: result }));
   } catch (error: any) {
     logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to delete auth configuration', 500), 500);
+    return handleError(c, error, 'Failed to delete auth configuration');
   }
 });
-// ============ API Key Management ============
-
-// GET /api/orgs/:slug/apikey - Get organization's API key
-organizations.get('/api/orgs/:slug/apikey', async (c) => {
-  try {
-    const slug = c.req.param('slug');
-    
-    // Verify organization exists
-    const org = await getOrganizationBySlug(slug);
-    if (!org) {
-      return c.json(apiError('Organization not found', 404), 404);
-    }
-    
-    // Get organization by ID to check apiKey
-    const orgById = await getOrganizationById(org.id);
-    
-    return c.json(apiSuccess({
-      hasApiKey: orgById?.apiKey ? true : false,
-      apiKey: orgById?.apiKey || null,
-    }));
-  } catch (error: any) {
-    logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to get API key status', 500), 500);
-  }
-});
-
-// POST /api/orgs/:slug/apikey - Regenerate API key
-organizations.post('/api/orgs/:slug/apikey', async (c) => {
-  try {
-    const slug = c.req.param('slug');
-    
-    // Verify organization exists
-    const org = await getOrganizationBySlug(slug);
-    if (!org) {
-      return c.json(apiError('Organization not found', 404), 404);
-    }
-    
-    const newApiKey = await regenerateApiKey(org.id);
-    
-    if (!newApiKey) {
-      return c.json(apiError('Failed to regenerate API key', 500), 500);
-    }
-    
-    return c.json(apiSuccess({
-      apiKey: newApiKey,
-      message: 'API key regenerated. Store this key securely - it will not be shown again.',
-    }));
-  } catch (error: any) {
-    logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to regenerate API key', 500), 500);
-  }
-});
-
-// DELETE /api/orgs/:slug/apikey - Revoke API key
-organizations.delete('/api/orgs/:slug/apikey', async (c) => {
-  try {
-    const slug = c.req.param('slug');
-    
-    // Verify organization exists
-    const org = await getOrganizationBySlug(slug);
-    if (!org) {
-      return c.json(apiError('Organization not found', 404), 404);
-    }
-    
-    const result = await revokeApiKey(org.id);
-    
-    if (!result) {
-      return c.json(apiError('Failed to revoke API key', 500), 500);
-    }
-    
-    return c.json(apiSuccess({
-      success: true,
-      message: 'API key revoked. Organization can no longer access API.',
-    }));
-  } catch (error: any) {
-    logger.error(error, "API error");
-    return c.json(apiError(error.message || 'Failed to revoke API key', 500), 500);
-  }
-});
-
 export default organizations;

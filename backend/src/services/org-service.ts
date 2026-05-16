@@ -2,14 +2,16 @@ import logger from '../lib/logger.js';
 import { organizations, employees } from '../db/index.js';
 import { eq, count } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
+import bcrypt from 'bcryptjs';
 import { getEmployeesByOrganization } from './employee-manager.js';
-
+import { registerMatrixUserAdmin } from './matrix-service.js';
 // Zod schemas for validation
 import { z } from 'zod';
 
 const CreateOrgSchema = z.object({
   name: z.string().min(1),
   slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with dashes'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
   description: z.string().optional(),
 });
 
@@ -37,91 +39,32 @@ function generateOrgId(): string {
 }
 
 /**
- * Generate an API key for organization authentication
- * Format: nexus_live_{32 random hex chars}
+ * Hash a password using bcrypt
  */
-function generateApiKey(): string {
-  return `nexus_live_${randomBytes(16).toString('hex')}`;
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 10);
 }
 
 /**
- * Verify an API key and return the organization
+ * Verify a password against a bcrypt hash
  */
-export async function verifyApiKey(apiKey: string): Promise<{
-  id: string;
-  name: string;
-  slug: string;
-} | null> {
-  if (!apiKey || !apiKey.startsWith('nexus_live_')) {
-    return null;
-  }
-  
-  const database = await getDb();
-  const records = await database
-    .select()
-    .from(organizations)
-    .where(eq(organizations.apiKey, apiKey));
-  
-  if (records.length === 0) {
-    return null;
-  }
-  
-  const org = records[0];
-  return {
-    id: org.id,
-    name: org.name,
-    slug: org.slug,
-  };
-}
-
-/**
- * Regenerate API key for an organization
- */
-export async function regenerateApiKey(orgId: string): Promise<string | null> {
-  const database = await getDb();
-  const existing = await getOrganizationById(orgId);
-  if (!existing) {
-    return null;
-  }
-  
-  const newApiKey = generateApiKey();
-  await database
-    .update(organizations)
-    .set({ apiKey: newApiKey, updatedAt: Date.now() })
-    .where(eq(organizations.id, orgId));
-  
-  return newApiKey;
-}
-
-/**
- * Revoke API key for an organization (set to null)
- */
-export async function revokeApiKey(orgId: string): Promise<boolean> {
-  const database = await getDb();
-  const existing = await getOrganizationById(orgId);
-  if (!existing) {
-    return false;
-  }
-  
-  await database
-    .update(organizations)
-    .set({ apiKey: null, updatedAt: Date.now() })
-    .where(eq(organizations.id, orgId));
-  
-  return true;
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(password, hash);
 }
 
 /**
  * Slugify a name to create a valid slug
  */
 export function slugify(name: string): string {
-  return name
+  const slug = name
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
-    .replace(/\s+/g, '-')         // Replace spaces with dashes
-    .replace(/-+/g, '-')          // Collapse multiple dashes
-    .slice(0, 50);                // Limit length
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 50);
+  return slug || 'org-' + Date.now().toString(36);
 }
 
 /**
@@ -147,7 +90,6 @@ export async function createOrganization(
   name: string;
   slug: string;
   description?: string;
-  apiKey: string;
   createdAt: number;
   updatedAt: number;
 }> {
@@ -161,20 +103,35 @@ export async function createOrganization(
 
   const now = Date.now();
   const orgId = generateOrgId();
-  const apiKey = generateApiKey();
+  const hashedPassword = await hashPassword(validated.password);
+
+  // Register Matrix account for the organization
+  const matrixUsername = `nexus-org-${validated.slug}`;
+  const matrixPassword = randomBytes(16).toString('hex');
+  let matrixAccount;
+  try {
+    matrixAccount = await registerMatrixUserAdmin(
+      matrixUsername,
+      matrixPassword,
+      validated.name,
+    );
+    logger.info({ matrixUserId: matrixAccount.userId, orgSlug: validated.slug }, 'Matrix account registered for organization');
+  } catch (error) {
+    logger.error(error, 'Failed to register Matrix account for organization, continuing without Matrix');
+  }
 
   await database.insert(organizations).values({
     id: orgId,
     name: validated.name,
     slug: validated.slug,
     description: validated.description || null,
-    apiKey: apiKey,
+    password: hashedPassword,
+    matrixAdminUserId: matrixAccount?.userId || null,
+    matrixAdminAccessToken: matrixAccount?.accessToken || null,
+    matrixAdminPassword: matrixPassword,
     createdAt: now,
     updatedAt: now,
   });
-
-  // Skip Matrix room creation - not implemented in new schema
-  // This requires database schema update
 
   // Create auth.json for the organization
   const finalAuthConfig = authConfig || getDefaultAuthConfig();
@@ -191,7 +148,6 @@ export async function createOrganization(
     name: validated.name,
     slug: validated.slug,
     description: validated.description,
-    apiKey: apiKey,
     createdAt: now,
     updatedAt: now,
   };
@@ -224,6 +180,8 @@ export async function getAllOrganizations(): Promise<Array<{
   name: string;
   slug: string;
   description?: string;
+  matrixAdminUserId?: string;
+  matrixAdminPassword?: string;
   createdAt: number;
   updatedAt: number;
   employeeCount: number;
@@ -244,6 +202,8 @@ const orgRecords = await database.select().from(organizations);
         name: org.name,
         slug: org.slug,
         description: org.description || undefined,
+        matrixAdminUserId: org.matrixAdminUserId || undefined,
+        matrixAdminPassword: org.matrixAdminPassword || undefined,
         createdAt: org.createdAt,
         updatedAt: org.updatedAt,
         employeeCount,
@@ -262,7 +222,6 @@ export async function getOrganizationById(orgId: string): Promise<{
   name: string;
   slug: string;
   description?: string;
-  apiKey?: string;
   createdAt: number;
   updatedAt: number;
 } | null> {
@@ -282,7 +241,6 @@ export async function getOrganizationById(orgId: string): Promise<{
     name: org.name,
     slug: org.slug,
     description: org.description || undefined,
-    apiKey: org.apiKey || undefined,
     createdAt: org.createdAt,
     updatedAt: org.updatedAt,
   };

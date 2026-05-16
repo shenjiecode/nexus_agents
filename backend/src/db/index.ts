@@ -10,6 +10,7 @@ import {
   roleSkills,
   roleMcps,
   employees,
+  marketplaceRoles,
 } from './schema.js';
 
 const schema = {
@@ -21,6 +22,7 @@ const schema = {
   roleSkills,
   roleMcps,
   employees,
+  marketplaceRoles,
 };
 
 const connectionString = process.env.DATABASE_URL || (() => { throw new Error('DATABASE_URL environment variable is required'); })();
@@ -62,4 +64,5 @@ export {
   roleSkills,
   roleMcps,
   employees,
+  marketplaceRoles,
 };
