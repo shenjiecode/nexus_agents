@@ -11,6 +11,7 @@ import sessionRoutes from './api/routes/sessions.js'
 import marketplaceRoutes from './api/routes/marketplace.js'
 import authRoutes from './api/routes/auth.js'
 import matrixRoutes from './api/routes/matrix.js'
+import employeeConfigRoutes from './api/routes/employee-config.js'
 import { restoreEmployees } from './services/employee-manager.js'
 import { initDatabase, closeDatabase } from './db/index.js'
 
@@ -46,6 +47,7 @@ app.route('/', sessionRoutes)
 app.route('/', employeeRoutes)
 app.route('/', marketplaceRoutes)
 app.route('/', matrixRoutes)
+app.route('/', employeeConfigRoutes)
 
 // 404 handler
 app.notFound((c) => {
