@@ -43,10 +43,13 @@ async function request<T>(
 ): Promise<T> {
   const url = `${client.baseUrl}${path}`;
 
-  // Build headers - only add auth if password is set
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+  // Build headers - only add auth and content-type if needed
+  const headers: Record<string, string> = {};
+
+  // Only add Content-Type if we have a body
+  if (body) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   // Only add Basic Auth if password is configured
   if (client.password) {
@@ -88,14 +91,17 @@ async function request<T>(
  */
 export async function createSession(systemPrompt?: string): Promise<string> {
   const client = getClient();
+  // Always send a body for POST /session
+  const body = {
+    title: systemPrompt ? systemPrompt.slice(0, 100) : 'Matrix Agent Session',
+    ...(systemPrompt && systemPrompt.trim() ? { systemPrompt } : {})
+  };
+  
   const result = await request<OpenCodeSession>(
     client,
     'POST',
     '/session',
-    systemPrompt ? { 
-      title: systemPrompt.slice(0, 100),
-      systemPrompt: systemPrompt 
-    } : {}
+    body
   );
   return result.id;
 }

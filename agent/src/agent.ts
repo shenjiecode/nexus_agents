@@ -179,7 +179,9 @@ async function handleMessage(roomId: string, event: any): Promise<void> {
   // Check for mention in message
   // Matrix @ format: formatted_body contains <a href="matrix.to/#/@userId">displayName</a>
   const myUserId = config.matrix.userId || '';
-  const isMentioned = 
+  // Extract localpart from userId (@localpart:server → localpart)
+  const localpart = myUserId.startsWith('@') ? myUserId.split(':')[0].substring(1) : myUserId;
+  const isMentioned =
     // Check if formatted_body contains our user ID link
     (event.content.formatted_body && event.content.formatted_body.includes(myUserId)) ||
     // Check if body contains our display name (fallback)
