@@ -4,20 +4,18 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Aliyun apt mirror
-RUN cat > /etc/apt/sources.list.d/ubuntu.sources << 'SRCEOF'
-Types: deb
-URIs: http://mirrors.aliyun.com/ubuntu
-Suites: noble noble-updates noble-backports
-Components: main restricted universe multiverse
-Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-
-Types: deb
-URIs: http://mirrors.aliyun.com/ubuntu
-Suites: noble-security
-Components: main restricted universe multiverse
-Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-SRCEOF
-RUN rm -f /etc/apt/sources.list
+RUN echo 'Types: deb\n\
+URIs: http://mirrors.aliyun.com/ubuntu\n\
+Suites: noble noble-updates noble-backports\n\
+Components: main restricted universe multiverse\n\
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n\
+\n\
+Types: deb\n\
+URIs: http://mirrors.aliyun.com/ubuntu\n\
+Suites: noble-security\n\
+Components: main restricted universe multiverse\n\
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' > /etc/apt/sources.list.d/ubuntu.sources && \
+    rm -f /etc/apt/sources.list
 
 # Install Node.js 24
 RUN apt-get update && apt-get install -y \
@@ -35,11 +33,11 @@ RUN npm config set registry https://registry.npmmirror.com
 # Install global tools
 RUN npm install -g opencode-ai tsx
 
-RUN mkdir -p /workspace /data/matrix /workspace/.opencode/skills
+# Create directories
 RUN mkdir -p /workspace /data/matrix /workspace/.opencode/skills
 
 # Copy entrypoint
-COPY images/base/entrypoint.sh /entrypoint.sh
+COPY images-base/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Copy agent package.json and install dependencies

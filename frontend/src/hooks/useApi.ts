@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ApiResponse } from '../types';
 
-const API_BASE_URL = 'http://localhost:13207';
+// API Base URL - use relative path in production (proxied by Nginx)
+// API Base URL - empty string means use relative path (proxied by Nginx)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:13207';
 
 /** Get stored user info from localStorage */
 function getStoredUser(): { role: string; id: string; orgId?: string } | null {

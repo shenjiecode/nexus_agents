@@ -1,6 +1,11 @@
 # Matrix Stack - Dendrite Homeserver + Element Web
-# Self-contained deployment: cd matrix && docker-compose up -d
-# Initialize: .\init.ps1
+# 
+# Usage:
+#   ./start.sh    - Generate configs and start services
+#   ./stop.sh     - Stop services
+#   docker-compose logs - View logs
+#
+# DO NOT run docker-compose up directly - use start.sh instead
 
 services:
   # Matrix database
@@ -11,7 +16,7 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-dendrite}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-itsasecret}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
       POSTGRES_DB: ${POSTGRES_DB:-dendrite}
     volumes:
       - ./data/postgres:/var/lib/postgresql/data

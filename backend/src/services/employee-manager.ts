@@ -9,13 +9,31 @@ import { initEmployeeData } from './config-manager.js';
 import { getOrgAuthPath, getOrgPublicPath } from './org-service.js';
 import { registerMatrixUserAdmin, generateMatrixPassword, inviteToRoom, joinRoom } from './matrix-service.js';
 
-// Initialize Docker connection (auto-detect platform)
-const docker = new Docker();
+// Initialize Docker connection with explicit socket path
+const docker = new Docker({ socketPath: process.env.DOCKER_HOST || '/var/run/docker.sock' });
 
 // Configuration
 const MAX_CONTAINERS = 10;
 const DEFAULT_START_PORT = 4096;
 const CONTAINER_PREFIX = 'nexus';
+
+// Host data path for volume mounts (when running in a container)
+// Backend container mounts /opt/nexus/data -> /app/data
+// Employee containers need host paths for mounts
+const HOST_DATA_PATH = process.env.NEXUS_HOST_DATA_PATH || '/opt/nexus/data';
+const CONTAINER_DATA_PATH = join(process.cwd(), 'data');
+
+/**
+ * Convert container-internal path to host path for volume mounts
+ * When Backend runs in a container, paths like /app/data/employees/xxx
+ * need to be converted to /opt/nexus/data/employees/xxx for employee containers
+ */
+function toHostPath(containerPath: string): string {
+  if (containerPath.startsWith(CONTAINER_DATA_PATH)) {
+    return containerPath.replace(CONTAINER_DATA_PATH, HOST_DATA_PATH);
+  }
+  return containerPath;
+}
 
 // Employee instance tracking
 interface EmployeeInstance {
@@ -178,7 +196,7 @@ export async function createEmployee(
   const containerName = `${CONTAINER_PREFIX}-${sanitize(orgSlug)}-${sanitize(roleSlug)}-${containerId.slice(-8)}`;
 
   // Use base image (opencode-ai pre-installed)
-  const image = imageName || 'localhost/nexus-base:latest';
+  const image = imageName || 'nexus-base:latest';
   // Generate employee info if not provided
   const finalEmployeeId = employeeId || `emp_${Date.now()}_${randomBytes(4).toString('hex')}`;
   const finalEmpSlug = empSlug || `${roleSlug}-${orgSlug}-${randomBytes(2).toString('hex')}`;
@@ -258,8 +276,9 @@ export async function createEmployee(
   };
   try {
     // Prepare volume mounts - employee data path maps directly to /workspace
+    // Use host paths for mounts (Backend runs in container, employee containers run on host)
     const volumes = [
-      `${employeeDataPath}:/workspace:rw`,
+      `${toHostPath(employeeDataPath)}:/workspace:rw`,
     ];
 
     // Mount organization auth.json (required, read-only)
@@ -267,12 +286,12 @@ export async function createEmployee(
     if (!existsSync(authPath)) {
       throw new Error(`Organization auth.json not found: ${orgSlug}. Please configure auth first.`);
     }
-    volumes.push(`${authPath}:/workspace/auth/auth.json:ro`);
+    volumes.push(`${toHostPath(authPath)}:/workspace/auth/auth.json:ro`);
 
     // Mount organization public directory (read-only)
     const orgPublicPath = getOrgPublicPath(orgSlug);
     if (existsSync(orgPublicPath)) {
-      volumes.push(`${orgPublicPath}:/workspace/org:ro`);
+      volumes.push(`${toHostPath(orgPublicPath)}:/workspace/org:ro`);
     }
 
     const envVars = [

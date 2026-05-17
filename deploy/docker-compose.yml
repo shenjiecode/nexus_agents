@@ -1,0 +1,75 @@
+# Nexus Agents Deployment
+# Server: 8.217.143.228
+
+services:
+  # ============================================
+  # Business PostgreSQL (separate from Matrix)
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: nexus-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: NexusProd2024SecurePwd
+      POSTGRES_DB: nexus
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Backend API Service (pre-built image)
+  # ============================================
+  backend:
+    image: nexus-backend:latest
+    container_name: nexus-backend
+    restart: unless-stopped
+    ports:
+      - "13207:13207"
+    environment:
+      PORT: 13207
+      LOG_LEVEL: info
+      NODE_ENV: production
+      DATABASE_URL: postgresql://nexus:NexusProd2024SecurePwd@postgres:5432/nexus
+      MATRIX_HOMESERVER_URL: http://8.217.143.228:8008
+      MATRIX_REGISTRATION_SECRET: nexus_matrix_secret_xK9mP2vL7qR4wY6j
+      DOCKER_HOST: /var/run/docker.sock
+      NEXUS_HOST_DATA_PATH: /opt/nexus/data
+      OPENCODE_PROVIDER_NAME: tencent-coding-plan
+      OPENCODE_API_KEY: sk-sp-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      ADMIN_PASSWORD: admin123
+      OSS_ENDPOINT: https://s3.cn-east-1.jdcloud-oss.com
+      OSS_BUCKET: agent-resource
+      OSS_ACCESS_KEY_ID: JDC_921912A9F93626C555461C545917
+      OSS_ACCESS_KEY_SECRET: 2E86CE84E4C36884E3E563AE2AE8924A
+    volumes:
+      - ./data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ============================================
+  # Frontend (Nginx + Static Files)
+  # ============================================
+  frontend:
+    image: nginx:alpine
+    container_name: nexus-frontend
+    restart: unless-stopped
+    ports:
+      - "13208:80"
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+
+networks:
+  default:
+    name: nexus-network

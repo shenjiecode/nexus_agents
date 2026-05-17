@@ -65,3 +65,22 @@ docker-data/
 
 # Backup files
 *_bak.*
+
+# Production configs (contain secrets)
+backend/.env.production
+matrix/.env.production
+
+# Deployment temp files
+deploy/*.tar
+deploy/test-*.js
+deploy/*cleanup*.sql
+deploy/*check*.sql
+deploy/*del*.sql
+deploy/*list*.sql
+deploy/*verify*.sql
+deploy/*schema*.sql
+deploy/*membership*.sql
+deploy/*event*.sql
+deploy/*roomserver*.sql
+deploy/*syncapi*.sql
+deploy/auth.json
