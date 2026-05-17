@@ -58,7 +58,6 @@ employees.get('/api/employees/:id', async (c) => {
     return c.json(apiSuccess({
       id: employee.id,
       organizationId: employee.organizationId,
-      roleId: employee.roleId,
       roleSlug: employee.roleSlug,
       roleVersion: employee.roleVersion,
       status: employee.status,

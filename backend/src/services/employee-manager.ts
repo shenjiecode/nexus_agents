@@ -7,17 +7,10 @@ import { initDatabase, employees } from '../db/index.js';
 import { eq } from 'drizzle-orm';
 import { initEmployeeData } from './config-manager.js';
 import { getOrgAuthPath, getOrgPublicPath } from './org-service.js';
-import { registerMatrixUserAdmin, generateMatrixUsername, generateMatrixPassword } from './matrix-service.js';
+import { registerMatrixUserAdmin, generateMatrixPassword, inviteToRoom, joinRoom } from './matrix-service.js';
 
-// Get Docker socket path
-function getDockerSocket(): string {
-  if (process.env.DOCKER_HOST) {
-    return process.env.DOCKER_HOST.replace('unix://', '');
-  }
-  return '/var/run/docker.sock';
-}
-
-const docker = new Docker({ socketPath: getDockerSocket() });
+// Initialize Docker connection (auto-detect platform)
+const docker = new Docker();
 
 // Configuration
 const MAX_CONTAINERS = 10;
@@ -28,7 +21,6 @@ const CONTAINER_PREFIX = 'nexus';
 interface EmployeeInstance {
   id: string;
   organizationId: string;
-  roleId: string;
   roleSlug: string;
   roleVersion: string;
   employeeId: string;
@@ -82,8 +74,9 @@ async function isPortAvailable(port: number): Promise<boolean> {
     }
     return true;
   } catch (error) {
-    logger.error(error, 'Error checking port availability');
-    return false;
+    // Docker connection failed - assume port is available since no containers can be using it
+    logger.warn({ error, port }, 'Docker not reachable, assuming port available');
+    return true;
   }
 }
 
@@ -123,15 +116,49 @@ async function checkEmployeeLimit(): Promise<void> {
 export async function createEmployee(
   organizationId: string,
   orgSlug: string,
-  roleId: string,
   roleSlug: string,
   employeeId?: string,
   empSlug?: string,
   roleVersion: string = 'latest',
   imageName?: string,
-  port?: number
+  port?: number,
+  marketplaceRoleId?: string,
+  orgInternalRoomId?: string,
+  orgMatrixAdminToken?: string
 ): Promise<EmployeeInstance> {
   await checkEmployeeLimit();
+
+  // Query marketplace role if provided
+  let marketplaceRole: any = null;
+  let mcpIds: string[] = [];
+  let skillIds: string[] = [];
+  let agentsMd: string = '';
+
+  if (marketplaceRoleId) {
+    try {
+      const { initDatabase } = await import('../db/index.js');
+      const db = await initDatabase();
+      const { marketplaceRoles } = await import('../db/index.js');
+      const roleResult = await db.select().from(marketplaceRoles).where(eq(marketplaceRoles.id, marketplaceRoleId));
+      if (roleResult.length > 0) {
+        marketplaceRole = roleResult[0];
+        // Parse config
+        let config = marketplaceRole.config || {};
+        if (typeof config === 'string') {
+          try {
+            config = JSON.parse(config);
+          } catch {
+            config = { mcpIds: [], skillIds: [], agentsMd: '' };
+          }
+        }
+        mcpIds = config.mcpIds || [];
+        skillIds = config.skillIds || [];
+        agentsMd = config.agentsMd || '';
+      }
+    } catch (err) {
+      logger.warn({ err, marketplaceRoleId }, 'Failed to fetch marketplace role');
+    }
+  }
 
   // Find available port if not provided
   const employeePort = port ?? (await findAvailablePort(DEFAULT_START_PORT));
@@ -143,11 +170,12 @@ export async function createEmployee(
 
   const containerId = generateEmployeeId();
   const password = generatePassword();
-  const containerName = `${CONTAINER_PREFIX}-${orgSlug}-${roleSlug}-${containerId.slice(-8)}`;
+  // Sanitize container name: only [a-zA-Z0-9_.-] allowed
+  const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_.-]/g, '').toLowerCase() || 'emp';
+  const containerName = `${CONTAINER_PREFIX}-${sanitize(orgSlug)}-${sanitize(roleSlug)}-${containerId.slice(-8)}`;
 
-  // Determine image name
-  const image = imageName || `localhost/nexus-role-${roleSlug}:${roleVersion}`;
-
+  // Use base image (opencode-ai pre-installed)
+  const image = imageName || 'localhost/nexus-base:latest';
   // Generate employee info if not provided
   const finalEmployeeId = employeeId || `emp_${Date.now()}_${randomBytes(4).toString('hex')}`;
   const finalEmpSlug = empSlug || `${roleSlug}-${orgSlug}-${randomBytes(2).toString('hex')}`;
@@ -155,11 +183,26 @@ export async function createEmployee(
   // Initialize employee data directory
   const employeeDataPath = initEmployeeData(finalEmployeeId, finalEmpSlug, orgSlug);
 
+  // Write AGENTS.md to employee data directory if marketplace role has agentsMd
+  if (agentsMd && employeeDataPath) {
+    const agentsMdPath = join(employeeDataPath, 'AGENTS.md');
+    writeFileSync(agentsMdPath, agentsMd, 'utf-8');
+    logger.info({ employeeId: finalEmployeeId, agentsMdPath }, 'AGENTS.md written to employee data directory');
+  }
+
   // Register Matrix account for this employee
   let matrixAccount;
   let matrixPassword = '';
   try {
-    const matrixUsername = generateMatrixUsername(orgSlug, finalEmpSlug);
+    // Generate unique Matrix username (role slug + timestamp to avoid conflicts)
+    let matrixUsername: string;
+    if (marketplaceRole && marketplaceRole.slug) {
+      const timestamp = Date.now().toString(36);
+      const random = Math.random().toString(36).slice(2, 6);
+      matrixUsername = `${marketplaceRole.slug.toLowerCase()}-${timestamp}${random}`;
+    } else {
+      matrixUsername = `nexus-${orgSlug}-employee-${Date.now()}`;
+    }
     matrixPassword = generateMatrixPassword();
     matrixAccount = await registerMatrixUserAdmin(
       matrixUsername,
@@ -168,14 +211,31 @@ export async function createEmployee(
       false
     );
     logger.info({ matrixUserId: matrixAccount.userId, employeeId: finalEmployeeId }, 'Matrix account registered');
+
+    // Invite and join employee to organization's internal room
+    const internalRoomId = orgInternalRoomId;
+    const orgAdminToken = orgMatrixAdminToken;
+    if (internalRoomId && orgAdminToken) {
+      try {
+        // Invite employee to room
+        await inviteToRoom(internalRoomId, matrixAccount.userId, orgAdminToken);
+        logger.info({ roomId: internalRoomId, userId: matrixAccount.userId }, 'Invited employee to internal room');
+        
+        // Join room as employee
+        await joinRoom(internalRoomId, matrixAccount.accessToken);
+        logger.info({ roomId: internalRoomId, userId: matrixAccount.userId }, 'Employee joined internal room');
+      } catch (roomError) {
+        logger.error({ roomError, employeeId: finalEmployeeId }, 'Failed to add employee to internal room, continuing');
+      }
+    }
   } catch (matrixError) {
     logger.error({ matrixError, employeeId: finalEmployeeId }, 'Failed to register Matrix account');
+    throw matrixError;
   }
 
   const instance: EmployeeInstance = {
     id: containerId,
     organizationId,
-    roleId,
     roleSlug,
     roleVersion,
     employeeId: finalEmployeeId,
@@ -208,11 +268,11 @@ export async function createEmployee(
       volumes.push(`${orgPublicPath}:/workspace/org:ro`);
     }
 
-    // Prepare environment variables
     const envVars = [
       `OPENCODE_SERVER_PORT=4096`,
       'OPENCODE_SERVER_HOSTNAME=0.0.0.0',
       `OPENCODE_SERVER_PASSWORD=${password}`,
+      `OPENCODE_PASSWORD=${password}`,  // Same password for client authentication
       `OPENCODE_AUTH_PATH=/workspace/auth/auth.json`,
       `EMPLOYEE_ID=${finalEmployeeId}`,
       `EMPLOYEE_SLUG=${finalEmpSlug}`,
@@ -220,11 +280,13 @@ export async function createEmployee(
 
     // Add Matrix config if account was created
     if (matrixAccount) {
-      envVars.push(`MATRIX_HOMESERVER_URL=${process.env.MATRIX_HOMESERVER_URL || 'http://localhost:8008'}`);
+      // Replace localhost with host.docker.internal for container access
+      const matrixUrl = (process.env.MATRIX_HOMESERVER_URL || 'http://localhost:8008')
+        .replace(/localhost/g, 'host.docker.internal');
+      envVars.push(`MATRIX_HOMESERVER_URL=${matrixUrl}`);
       envVars.push(`MATRIX_ACCESS_TOKEN=${matrixAccount.accessToken}`);
       envVars.push(`MATRIX_USER_ID=${matrixAccount.userId}`);
     }
-
     // Create container
     const container = await docker.createContainer({
       Image: image,
@@ -245,7 +307,6 @@ export async function createEmployee(
       },
       Labels: {
         'nexus.org.id': organizationId,
-        'nexus.role.id': roleId,
         'nexus.role.slug': roleSlug,
         'nexus.role.version': roleVersion,
         'nexus.container.id': containerId,
@@ -266,10 +327,12 @@ export async function createEmployee(
         id: finalEmployeeId,
         slug: finalEmpSlug,
         name: finalEmpSlug,
-        roleId: roleId,
         organizationId: organizationId,
         containerId: containerId,
         employeeDataPath: employeeDataPath,
+        marketplaceRoleId: marketplaceRoleId || null,
+        mcpIds: JSON.stringify(mcpIds),
+        skillIds: JSON.stringify(skillIds),
         matrixUserId: matrixAccount?.userId,
         matrixAccessToken: matrixAccount?.accessToken,
         matrixDeviceId: matrixAccount?.deviceId,
@@ -561,7 +624,6 @@ export async function restoreEmployees(): Promise<number> {
         const instance: EmployeeInstance = {
           id: record.containerId || '',
           organizationId: record.organizationId || '',
-          roleId: record.roleId || '',
           roleSlug: '',
           roleVersion: '',
           employeeId: record.id || '',
@@ -620,7 +682,6 @@ export async function rebuildEmployeesForOrg(orgSlug: string): Promise<{ rebuilt
       const employeeConfig = {
         roleSlug: instance.roleSlug,
         roleVersion: instance.roleVersion,
-        roleId: instance.roleId,
       };
       
       // Stop and remove the container
@@ -642,7 +703,6 @@ export async function rebuildEmployeesForOrg(orgSlug: string): Promise<{ rebuilt
       await createEmployee(
         org.id,
         orgSlug,
-        instance.roleId,
         instance.roleSlug,
         instance.employeeId,
         instance.roleSlug + '-' + orgSlug.slice(-4),

@@ -3,24 +3,16 @@ import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import {
   organizations,
-  roles,
-  roleVersions,
   skills,
   mcps,
-  roleSkills,
-  roleMcps,
   employees,
   marketplaceRoles,
 } from './schema.js';
 
 const schema = {
   organizations,
-  roles,
-  roleVersions,
   skills,
   mcps,
-  roleSkills,
-  roleMcps,
   employees,
   marketplaceRoles,
 };
@@ -57,12 +49,8 @@ export async function closeDatabase(): Promise<void> {
 // Export tables
 export {
   organizations,
-  roles,
-  roleVersions,
   skills,
   mcps,
-  roleSkills,
-  roleMcps,
   employees,
   marketplaceRoles,
 };

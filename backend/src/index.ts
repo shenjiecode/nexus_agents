@@ -4,12 +4,13 @@ import { cors } from 'hono/cors'
 import logger from './lib/logger.js'
 import { authMiddleware } from './api/middleware/auth.js'
 import organizationRoutes from './api/routes/organizations.js'
-import roleRoutes from './api/routes/roles.js'
+
 import orgEmployeeRoutes from './api/routes/org-employees.js'
 import employeeRoutes from './api/routes/employees.js'
 import sessionRoutes from './api/routes/sessions.js'
 import marketplaceRoutes from './api/routes/marketplace.js'
 import authRoutes from './api/routes/auth.js'
+import matrixRoutes from './api/routes/matrix.js'
 import { restoreEmployees } from './services/employee-manager.js'
 import { initDatabase, closeDatabase } from './db/index.js'
 
@@ -39,11 +40,12 @@ app.get('/health', (c) => {
 // API Routes
 app.route('/', authRoutes)
 app.route('/', organizationRoutes)
-app.route('/', roleRoutes)
+
 app.route('/', orgEmployeeRoutes)
 app.route('/', sessionRoutes)
 app.route('/', employeeRoutes)
 app.route('/', marketplaceRoutes)
+app.route('/', matrixRoutes)
 
 // 404 handler
 app.notFound((c) => {

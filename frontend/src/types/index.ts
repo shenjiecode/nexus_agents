@@ -8,6 +8,7 @@ export interface Organization {
   createdAt: string;
   updatedAt: string;
   employeeCount?: number;
+  internalRoomId?: string;
 }
 
 export interface Role {
@@ -38,6 +39,9 @@ export interface Employee {
   port: number;
   url: string;
   healthStatus: string;
+  marketplaceRoleId?: string;
+  mcpIds?: string;
+  skillIds?: string;
   createdAt: string;
 }
 

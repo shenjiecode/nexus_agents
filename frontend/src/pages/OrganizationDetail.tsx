@@ -5,7 +5,7 @@ import { CyberButton } from '../components/CyberButton';
 import { CyberModal } from '../components/CyberModal';
 import { StatusDot } from '../components/StatusDot';
 import { useApi, apiRequest } from '../hooks/useApi';
-import type { Organization, Employee, Role, CreateEmployeeRequest } from '../types';
+import type { Organization, Employee, MarketplaceRole } from '../types';
 function ArrowLeftIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -57,9 +57,9 @@ export function OrganizationDetail() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [employeeToRemove, setEmployeeToRemove] = useState<string | null>(null);
-  const [hireForm, setHireForm] = useState<CreateEmployeeRequest>({
-    roleSlug: '',
-    roleVersion: '',
+  const [hireForm, setHireForm] = useState<{ name: string; marketplaceRoleId: string }>({
+    name: '',
+    marketplaceRoleId: '',
   });
   const [authEditText, setAuthEditText] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
@@ -72,11 +72,11 @@ export function OrganizationDetail() {
   const { data: employees, loading: employeesLoading, error: employeesError, refetch: refetchEmployees } = 
     useApi<Employee[]>(`/api/orgs/${slug}/employees`);
   
-  const { data: roles } = useApi<Role[]>('/api/roles');
+  const { data: marketplaceRoles } = useApi<MarketplaceRole[]>('/api/marketplace-roles');
 
   const handleHireEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hireForm.roleSlug || !hireForm.roleVersion) return;
+    if (!hireForm.name) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
@@ -87,7 +87,7 @@ export function OrganizationDetail() {
         body: JSON.stringify(hireForm),
       });
       setIsHireModalOpen(false);
-      setHireForm({ roleSlug: '', roleVersion: '' });
+      setHireForm({ name: '', marketplaceRoleId: '' });
       refetchEmployees();
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to hire employee');
@@ -148,7 +148,7 @@ export function OrganizationDetail() {
     }
   };
 
-  const selectedRole = roles?.find(r => r.slug === hireForm.roleSlug);
+
 
 
   if (orgLoading) {
@@ -277,8 +277,8 @@ export function OrganizationDetail() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-cyber-cyan/20">
-                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Role</th>
-                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">版本</th>
+                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">名称</th>
+                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">角色</th>
                   <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">状态</th>
                   <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">端口</th>
                   <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Employee ID</th>
@@ -314,10 +314,10 @@ export function OrganizationDetail() {
                       onClick={() => navigate(`/employees/${employee.id}`)}
                     >
                       <td className="py-4 px-6">
-                        <span className="font-medium text-cyber-white">{employee.roleSlug}</span>
+                        <span className="font-medium text-cyber-white">{(employee as any).name || employee.roleSlug}</span>
                       </td>
                       <td className="py-4 px-6">
-                        <code className="font-mono text-sm text-cyber-purple">{employee.roleVersion}</code>
+                        <code className="font-mono text-sm text-cyber-purple">{(employee as any).marketplaceRoleId || employee.roleVersion}</code>
                       </td>
                       <td className="py-4 px-6">
                         <StatusDot status={employee.status} showLabel />
@@ -373,7 +373,7 @@ export function OrganizationDetail() {
             <CyberButton
               type="submit"
               form="hire-form"
-              disabled={isSubmitting || !hireForm.roleSlug || !hireForm.roleVersion}
+              disabled={isSubmitting || !hireForm.name}
             >
               {isSubmitting ? '雇佣中...' : '雇佣 Employee'}
             </CyberButton>
@@ -387,43 +387,29 @@ export function OrganizationDetail() {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-cyber-muted mb-1">选择 Role</label>
-            <select
-              value={hireForm.roleSlug || ''}
-              onChange={(e) => {
-                const roleSlug = e.target.value;
-                const role = roles?.find(r => r.slug === roleSlug);
-                setHireForm(prev => ({
-                  ...prev,
-                  roleSlug,
-                  roleVersion: role?.versions[0]?.version || '',
-                }));
-              }}
+            <label className="block text-sm font-medium text-cyber-muted mb-1">名称 *</label>
+            <input
+              type="text"
+              value={hireForm.name}
+              onChange={(e) => setHireForm(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="输入员工名称"
               className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white focus:border-cyber-cyan focus:outline-none"
               required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-cyber-muted mb-1">选择角色 (可选)</label>
+            <select
+              value={hireForm.marketplaceRoleId || ''}
+              onChange={(e) => setHireForm(prev => ({ ...prev, marketplaceRoleId: e.target.value }))}
+              className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white focus:border-cyber-cyan focus:outline-none"
             >
-              <option value="">选择 Role...</option>
-              {roles?.map(role => (
-                <option key={role.id} value={role.slug}>{role.name}</option>
+              <option value="">不选择角色</option>
+              {marketplaceRoles?.map(role => (
+                <option key={role.id} value={role.id}>{role.name}</option>
               ))}
             </select>
           </div>
-          {selectedRole && (
-            <div>
-              <label className="block text-sm font-medium text-cyber-muted mb-1">版本</label>
-              <select
-                value={hireForm.roleVersion}
-                onChange={(e) => setHireForm(prev => ({ ...prev, roleVersion: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white focus:border-cyber-cyan focus:outline-none"
-                required
-              >
-                <option value="">选择版本...</option>
-                {selectedRole.versions.map(version => (
-                  <option key={version.id} value={version.version}>{version.version}</option>
-                ))}
-              </select>
-            </div>
-          )}
         </form>
       </CyberModal>
 

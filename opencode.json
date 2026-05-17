@@ -1,8 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "zai-coding-plan/glm-5.1",
+  "model": "tencent-coding-plan/glm-5",
   "small_model": "tencent-coding-plan/minimax-m2.5",
-  "enabled_providers": ["zai-coding-plan", "tencent-coding-plan"],
+  "enabled_providers": ["tencent-coding-plan"],
   "plugin": [
     "oh-my-openagent@latest"
   ],

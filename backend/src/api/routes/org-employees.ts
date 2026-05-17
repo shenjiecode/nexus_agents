@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
+import fs from 'node:fs';
+import path from 'node:path';
 import logger from '../../lib/logger.js';
 import { handleError } from '../../lib/format-error.js';
-import { getOrganizationBySlug } from '../../services/org-service.js';
-import { getRoleBySlug } from '../../services/role-service.js';
+import { getOrganizationBySlug, getOrganizationBySlugWithMatrix } from '../../services/org-service.js';
+import { getRoleById } from '../../services/marketplace-service.js';
 import {
   createEmployee,
   startEmployee,
@@ -64,32 +66,36 @@ orgEmployees.post('/api/orgs/:orgSlug/employees', async (c) => {
       return c.json(apiError('Request body must be an object', 400), 400);
     }
 
-    if (!body.roleSlug || typeof body.roleSlug !== 'string') {
-      return c.json(apiError('roleSlug is required', 400), 400);
-    }
+    const marketplaceRoleId = body.marketplaceRoleId || null;
 
     // Verify organization exists
-    const org = await getOrganizationBySlug(orgSlug);
+    const org = await getOrganizationBySlugWithMatrix(orgSlug);
     if (!org) {
       return c.json(apiError('Organization not found', 404), 404);
     }
 
-    // Verify role exists
-    const role = await getRoleBySlug(body.roleSlug);
-    if (!role) {
-      return c.json(apiError('Role not found', 404), 404);
+    // Verify marketplace role if provided
+    let marketplaceRole: any = null;
+    if (marketplaceRoleId) {
+      marketplaceRole = await getRoleById(marketplaceRoleId);
+      if (!marketplaceRole) {
+        return c.json(apiError('Marketplace role not found', 404), 404);
+      }
     }
 
     // Create employee
     const employee = await createEmployee(
       org.id,
       orgSlug,
-      role.id,
-      role.slug,
+      body.name || '',
       undefined,
       undefined,
-      body.roleVersion || 'latest',
-      role.imageName
+      'latest',
+      undefined,
+      undefined,
+      marketplaceRoleId || undefined,
+      org.internalRoomId,
+      org.matrixAdminAccessToken
     );
 
     // Start employee
@@ -97,8 +103,12 @@ orgEmployees.post('/api/orgs/:orgSlug/employees', async (c) => {
 
     return c.json(apiSuccess({
       id: employee.id,
+      name: body.name,
       roleSlug: employee.roleSlug,
       roleVersion: employee.roleVersion,
+      marketplaceRoleId: marketplaceRoleId,
+      mcpIds: [],
+      skillIds: [],
       status: employee.status,
       port: employee.port,
       url: employee.url,
@@ -107,7 +117,7 @@ orgEmployees.post('/api/orgs/:orgSlug/employees', async (c) => {
       createdAt: employee.createdAt.toISOString(),
     }), 201);
   } catch (error: any) {
-    logger.error(error, "API error");
+    logger.error(error, 'API error');
     return handleError(c, error, 'Failed to create employee');
   }
 });
@@ -227,6 +237,34 @@ orgEmployees.delete('/api/orgs/:orgSlug/employees/:employeeId', async (c) => {
   } catch (error: any) {
     logger.error(error, "API error");
     return handleError(c, error, 'Failed to remove employee');
+  }
+});
+
+// GET /api/employees/:id/agents-md - Get employee's AGENTS.md content
+orgEmployees.get('/api/employees/:id/agents-md', async (c) => {
+  try {
+    const employeeId = c.req.param('id');
+
+    const employee = getEmployee(employeeId);
+    if (!employee) {
+      return c.json(apiError('Employee not found', 404), 404);
+    }
+
+    const dataPath = (employee as any).employeeDataPath;
+    if (!dataPath) {
+      return c.json(apiError('Employee data path not found', 404), 404);
+    }
+
+    const agentsMdPath = path.join(dataPath, 'AGENTS.md');
+    if (!fs.existsSync(agentsMdPath)) {
+      return c.json({ success: true, content: '' });
+    }
+
+    const content = fs.readFileSync(agentsMdPath, 'utf-8');
+    return c.json({ success: true, content });
+  } catch (error: any) {
+    logger.error(error, 'Failed to read AGENTS.md');
+    return c.json(apiError('Failed to read AGENTS.md', 500), 500);
   }
 });
 

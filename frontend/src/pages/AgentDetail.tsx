@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { MatrixChat } from '../components/MatrixChat';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CyberCard } from '../components/CyberCard';
 import { CyberButton } from '../components/CyberButton';
 import { StatusDot } from '../components/StatusDot';
 import { useApi, apiRequest } from '../hooks/useApi';
-import type { Employee } from '../types';
+import type { Employee, Skill, Mcp } from '../types';
 
 interface Session {
   id: string;
@@ -53,20 +54,86 @@ export function AgentDetail() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [chatMode, setChatMode] = useState<'session' | 'matrix'>('matrix');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: employee, loading: employeeLoading, error: employeeError } = 
     useApi<Employee>(`/api/employees/${id}`);
-  
+
+  // Fetch organization to get orgSlug for Matrix chat
+  const { data: organizations } = useApi<{ id: string; slug: string }[]>('/api/organizations');
+  const employeeOrg = organizations?.find(org => org.id === employee?.organizationId);
 
   const { data: sessions, loading: sessionsLoading, refetch: refetchSessions } =
     useApi<Session[]>(`/api/employees/${id}/sessions`);
   
-  const { data: roleSkills } =
-    useApi<{id: string; name: string; description?: string}[]>(employee ? `/api/roles/${employee.roleSlug}/skills` : '');
+  // Fetch all skills and mcps from marketplace for name lookup
+  const { data: allSkills } = useApi<Skill[]>('/api/skills');
+  const { data: allMcps } = useApi<Mcp[]>('/api/mcps');
   
-  const { data: roleMcps } =
-    useApi<{id: string; name: string; description?: string}[]>(employee ? `/api/roles/${employee.roleSlug}/mcps` : '');
+  // Fetch employee's AGENTS.md content
+  const { data: agentsMdContent, loading: agentsMdLoading } = useApi<string>(`/api/employees/${id}/agents-md`);
+  
+  // Parse employee's mcpIds and skillIds from JSON strings
+  const [employeeMcpIds, setEmployeeMcpIds] = useState<string[]>([]);
+  const [employeeSkillIds, setEmployeeSkillIds] = useState<string[]>([]);
+  
+  useEffect(() => {
+    if (employee?.mcpIds) {
+      try {
+        const parsed = JSON.parse(employee.mcpIds);
+        if (Array.isArray(parsed)) {
+          setEmployeeMcpIds(parsed);
+        }
+      } catch (err) {
+        console.error('Failed to parse mcpIds:', err);
+        setEmployeeMcpIds([]);
+      }
+    } else {
+      setEmployeeMcpIds([]);
+    }
+  }, [employee?.mcpIds]);
+  
+  useEffect(() => {
+    if (employee?.skillIds) {
+      try {
+        const parsed = JSON.parse(employee.skillIds);
+        if (Array.isArray(parsed)) {
+          setEmployeeSkillIds(parsed);
+        }
+      } catch (err) {
+        console.error('Failed to parse skillIds:', err);
+        setEmployeeSkillIds([]);
+      }
+    } else {
+      setEmployeeSkillIds([]);
+    }
+  }, [employee?.skillIds]);
+  
+  // Build employee's mcps and skills with names
+  const employeeMcps = useMemo(() => {
+    if (!allMcps || employeeMcpIds.length === 0) return [];
+    return employeeMcpIds.map(id => {
+      const mcp = allMcps.find(m => m.id === id);
+      return {
+        id,
+        name: mcp?.name || id,
+        description: mcp?.description
+      };
+    });
+  }, [allMcps, employeeMcpIds]);
+  
+  const employeeSkills = useMemo(() => {
+    if (!allSkills || employeeSkillIds.length === 0) return [];
+    return employeeSkillIds.map(id => {
+      const skill = allSkills.find(s => s.id === id);
+      return {
+        id,
+        name: skill?.name || id,
+        description: skill?.description
+      };
+    });
+  }, [allSkills, employeeSkillIds]);
 
   // Trigger health check when employee loads
   useEffect(() => {
@@ -226,17 +293,17 @@ export function AgentDetail() {
           </CyberCard>
 
 
-          {/* Config */}
+          {/* Config - 员工配置 */}
           <CyberCard>
             <div className="p-4 space-y-4">
-              <h2 className="text-lg font-display font-semibold text-cyber-cyan">配置</h2>
+              <h2 className="text-lg font-display font-semibold text-cyber-cyan">员工配置</h2>
               
               {/* MCPs */}
               <div className="space-y-2">
                 <h3 className="text-sm font-medium text-cyber-white">MCPs</h3>
-                {roleMcps && roleMcps.length > 0 ? (
+                {employeeMcps.length > 0 ? (
                   <div className="space-y-2">
-                    {roleMcps.map(mcp => (
+                    {employeeMcps.map(mcp => (
                       <div key={mcp.id} className="p-2 rounded bg-cyber-dark border border-cyber-cyan/10">
                         <p className="text-sm text-cyber-white font-medium">{mcp.name}</p>
                         {mcp.description && <p className="text-xs text-cyber-muted mt-1">{mcp.description}</p>}
@@ -244,16 +311,16 @@ export function AgentDetail() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-cyber-muted italic">暂无 MCP 配置</p>
+                  <p className="text-xs text-cyber-muted italic">未配置 MCP</p>
                 )}
               </div>
               
               {/* Skills */}
               <div className="space-y-2">
                 <h3 className="text-sm font-medium text-cyber-white">Skills</h3>
-                {roleSkills && roleSkills.length > 0 ? (
+                {employeeSkills.length > 0 ? (
                   <div className="space-y-2">
-                    {roleSkills.map(skill => (
+                    {employeeSkills.map(skill => (
                       <div key={skill.id} className="p-2 rounded bg-cyber-dark border border-cyber-cyan/10">
                         <p className="text-sm text-cyber-white font-medium">{skill.name}</p>
                         {skill.description && <p className="text-xs text-cyber-muted mt-1">{skill.description}</p>}
@@ -261,7 +328,19 @@ export function AgentDetail() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-cyber-muted italic">暂无 Skills 配置</p>
+                  <p className="text-xs text-cyber-muted italic">未配置 Skills</p>
+                )}
+              </div>
+              
+              {/* AGENTS.md */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-cyber-white">AGENTS.md</h3>
+                {agentsMdLoading ? (
+                  <div className="skeleton h-32 rounded" />
+                ) : agentsMdContent ? (
+                  <pre className="p-3 rounded bg-cyber-dark border border-cyber-cyan/10 text-xs text-cyber-white font-mono overflow-auto max-h-64 whitespace-pre-wrap">{agentsMdContent}</pre>
+                ) : (
+                  <p className="text-xs text-cyber-muted italic">未配置 AGENTS.md</p>
                 )}
               </div>
             </div>
@@ -307,81 +386,113 @@ export function AgentDetail() {
           </CyberCard>
         </div>
 
-        {/* Right Panel: Chat */}
+        {/* Right Panel: Chat with tabs */}
         <div className="lg:col-span-2">
           <CyberCard className="h-[calc(100vh-200px)] flex flex-col">
-            <div className="p-4 border-b border-cyber-cyan/20">
-              <h2 className="text-lg font-display font-semibold text-cyber-cyan">
-                对话 {activeSession && <span className="text-cyber-muted text-sm">(Session: {activeSession.id.slice(0, 8)})</span>}
-              </h2>
+            {/* Tab header */}
+            <div className="p-4 border-b border-cyber-cyan/20 flex items-center gap-4">
+              <button
+                onClick={() => setChatMode('matrix')}
+                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                  chatMode === 'matrix'
+                    ? 'bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/50'
+                    : 'text-cyber-muted hover:text-cyber-white'
+                }`}
+              >
+                组织群聊
+              </button>
+              <button
+                onClick={() => setChatMode('session')}
+                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                  chatMode === 'session'
+                    ? 'bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/50'
+                    : 'text-cyber-muted hover:text-cyber-white'
+                }`}
+              >
+                会话 {activeSession && <span className="text-cyber-muted text-xs">({activeSession.id.slice(0, 8)})</span>}
+              </button>
             </div>
             
-            {activeSession ? (
-              <>
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {messages.length === 0 ? (
-                    <div className="text-center text-cyber-muted py-8">
-                      开始对话吧！在下方输入消息。
-                    </div>
-                  ) : (
-                    messages.map((msg, idx) => (
-                      <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[80%] p-3 rounded-lg ${
-                          msg.role === 'user' 
-                            ? 'bg-cyber-cyan/20 text-cyber-white' 
-                            : 'bg-cyber-dark text-cyber-white'
-                        }`}>
-                          <p className="whitespace-pre-wrap">{msg.content}</p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                  {isLoading && (
-                    <div className="flex justify-start">
-                      <div className="bg-cyber-dark p-3 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-cyber-cyan rounded-full animate-pulse" />
-                          <div className="w-2 h-2 bg-cyber-cyan rounded-full animate-pulse delay-75" />
-                          <div className="w-2 h-2 bg-cyber-cyan rounded-full animate-pulse delay-150" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div ref={messagesEndRef} />
+            {chatMode === 'matrix' ? (
+              /* Matrix Chat */
+              employeeOrg ? (
+                <MatrixChat orgSlug={employeeOrg.slug} className="flex-1" />
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <p className="text-cyber-muted">加载组织信息...</p>
                 </div>
-
-                {/* Input */}
-                <div className="p-4 border-t border-cyber-cyan/20">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                      placeholder="输入消息..."
-                      disabled={isLoading}
-                      className="flex-1 px-4 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none"
-                    />
-                    <CyberButton 
-                      onClick={handleSendMessage} 
-                      disabled={!inputText.trim() || isLoading}
-                      icon={<SendIcon className="w-4 h-4" />}
-                    >
-                      发送
-                    </CyberButton>
-                  </div>
-                </div>
-              </>
+              )
             ) : (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <p className="text-cyber-muted mb-4">请先创建会话开始对话</p>
-                  <CyberButton onClick={handleCreateSession} icon={<PlusIcon className="w-4 h-4" />}>
-                    新建会话
-                  </CyberButton>
-                </div>
-              </div>
+              /* Session Chat */
+              <>
+                {activeSession ? (
+                  <>
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                      {messages.length === 0 ? (
+                        <div className="text-center text-cyber-muted py-8">
+                          开始对话吧！在下方输入消息。
+                        </div>
+                      ) : (
+                        messages.map((msg, idx) => (
+                          <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[80%] p-3 rounded-lg ${
+                              msg.role === 'user' 
+                                ? 'bg-cyber-cyan/20 text-cyber-white' 
+                                : 'bg-cyber-dark text-cyber-white'
+                            }`}>
+                              <p className="whitespace-pre-wrap">{msg.content}</p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                      {isLoading && (
+                        <div className="flex justify-start">
+                          <div className="bg-cyber-dark p-3 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-cyber-cyan rounded-full animate-pulse" />
+                              <div className="w-2 h-2 bg-cyber-cyan rounded-full animate-pulse delay-75" />
+                              <div className="w-2 h-2 bg-cyber-cyan rounded-full animate-pulse delay-150" />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* Input */}
+                    <div className="p-4 border-t border-cyber-cyan/20">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                          placeholder="输入消息..."
+                          disabled={isLoading}
+                          className="flex-1 px-4 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none"
+                        />
+                        <CyberButton 
+                          onClick={handleSendMessage} 
+                          disabled={!inputText.trim() || isLoading}
+                          icon={<SendIcon className="w-4 h-4" />}
+                        >
+                          发送
+                        </CyberButton>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-cyber-muted mb-4">请先创建会话开始对话</p>
+                      <CyberButton onClick={handleCreateSession} icon={<PlusIcon className="w-4 h-4" />}>
+                        新建会话
+                      </CyberButton>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </CyberCard>
         </div>

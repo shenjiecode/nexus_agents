@@ -4,7 +4,7 @@ import { eq, count } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
 import { getEmployeesByOrganization } from './employee-manager.js';
-import { registerMatrixUserAdmin } from './matrix-service.js';
+import { registerMatrixUserAdmin, createRoom } from './matrix-service.js';
 // Zod schemas for validation
 import { z } from 'zod';
 
@@ -109,6 +109,7 @@ export async function createOrganization(
   const matrixUsername = `nexus-org-${validated.slug}`;
   const matrixPassword = randomBytes(16).toString('hex');
   let matrixAccount;
+  let internalRoomId: string | null = null;
   try {
     matrixAccount = await registerMatrixUserAdmin(
       matrixUsername,
@@ -116,6 +117,25 @@ export async function createOrganization(
       validated.name,
     );
     logger.info({ matrixUserId: matrixAccount.userId, orgSlug: validated.slug }, 'Matrix account registered for organization');
+
+    // Create internal group chat for the organization
+    if (matrixAccount?.accessToken) {
+      try {
+        const roomName = `${validated.name}内部群`;
+        const roomAlias = `${validated.slug}-internal`;
+        const room = await createRoom(
+          roomName,
+          roomAlias,
+          matrixAccount.accessToken,
+          false, // isPublic: false = private
+        );
+        internalRoomId = room.roomId;
+        logger.info({ roomId: internalRoomId, orgSlug: validated.slug }, 'Internal room created for organization');
+      } catch (roomError) {
+        logger.error(roomError, 'Failed to create internal room, rolling back organization');
+        throw new Error(`Failed to create internal room: ${roomError instanceof Error ? roomError.message : 'Unknown error'}`);
+      }
+    }
   } catch (error) {
     logger.error(error, 'Failed to register Matrix account for organization, continuing without Matrix');
   }
@@ -129,6 +149,7 @@ export async function createOrganization(
     matrixAdminUserId: matrixAccount?.userId || null,
     matrixAdminAccessToken: matrixAccount?.accessToken || null,
     matrixAdminPassword: matrixPassword,
+    internalRoomId: internalRoomId,
     createdAt: now,
     updatedAt: now,
   });
@@ -277,6 +298,48 @@ export async function getOrganizationBySlug(slug: string): Promise<{
     name: org.name,
     slug: org.slug,
     description: org.description || undefined,
+    employeeCount: orgEmployees.length,
+    createdAt: org.createdAt,
+    updatedAt: org.updatedAt,
+  };
+}
+
+/**
+ * Get organization by slug with full details including Matrix info
+ */
+export async function getOrganizationBySlugWithMatrix(slug: string): Promise<{
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  internalRoomId?: string;
+  matrixAdminAccessToken?: string;
+  createdAt: number;
+  updatedAt: number;
+  employeeCount?: number;
+} | null> {
+  const database = await getDb();
+  const records = await database
+    .select()
+    .from(organizations)
+    .where(eq(organizations.slug, slug));
+
+  if (records.length === 0) {
+    return null;
+  }
+  const org = records[0];
+  
+  // Count employees for this organization
+  const { getEmployeesByOrganization } = await import('./employee-manager.js');
+  const orgEmployees = getEmployeesByOrganization(org.id);
+  
+  return {
+    id: org.id,
+    name: org.name,
+    slug: org.slug,
+    description: org.description || undefined,
+    internalRoomId: org.internalRoomId || undefined,
+    matrixAdminAccessToken: org.matrixAdminAccessToken || undefined,
     employeeCount: orgEmployees.length,
     createdAt: org.createdAt,
     updatedAt: org.updatedAt,

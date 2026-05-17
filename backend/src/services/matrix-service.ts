@@ -295,3 +295,137 @@ export function generateMatrixPassword(): string {
   }
   return password;
 }
+
+/**
+ * Get room messages (paginated timeline)
+ * @param roomId - The Matrix room ID
+ * @param accessToken - User's access token
+ * @param params - Pagination parameters
+ */
+export async function getRoomMessages(
+  roomId: string,
+  accessToken: string,
+  params?: { from?: string; dir?: 'f' | 'b'; limit?: number }
+): Promise<{ chunk: any[]; start: string; end?: string }> {
+  const encodedRoomId = encodeURIComponent(roomId);
+  const query = new URLSearchParams();
+  if (params?.from) query.set('from', params.from);
+  if (params?.dir) query.set('dir', params.dir);
+  if (params?.limit) query.set('limit', params.limit.toString());
+
+  const url = `${MATRIX_HOMESERVER_URL}/_matrix/client/v3/rooms/${encodedRoomId}/messages?${query.toString()}`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = (await response.json()) as Record<string, string>;
+      throw new Error(`Failed to get room messages: ${error.error || response.statusText}`);
+    }
+
+    const data = (await response.json()) as { chunk: any[]; start: string; end?: string };
+    logger.info({ roomId, count: data.chunk.length }, 'Retrieved room messages');
+
+    return data;
+  } catch (error) {
+    logger.error({ error, roomId }, 'Failed to get room messages');
+    throw error;
+  }
+}
+
+/**
+ * Get room members
+ * @param roomId - The Matrix room ID
+ * @param accessToken - User's access token
+ */
+export async function getRoomMembers(
+  roomId: string,
+  accessToken: string
+): Promise<Array<{ user_id: string; display_name?: string; avatar_url?: string }>> {
+  const encodedRoomId = encodeURIComponent(roomId);
+  const url = `${MATRIX_HOMESERVER_URL}/_matrix/client/v3/rooms/${encodedRoomId}/members`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = (await response.json()) as Record<string, string>;
+      throw new Error(`Failed to get room members: ${error.error || response.statusText}`);
+    }
+
+    const data = (await response.json()) as { chunk: Array<{ state_key: string; content: { displayname?: string; avatar_url?: string } }> };
+
+    const members = data.chunk.map((event) => ({
+      user_id: event.state_key,
+      display_name: event.content.displayname,
+      avatar_url: event.content.avatar_url,
+    }));
+
+    logger.info({ roomId, count: members.length }, 'Retrieved room members');
+
+    return members;
+  } catch (error) {
+    logger.error({ error, roomId }, 'Failed to get room members');
+    throw error;
+  }
+}
+
+/**
+ * Get room state (name, topic, etc.)
+ * @param roomId - The Matrix room ID
+ * @param accessToken - User's access token
+ */
+export async function getRoomState(
+  roomId: string,
+  accessToken: string
+): Promise<{ name?: string; topic?: string; [key: string]: any }> {
+  const encodedRoomId = encodeURIComponent(roomId);
+  const url = `${MATRIX_HOMESERVER_URL}/_matrix/client/v3/rooms/${encodedRoomId}/state`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = (await response.json()) as Record<string, string>;
+      throw new Error(`Failed to get room state: ${error.error || response.statusText}`);
+    }
+
+    const events = (await response.json()) as Array<{ type: string; content: Record<string, any> }>;
+
+    // Extract useful state events
+    const state: { name?: string; topic?: string; [key: string]: any } = {};
+
+    for (const event of events) {
+      if (event.type === 'm.room.name' && event.content.name) {
+        state.name = event.content.name as string;
+      } else if (event.type === 'm.room.topic' && event.content.topic) {
+        state.topic = event.content.topic as string;
+      } else {
+        // Store other state events by type
+        state[event.type] = event.content;
+      }
+    }
+
+    logger.info({ roomId, state }, 'Retrieved room state');
+
+    return state;
+  } catch (error) {
+    logger.error({ error, roomId }, 'Failed to get room state');
+    throw error;
+  }
+}

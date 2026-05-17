@@ -113,6 +113,33 @@ async function sendMessage(roomId: string, body: string): Promise<void> {
   });
 }
 
+// ============== Room Info ============== 
+
+// Cache for room member counts (to detect DM vs group)
+const roomMemberCache = new Map<string, number>();
+
+async function getRoomMemberCount(roomId: string): Promise<number> {
+  // Check cache first
+  const cached = roomMemberCache.get(roomId);
+  if (cached !== undefined) return cached;
+
+  try {
+    const data = await matrixGet(`/rooms/${roomId}/members`);
+    // Matrix returns { chunk: [...member events] }
+    // Filter for joined members
+    const chunk = data?.chunk || [];
+    const joinedCount = chunk.filter((e: any) => 
+      e.content?.membership === 'join'
+    ).length;
+    roomMemberCache.set(roomId, joinedCount);
+    logger.info({ roomId, joinedCount, totalEvents: chunk.length }, 'Room member count');
+    return joinedCount;
+  } catch (error) {
+    logger.warn({ error, roomId }, 'Failed to get member count, assuming group room');
+    return 10; // Assume it's a group room
+  }
+}
+
 /**
  * Set typing indicator
  */
@@ -136,19 +163,66 @@ async function handleMessage(roomId: string, event: any): Promise<void> {
   const message = event.content.body;
   if (!message) return;
 
-  logger.info({ roomId, sender: event.sender }, 'Received message');
+  // Debug: log raw event content to see @ format
+  logger.info({
+    roomId,
+    sender: event.sender,
+    body: message,
+    formattedBody: event.content.formatted_body,
+    relatesTo: event.content['m.relates_to'],
+  }, 'Raw message event');
+  // Check room type (DM vs group)
+  const memberCount = await getRoomMemberCount(roomId);
+  const isDM = memberCount <= 2; // DM = 2 members (agent + sender)
+  logger.info({ roomId, memberCount, isDM }, 'Room type detection');
 
-  // Simple greeting check
-  if (isSimpleGreeting(message)) {
+  // Check for mention in message
+  // Matrix @ format: formatted_body contains <a href="matrix.to/#/@userId">displayName</a>
+  const myUserId = config.matrix.userId || '';
+  const isMentioned = 
+    // Check if formatted_body contains our user ID link
+    (event.content.formatted_body && event.content.formatted_body.includes(myUserId)) ||
+    // Check if body contains our display name (fallback)
+    message.includes(localpart) ||
+    // Replies count as mentions
+    (event.content['m.relates_to']?.['m.in_reply_to']?.event_id);
+
+  if (isMentioned) {
+    logger.info({ roomId, sender: event.sender }, 'Message mentions me');
+  }
+
+  // In group rooms, only respond when mentioned; in DM, respond to all messages
+  if (!isDM && !isMentioned) {
+    logger.info({ roomId, sender: event.sender }, 'Group message not addressed to me, ignoring');
+    return;
+  }
+
+  logger.info({ roomId, sender: event.sender, isDM, isMentioned }, 'Processing message');
+
+  logger.info({ roomId, sender: event.sender }, 'Received mention');
+
+  // Strip the mention prefix from message before sending to AI
+  // Matrix @ format: "displayName: actual message" in body
+  const formattedBody = event.content.formatted_body || '';
+  let cleanMessage = message;
+  if (formattedBody.includes(myUserId)) {
+    // It's a Matrix @ mention - strip "displayName: " prefix
+    const colonIdx = cleanMessage.indexOf(': ');
+    if (colonIdx > 0 && colonIdx < 50) {
+      cleanMessage = cleanMessage.substring(colonIdx + 2).trim();
+    }
+  }
+
+  if (!cleanMessage) {
     await sendMessage(roomId, '👋 Hello! How can I help you?');
     return;
   }
 
-  // Ensure session exists
   if (!currentSessionId) {
     const agentsContent = loadAgentsContent();
+    logger.info({ hasAgents: !!agentsContent, agentsLength: agentsContent?.length }, 'Creating opencode session...');
     currentSessionId = await serveClient.createSession(agentsContent || undefined);
-    logger.info({ sessionId: currentSessionId }, 'Created session');
+    logger.info({ sessionId: currentSessionId }, 'Session created');
   }
 
   // Send typing indicator
@@ -156,7 +230,7 @@ async function handleMessage(roomId: string, event: any): Promise<void> {
 
   // Call opencode
   try {
-    const response = await serveClient.sendMessage(currentSessionId, message);
+    const response = await serveClient.sendMessage(currentSessionId, cleanMessage);
     
     // Extract text from response
     const text = response.parts
@@ -225,7 +299,8 @@ async function syncLoop(): Promise<void> {
         }
       }
     } catch (error) {
-      logger.error({ error }, 'Sync error, retrying in 5s...');
+      const errDetails = error instanceof Error ? { message: error.message, stack: error.stack } : String(error);
+      logger.error({ err: errDetails }, 'Sync error, retrying in 5s...');
       await new Promise(r => setTimeout(r, 5000));
     }
   }
@@ -233,5 +308,21 @@ async function syncLoop(): Promise<void> {
 
 // Start client
 logger.info('Starting Matrix client...');
+logger.info({
+  matrixUrl: config.matrix.homeserverUrl,
+  userId: config.matrix.userId,
+  opencodeUrl: config.opencode.baseUrl,
+  hasPassword: !!config.opencode.password,
+  agentsFile: config.agentsFile,
+}, 'Configuration loaded');
+
+// Health check opencode serve
+const healthy = await serveClient.healthCheck();
+if (!healthy) {
+  logger.error('OpenCode serve not healthy, exiting');
+  process.exit(1);
+}
+logger.info('OpenCode serve is healthy');
+
 logger.info(`Agent starting as ${config.matrix.userId}`);
 await syncLoop();

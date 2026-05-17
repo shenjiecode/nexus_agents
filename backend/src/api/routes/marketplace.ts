@@ -10,12 +10,6 @@ import {
   getMcpBySlug,
   createMcp,
   deleteMcp,
-  getSkillsForRole,
-  getMcpsForRole,
-  addSkillToRole,
-  addMcpToRole,
-  removeSkillFromRole,
-  removeMcpFromRole,
   getAllRoles,
   getRoleBySlug,
   createRole,
@@ -160,32 +154,6 @@ marketplace.delete('/api/mcps/:slug', async (c) => {
   }
 });
 
-// Role association routes
-marketplace.get('/api/roles/:slug/skills', async (c) =>
-  c.json(apiSuccess(await getSkillsForRole(c.req.param('slug')))));
-
-marketplace.get('/api/roles/:slug/mcps', async (c) =>
-  c.json(apiSuccess(await getMcpsForRole(c.req.param('slug')))));
-
-marketplace.post('/api/roles/:slug/skills/:skillSlug', async (c) => {
-  await addSkillToRole(c.req.param('slug'), c.req.param('skillSlug'));
-  return c.json(apiSuccess({ added: true }));
-});
-
-marketplace.delete('/api/roles/:slug/skills/:skillSlug', async (c) => {
-  await removeSkillFromRole(c.req.param('slug'), c.req.param('skillSlug'));
-  return c.json(apiSuccess({ removed: true }));
-});
-
-marketplace.post('/api/roles/:slug/mcps/:mcpSlug', async (c) => {
-  await addMcpToRole(c.req.param('slug'), c.req.param('mcpSlug'));
-  return c.json(apiSuccess({ added: true }));
-});
-
-marketplace.delete('/api/roles/:slug/mcps/:mcpSlug', async (c) => {
-  await removeMcpFromRole(c.req.param('slug'), c.req.param('mcpSlug'));
-  return c.json(apiSuccess({ removed: true }));
-});
 
 // ============== Marketplace Roles Routes ==============
 
