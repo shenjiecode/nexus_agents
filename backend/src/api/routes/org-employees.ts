@@ -41,14 +41,21 @@ orgEmployees.get('/api/orgs/:orgSlug/employees', async (c) => {
     
     return c.json(apiSuccess(employees.map(e => ({
       id: e.id,
+      containerId: e.containerId,
+      name: e.name,
+      organizationId: e.organizationId,
       roleSlug: e.roleSlug,
       roleVersion: e.roleVersion,
+      marketplaceRoleId: e.marketplaceRoleId,
       status: e.status,
       port: e.port,
       url: e.url,
       healthStatus: e.healthStatus,
-      createdAt: e.createdAt.toISOString(),
-    }))));
+      matrixUserId: e.matrixUserId,
+      mcpIds: e.mcpIds,
+      skillIds: e.skillIds,
+      createdAt: e.createdAt.toISOString()
+    }))))
   } catch (error: any) {
     logger.error(error, "API error");
     return handleError(c, error, 'Failed to list employees');

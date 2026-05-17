@@ -19,12 +19,15 @@ const CONTAINER_PREFIX = 'nexus';
 
 // Employee instance tracking
 interface EmployeeInstance {
-  id: string;
+  id: string; // 员工 ID（数据库主键，也是 map key）
+  containerId: string; // Docker 容器 ID
   organizationId: string;
   roleSlug: string;
   roleVersion: string;
-  employeeId: string;
-  containerId: string;
+  name: string; // 告工名称
+  marketplaceRoleId?: string; // Marketplace role ID
+  mcpIds?: string; // JSON array string
+  skillIds?: string; // JSON array string
   status: 'starting' | 'running' | 'stopping' | 'stopped' | 'error';
   port: number;
   url: string;
@@ -234,12 +237,15 @@ export async function createEmployee(
   }
 
   const instance: EmployeeInstance = {
-    id: containerId,
+    id: finalEmployeeId, // 员工 ID（map key）
+    containerId: '', // Docker 容器 ID（稍后设置）
     organizationId,
     roleSlug,
     roleVersion,
-    employeeId: finalEmployeeId,
-    containerId: '',
+    name: finalEmpSlug,
+    marketplaceRoleId: marketplaceRoleId || undefined,
+    mcpIds: mcpIds.length > 0 ? JSON.stringify(mcpIds) : undefined,
+    skillIds: skillIds.length > 0 ? JSON.stringify(skillIds) : undefined,
     status: 'starting',
     port: employeePort,
     url: `http://localhost:${employeePort}`,
@@ -247,12 +253,13 @@ export async function createEmployee(
     employeeDataPath,
     healthStatus: 'unknown',
     createdAt: new Date(),
+    matrixUserId: matrixAccount?.userId,
+    matrixAccessToken: matrixAccount?.accessToken,
   };
-
   try {
-    // Prepare volume mounts
+    // Prepare volume mounts - employee data path maps directly to /workspace
     const volumes = [
-      `${employeeDataPath}:/workspace/emp:rw`,
+      `${employeeDataPath}:/workspace:rw`,
     ];
 
     // Mount organization auth.json (required, read-only)
@@ -318,8 +325,7 @@ export async function createEmployee(
     });
 
     instance.containerId = container.id;
-    employeesMap.set(containerId, instance);
-
+    employeesMap.set(finalEmployeeId, instance);
     // Save employee to database
     try {
       const db = await initDatabase();
@@ -328,11 +334,12 @@ export async function createEmployee(
         slug: finalEmpSlug,
         name: finalEmpSlug,
         organizationId: organizationId,
-        containerId: containerId,
+        containerId: container.id,
         employeeDataPath: employeeDataPath,
         marketplaceRoleId: marketplaceRoleId || null,
         mcpIds: JSON.stringify(mcpIds),
         skillIds: JSON.stringify(skillIds),
+        agentsContent: agentsMd || null,
         matrixUserId: matrixAccount?.userId,
         matrixAccessToken: matrixAccount?.accessToken,
         matrixDeviceId: matrixAccount?.deviceId,
@@ -345,9 +352,16 @@ export async function createEmployee(
       logger.error(dbError, 'Failed to save employee to database');
     }
 
-    // Add Matrix info to instance
-    instance.matrixUserId = matrixAccount?.userId;
-    instance.matrixAccessToken = matrixAccount?.accessToken;
+    // Install MCPs and Skills from role config
+    if (mcpIds.length > 0 || skillIds.length > 0 || agentsMd) {
+      try {
+        const { applyRoleConfig } = await import('./employee-config-service.js');
+        await applyRoleConfig(finalEmployeeId, { mcpIds, skillIds, agentsMd });
+        logger.info({ empId: finalEmployeeId, mcpCount: mcpIds.length, skillCount: skillIds.length }, 'Role config applied to employee');
+      } catch (configError) {
+        logger.error(configError, 'Failed to apply role config, employee created but config incomplete');
+      }
+    }
 
     return instance;
   } catch (error) {
@@ -490,7 +504,7 @@ export async function removeEmployee(employeeId: string, force: boolean = false)
     // Delete from database
     try {
       const db = await initDatabase();
-      await db.delete(employees).where(eq(employees.id, instance.employeeId));
+      await db.delete(employees).where(eq(employees.id, instance.id));
     } catch (dbError) {
       logger.error(dbError, 'Failed to delete employee from database');
     }
@@ -572,10 +586,17 @@ export async function updateHealthStatus(employeeId: string): Promise<void> {
 }
 
 /**
- * Get employee info
+ * Get employee info by employee ID (map key)
  */
 export function getEmployee(employeeId: string): EmployeeInstance | undefined {
   return employeesMap.get(employeeId);
+}
+
+/**
+ * Get employee info by container ID
+ */
+export function getEmployeeByContainerId(containerId: string): EmployeeInstance | undefined {
+  return Array.from(employeesMap.values()).find(e => e.containerId === containerId);
 }
 
 /**
@@ -620,14 +641,17 @@ export async function restoreEmployees(): Promise<number> {
         const container = docker.getContainer(record.containerId);
         const info = await container.inspect();
         
-        // Restore to memory
+        // Restore to memory - use employeeId as map key
         const instance: EmployeeInstance = {
-          id: record.containerId || '',
+          id: record.id || '',
+          containerId: record.containerId || '',
           organizationId: record.organizationId || '',
           roleSlug: '',
           roleVersion: '',
-          employeeId: record.id || '',
-          containerId: record.containerId || '',
+          name: record.name || record.slug || '',
+          marketplaceRoleId: record.marketplaceRoleId || undefined,
+          mcpIds: record.mcpIds || undefined,
+          skillIds: record.skillIds || undefined,
           status: info.State.Running ? 'running' : 'stopped',
           port: 0,
           url: '',
@@ -639,7 +663,7 @@ export async function restoreEmployees(): Promise<number> {
           matrixAccessToken: record.matrixAccessToken || undefined,
         };
         
-        employeesMap.set(record.containerId, instance);
+        employeesMap.set(record.id, instance);
         restored++;
       } catch (error) {
         logger.error(error, `Failed to restore employee ${record.id}:`);
@@ -697,14 +721,14 @@ export async function rebuildEmployeesForOrg(orgSlug: string): Promise<{ rebuilt
       employeesMap.delete(instance.id);
       
       // Delete from database
-      await db.delete(employees).where(eq(employees.id, instance.employeeId));
+      await db.delete(employees).where(eq(employees.id, instance.id));
       
       // Create new employee with same config
       await createEmployee(
         org.id,
         orgSlug,
         instance.roleSlug,
-        instance.employeeId,
+        instance.id,
         instance.roleSlug + '-' + orgSlug.slice(-4),
         instance.roleVersion
       );

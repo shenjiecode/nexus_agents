@@ -34,9 +34,9 @@ export const employees = pgTable('employees', {
   
   // Marketplace role association
   marketplaceRoleId: text('marketplace_role_id'),
-  mcpIds: text('mcp_ids'), // JSON array string
-  skillIds: text('skill_ids'), // JSON array string
-  
+  mcpIds: text('mcp_ids'), // JSON array string - 已安装的 MCP IDs
+  skillIds: text('skill_ids'), // JSON array string - 已安装的 Skill IDs
+  agentsContent: text('agents_content'), // AGENTS.md 内容
   // Matrix 账号信息（员工级，跨组织保持）
   matrixUserId: text('matrix_user_id').unique(), // @user:homeserver
   matrixAccessToken: text('matrix_access_token'),
