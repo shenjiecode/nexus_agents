@@ -261,17 +261,10 @@ export function initEmployeeData(empId: string, empSlug: string, orgSlug: string
   // Initialize opencode.json for this employee
   const opencodePath = join(empDataPath, 'opencode.json');
   if (!existsSync(opencodePath)) {
+    // opencode-ai config: only valid fields are mcp, model, agent, etc.
+    // Do NOT add unrecognized fields like name, version, workspace, etc.
     const opencodeConfig = {
-      name: empSlug,
-      version: '1.0.0',
-      model: 'default',
-      workspace: '/workspace/emp',
-      skillsPath: '/workspace/emp/.opencode/skills',
-      sessionsPath: '/workspace/emp/.opencode/sessions',
-      memoryPath: '/workspace/emp/memory',
-      docsPath: '/workspace/emp/docs',
-      rulesPath: '/workspace/emp/rules',
-      authPath: '/workspace/auth/auth.json',
+      mcp: {}
     };
     writeFileSync(opencodePath, JSON.stringify(opencodeConfig, null, 2), 'utf-8');
   }
