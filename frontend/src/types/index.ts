@@ -32,6 +32,8 @@ export interface RoleVersion {
 
 export interface Employee {
   id: string;
+  containerId?: string;
+  name?: string;
   organizationId?: string;
   roleSlug: string;
   roleVersion: string;
@@ -40,6 +42,7 @@ export interface Employee {
   url: string;
   healthStatus: string;
   marketplaceRoleId?: string;
+  matrixUserId?: string;
   mcpIds?: string;
   skillIds?: string;
   createdAt: string;

@@ -281,7 +281,7 @@ export function OrganizationDetail() {
                   <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">角色</th>
                   <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">状态</th>
                   <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">端口</th>
-                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Employee ID</th>
+                  <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">Matrix账号</th>
                   <th className="text-left py-4 px-6 font-display font-semibold text-cyber-cyan">操作</th>
                 </tr>
               </thead>
@@ -314,10 +314,10 @@ export function OrganizationDetail() {
                       onClick={() => navigate(`/employees/${employee.id}`)}
                     >
                       <td className="py-4 px-6">
-                        <span className="font-medium text-cyber-white">{(employee as any).name || employee.roleSlug}</span>
+                        <span className="font-medium text-cyber-white">{employee.name || employee.roleSlug}</span>
                       </td>
                       <td className="py-4 px-6">
-                        <code className="font-mono text-sm text-cyber-purple">{(employee as any).marketplaceRoleId || employee.roleVersion}</code>
+                        <code className="font-mono text-sm text-cyber-purple">{employee.marketplaceRoleId || employee.roleVersion}</code>
                       </td>
                       <td className="py-4 px-6">
                         <StatusDot status={employee.status} showLabel />
@@ -327,7 +327,7 @@ export function OrganizationDetail() {
                       </td>
                       <td className="py-4 px-6">
                         <code className="font-mono text-xs text-cyber-muted">
-                          {employee.id.slice(0, 16)}
+                          {employee.matrixUserId || '-'}
                         </code>
                       </td>
                       <td className="py-4 px-6">

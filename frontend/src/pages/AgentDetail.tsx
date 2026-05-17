@@ -56,7 +56,9 @@ export function AgentDetail() {
   const [isLoading, setIsLoading] = useState(false);
   const [chatMode, setChatMode] = useState<'session' | 'matrix'>('matrix');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
+  const [editingAgentsMd, setEditingAgentsMd] = useState(false);
+  const [agentsMdDraft, setAgentsMdDraft] = useState('');
+  const [configLoading, setConfigLoading] = useState(false);
   const { data: employee, loading: employeeLoading, error: employeeError } = 
     useApi<Employee>(`/api/employees/${id}`);
 
@@ -149,6 +151,82 @@ export function AgentDetail() {
   }, [employee, id]);
 
 
+  // ============== Config Handlers ==============
+
+  const handleInstallMcp = async (mcpId: string) => {
+    if (!id || configLoading) return;
+    setConfigLoading(true);
+    try {
+      await apiRequest(`/api/employees/${id}/mcps/${mcpId}/install`, { method: 'POST' });
+      // Refresh employee data
+      const result = await apiRequest<Employee>(`/api/employees/${id}`);
+      if (result.data?.mcpIds) {
+        setEmployeeMcpIds(JSON.parse(result.data.mcpIds));
+      }
+    } catch (err) {
+      console.error('Failed to install MCP:', err);
+    } finally {
+      setConfigLoading(false);
+    }
+  };
+
+  const handleUninstallMcp = async (mcpId: string) => {
+    if (!id || configLoading) return;
+    setConfigLoading(true);
+    try {
+      await apiRequest(`/api/employees/${id}/mcps/${mcpId}`, { method: 'DELETE' });
+      setEmployeeMcpIds(prev => prev.filter(m => m !== mcpId));
+    } catch (err) {
+      console.error('Failed to uninstall MCP:', err);
+    } finally {
+      setConfigLoading(false);
+    }
+  };
+
+  const handleInstallSkill = async (skillId: string) => {
+    if (!id || configLoading) return;
+    setConfigLoading(true);
+    try {
+      await apiRequest(`/api/employees/${id}/skills/${skillId}/install`, { method: 'POST' });
+      const result = await apiRequest<Employee>(`/api/employees/${id}`);
+      if (result.data?.skillIds) {
+        setEmployeeSkillIds(JSON.parse(result.data.skillIds));
+      }
+    } catch (err) {
+      console.error('Failed to install skill:', err);
+    } finally {
+      setConfigLoading(false);
+    }
+  };
+
+  const handleUninstallSkill = async (skillId: string) => {
+    if (!id || configLoading) return;
+    setConfigLoading(true);
+    try {
+      await apiRequest(`/api/employees/${id}/skills/${skillId}`, { method: 'DELETE' });
+      setEmployeeSkillIds(prev => prev.filter(s => s !== skillId));
+    } catch (err) {
+      console.error('Failed to uninstall skill:', err);
+    } finally {
+      setConfigLoading(false);
+    }
+  };
+
+  const handleSaveAgentsMd = async () => {
+    if (!id || configLoading) return;
+    setConfigLoading(true);
+    try {
+      await apiRequest(`/api/employees/${id}/agents-md`, {
+        method: 'PUT',
+        body: JSON.stringify({ content: agentsMdDraft }),
+      });
+      setEditingAgentsMd(false);
+    } catch (err) {
+      console.error('Failed to save AGENTS.md:', err);
+    } finally {
+      setConfigLoading(false);
+    }
+  };
   // Fetch messages when active session changes
   useEffect(() => {
     if (activeSession) {
@@ -300,13 +378,34 @@ export function AgentDetail() {
               
               {/* MCPs */}
               <div className="space-y-2">
-                <h3 className="text-sm font-medium text-cyber-white">MCPs</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-cyber-white">MCPs</h3>
+                  <select
+                    className="text-xs px-2 py-1 rounded bg-cyber-dark border border-cyber-cyan/20 text-cyber-white"
+                    onChange={(e) => e.target.value && handleInstallMcp(e.target.value)}
+                    disabled={configLoading}
+                  >
+                    <option value="">+ 安装 MCP</option>
+                    {allMcps?.filter(m => !employeeMcpIds.includes(m.id)).map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
                 {employeeMcps.length > 0 ? (
                   <div className="space-y-2">
                     {employeeMcps.map(mcp => (
-                      <div key={mcp.id} className="p-2 rounded bg-cyber-dark border border-cyber-cyan/10">
-                        <p className="text-sm text-cyber-white font-medium">{mcp.name}</p>
-                        {mcp.description && <p className="text-xs text-cyber-muted mt-1">{mcp.description}</p>}
+                      <div key={mcp.id} className="p-2 rounded bg-cyber-dark border border-cyber-cyan/10 flex items-start justify-between">
+                        <div>
+                          <p className="text-sm text-cyber-white font-medium">{mcp.name}</p>
+                          {mcp.description && <p className="text-xs text-cyber-muted mt-1">{mcp.description}</p>}
+                        </div>
+                        <button
+                          onClick={() => handleUninstallMcp(mcp.id)}
+                          disabled={configLoading}
+                          className="text-xs px-2 py-1 text-cyber-error hover:text-cyber-white"
+                        >
+                          移除
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -317,13 +416,34 @@ export function AgentDetail() {
               
               {/* Skills */}
               <div className="space-y-2">
-                <h3 className="text-sm font-medium text-cyber-white">Skills</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-cyber-white">Skills</h3>
+                  <select
+                    className="text-xs px-2 py-1 rounded bg-cyber-dark border border-cyber-cyan/20 text-cyber-white"
+                    onChange={(e) => e.target.value && handleInstallSkill(e.target.value)}
+                    disabled={configLoading}
+                  >
+                    <option value="">+ 安装 Skill</option>
+                    {allSkills?.filter(s => !employeeSkillIds.includes(s.id)).map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
                 {employeeSkills.length > 0 ? (
                   <div className="space-y-2">
                     {employeeSkills.map(skill => (
-                      <div key={skill.id} className="p-2 rounded bg-cyber-dark border border-cyber-cyan/10">
-                        <p className="text-sm text-cyber-white font-medium">{skill.name}</p>
-                        {skill.description && <p className="text-xs text-cyber-muted mt-1">{skill.description}</p>}
+                      <div key={skill.id} className="p-2 rounded bg-cyber-dark border border-cyber-cyan/10 flex items-start justify-between">
+                        <div>
+                          <p className="text-sm text-cyber-white font-medium">{skill.name}</p>
+                          {skill.description && <p className="text-xs text-cyber-muted mt-1">{skill.description}</p>}
+                        </div>
+                        <button
+                          onClick={() => handleUninstallSkill(skill.id)}
+                          disabled={configLoading}
+                          className="text-xs px-2 py-1 text-cyber-error hover:text-cyber-white"
+                        >
+                          移除
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -334,9 +454,39 @@ export function AgentDetail() {
               
               {/* AGENTS.md */}
               <div className="space-y-2">
-                <h3 className="text-sm font-medium text-cyber-white">AGENTS.md</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-cyber-white">AGENTS.md</h3>
+                  {!editingAgentsMd && (
+                    <button
+                      onClick={() => {
+                        setAgentsMdDraft(agentsMdContent || '');
+                        setEditingAgentsMd(true);
+                      }}
+                      className="text-xs px-2 py-1 text-cyber-cyan hover:text-cyber-white"
+                    >
+                      编辑
+                    </button>
+                  )}
+                </div>
                 {agentsMdLoading ? (
                   <div className="skeleton h-32 rounded" />
+                ) : editingAgentsMd ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={agentsMdDraft}
+                      onChange={(e) => setAgentsMdDraft(e.target.value)}
+                      className="w-full p-3 rounded bg-cyber-dark border border-cyber-cyan/20 text-xs text-cyber-white font-mono resize-none min-h-[200px]"
+                      placeholder="AGENTS.md 内容..."
+                    />
+                    <div className="flex gap-2">
+                      <CyberButton size="sm" onClick={handleSaveAgentsMd} disabled={configLoading}>
+                        保存
+                      </CyberButton>
+                      <CyberButton size="sm" variant="ghost" onClick={() => setEditingAgentsMd(false)}>
+                        取消
+                      </CyberButton>
+                    </div>
+                  </div>
                 ) : agentsMdContent ? (
                   <pre className="p-3 rounded bg-cyber-dark border border-cyber-cyan/10 text-xs text-cyber-white font-mono overflow-auto max-h-64 whitespace-pre-wrap">{agentsMdContent}</pre>
                 ) : (
