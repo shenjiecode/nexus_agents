@@ -7,6 +7,7 @@ import {
   mcps,
   employees,
   marketplaceRoles,
+  picoclawWorkspaces,
 } from './schema.js';
 
 const schema = {
@@ -15,12 +16,13 @@ const schema = {
   mcps,
   employees,
   marketplaceRoles,
+  picoclawWorkspaces,
 };
 
 const connectionString = process.env.DATABASE_URL || (() => { throw new Error('DATABASE_URL environment variable is required'); })();
 
 // Database instances
-const client = postgres(connectionString);
+export const client = postgres(connectionString);
 let db: ReturnType<typeof drizzle> | null = null;
 
 /**
@@ -53,4 +55,5 @@ export {
   mcps,
   employees,
   marketplaceRoles,
+  picoclawWorkspaces,
 };

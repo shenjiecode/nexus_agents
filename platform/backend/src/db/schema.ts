@@ -1,4 +1,5 @@
 import { pgTable, text, integer, bigint } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 // Organizations table
 export const organizations = pgTable('organizations', {
@@ -44,6 +45,20 @@ export const employees = pgTable('employees', {
   matrixPassword: text('matrix_password'), // 存储密码以便重新登录
   matrixHomeserverUrl: text('matrix_homeserver_url'), // Matrix 服务器地址
   
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+});
+
+// PicoClaw Workspaces table
+export const picoclawWorkspaces = pgTable('picoclawWorkspaces', {
+  id: text('id').primaryKey().default(sql<any>`gen_random_uuid()`),
+  userId: text('user_id').notNull(),
+  name: text('name').notNull(),
+  variant: text('variant').notNull(),
+  containerId: text('container_id'),
+  containerPort: integer('container_port'),
+  status: text('status').notNull().default('stopped'),
+  workspacePath: text('workspace_path'),
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });
@@ -98,3 +113,6 @@ export type NewMarketplaceRole = typeof marketplaceRoles.$inferInsert;
 
 export type Employee = typeof employees.$inferSelect;
 export type NewEmployee = typeof employees.$inferInsert;
+
+export type PicoClawWorkspace = typeof picoclawWorkspaces.$inferSelect;
+export type NewPicoClawWorkspace = typeof picoclawWorkspaces.$inferInsert;
