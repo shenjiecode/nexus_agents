@@ -12,6 +12,7 @@ import marketplaceRoutes from './api/routes/marketplace.js'
 import authRoutes from './api/routes/auth.js'
 import matrixRoutes from './api/routes/matrix.js'
 import employeeConfigRoutes from './api/routes/employee-config.js'
+import picoclawRoutes, { handlePicoWsUpgrade } from './api/routes/picoclaw.js'
 import { restoreEmployees } from './services/employee-manager.js'
 import { initDatabase, closeDatabase } from './db/index.js'
 
@@ -48,6 +49,7 @@ app.route('/', employeeRoutes)
 app.route('/', marketplaceRoutes)
 app.route('/', matrixRoutes)
 app.route('/', employeeConfigRoutes)
+app.route('/', picoclawRoutes)
 
 // 404 handler
 app.notFound((c) => {
@@ -63,9 +65,15 @@ async function initialize() {
     logger.info(`Restored ${restored} employees from database`)
     const { serve } = await import('@hono/node-server')
     const port = parseInt(process.env.PORT || '13207', 10)
-    serve({
+    const server = serve({
       fetch: app.fetch,
       port,
+    })
+    server.on('upgrade', (req, socket, head) => {
+      const url = req.url || ''
+      if (url.startsWith('/api/picoclaw/') && url.endsWith('/ws')) {
+        handlePicoWsUpgrade(req, socket, head)
+      }
     })
     logger.info(`Server started on port ${port}`)
   } catch (error) {
