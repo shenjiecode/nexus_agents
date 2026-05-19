@@ -422,7 +422,27 @@ client_api:
 
 ## 七、项目结构
 
-```
+nexus_agents/
+├── platform/
+│   ├── frontend/              # React 前端 (@nexus/frontend)
+│   │   ├── src/
+│   │   │   ├── components/    # 通用组件 (CyberCard, CyberButton...)
+│   │   │   ├── pages/         # 页面 (Dashboard, Organizations...)
+│   │   │   ├── hooks/         # useApi
+│   │   │   └── types/         # TS 类型定义
+│   │   └── vite.config.ts     # API 代理 → localhost:13207
+│   │
+│   └── backend/               # Hono API 服务 (@nexus/backend)
+│       ├── src/
+│       │   ├── api/routes/    # 6 个路由模块
+│       │   ├── db/            # Drizzle schema + 连接
+│       │   ├── services/      # 7 个业务服务
+│       │   ├── integrations/  # OpenCode 集成
+│       │   └── lib/           # Pino 日志
+│       ├── docker-compose.yml # 开发用 PostgreSQL
+│       ├── drizzle.config.ts  # Drizzle Kit 配置
+│       └── .env               # 环境变量
+
 nexus_agents/
 ├── frontend/              # React 前端 (@nexus/frontend)
 │   ├── src/
@@ -464,7 +484,7 @@ nexus_agents/
 ├── docs/                  # 文档
 │   └── rules/             # 开发规范
 │
-├── AGENTS.md              # AI 开发规范入口
+├── pnpm-workspace.yaml    # monorepo (platform/backend + platform/frontend)
 ├── pnpm-workspace.yaml    # monorepo (backend + frontend)
 ├── package.json           # 根 package.json
 └── .env.example           # 环境变量模板

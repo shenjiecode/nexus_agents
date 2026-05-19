@@ -42,17 +42,17 @@ npm-debug.log*
 # Database data
 data/mysql/
 
-# Backend binaries
-backend/opc-aicom
-backend/server
-backend/bin/
-frontend/dist/
+# Platform binaries
+platform/backend/opc-aicom
+platform/backend/server
+platform/backend/bin/
+platform/frontend/dist/
 
 # Data directory
 data/
 
 # Role build artifacts
-backend/roles/
+platform/backend/roles/
 
 # Matrix sensitive files
 matrix/config/matrix_key.pem
@@ -67,7 +67,7 @@ docker-data/
 *_bak.*
 
 # Production configs (contain secrets)
-backend/.env.production
+platform/backend/.env.production
 matrix/.env.production
 
 # Deployment temp files
