@@ -8,9 +8,9 @@
 # 构建阶段
 FROM golang:1.24 AS builder
 WORKDIR /app
-COPY backend/go.mod backend/go.sum ./
+COPY platform/backend/go.mod platform/backend/go.sum ./
 RUN go mod download
-COPY backend/ .
+COPY platform/backend/ .
 RUN CGO_ENABLED=0 go build -o /server ./cmd/server
 
 # 运行阶段
@@ -27,13 +27,13 @@ CMD ["/server"]
 # 构建阶段
 FROM node:24 AS builder
 WORKDIR /app
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
+COPY platform/frontend/package.json platform/frontend/pnpm-lock.yaml ./
 RUN corepack enable && pnpm install
-COPY frontend/ .
+COPY platform/frontend/ .
 RUN pnpm build
 
 # 运行阶段
 FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY platform/frontend/nginx.conf /etc/nginx/conf.d/default.conf
 ```

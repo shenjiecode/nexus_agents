@@ -133,16 +133,16 @@ roles ──┬── role_versions
 
 | # | 文件 | 改动 |
 |---|------|------|
-| 1 | `backend/src/db/schema.ts` | 删 `containers`/`sessions`/`chatRooms` 三张表 + 类型导出；`employees` 加 5 个容器字段 |
-| 2 | `backend/src/db/index.ts` | 移除三张表的 import/export |
-| 3 | `backend/src/services/container-manager.ts` | 所有 `containersTable` → `employees`；删除 chatRooms 查询；删除 sessions 引用 |
-| 4 | `backend/src/services/org-service.ts` | 删除创建默认内部群（chatRooms）的 try/catch 块 |
-| 5 | `backend/src/services/qa-service.ts` | 删除 sessions 表写入，保留内存 Map |
+platform/backend/src/db/schema.ts
+platform/backend/src/db/index.ts
+platform/backend/src/services/container-manager.ts
+platform/backend/src/services/org-service.ts
+platform/backend/src/services/qa-service.ts
 | 6 | 路由文件 `containers.ts` + `org-containers.ts` + `sessions.ts` | 所有 containers 引用改为 employees；sessions 路由去掉 DB 操作 |
 
 ### 不改动的文件
 - `matrix-service.ts`、`marketplace-service.ts`、`role-service.ts` — 不变
-- `frontend/` — API 路径不变，只改内部实现
+platform/frontend/
 - `agent/` — 不变
 
 ## 六、优先改进点

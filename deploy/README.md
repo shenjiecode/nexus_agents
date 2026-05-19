@@ -17,7 +17,7 @@
 ├── deploy.sh              # 部署脚本
 ├── data/
 │   └── postgres/          # 数据库数据
-├── backend/               # Backend 源码（复制）
+├── platform/backend/               # Backend 源码（复制）
 └── frontend/
 │   └── dist/              # 前端构建产物
 ```
@@ -36,8 +36,8 @@
 
 ```bash
 # 在本地项目根目录
-cd frontend && pnpm install && pnpm build
-cd backend && pnpm install
+cd platform/frontend && pnpm install && pnpm build
+cd platform/backend && pnpm install
 ```
 
 ### 2. 上传到服务器
