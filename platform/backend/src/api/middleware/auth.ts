@@ -1,19 +1,19 @@
 import type { Context, Next } from 'hono';
 
 export interface UserContext {
-  role: 'admin' | 'org';
+  role: 'admin' | 'org' | 'user';
   id: string; // admin ID or organization ID
-  orgId?: string; // only for org role
+  orgId?: string; // only for org/user role
 }
 
 /**
  * Auth middleware - extracts user info from headers
  * Frontend should send X-User-Role and X-User-Id headers
  * 
- * For org role, also sends X-User-OrgId header
+ * For org/user role, also sends X-User-OrgId header
  */
 export async function authMiddleware(c: Context, next: Next) {
-  const role = c.req.header('X-User-Role') as 'admin' | 'org' | null;
+  const role = c.req.header('X-User-Role') as 'admin' | 'org' | 'user' | null;
   const userId = c.req.header('X-User-Id');
   const orgId = c.req.header('X-User-OrgId');
 
@@ -25,7 +25,7 @@ export async function authMiddleware(c: Context, next: Next) {
     return;
   }
 
-  if (role !== 'admin' && role !== 'org') {
+  if (role !== 'admin' && role !== 'org' && role !== 'user') {
     c.set('user', null);
     await next();
     return;
@@ -34,7 +34,7 @@ export async function authMiddleware(c: Context, next: Next) {
   const user: UserContext = {
     role,
     id: userId,
-    ...(role === 'org' && orgId ? { orgId } : {}),
+    ...((role === 'org' || role === 'user') && orgId ? { orgId } : {}),
   };
 
   c.set('user', user);

@@ -13,6 +13,8 @@ import authRoutes from './api/routes/auth.js'
 import matrixRoutes from './api/routes/matrix.js'
 import employeeConfigRoutes from './api/routes/employee-config.js'
 import picoclawRoutes, { handlePicoWsUpgrade } from './api/routes/picoclaw.js'
+import rolesRoutes from './api/routes/roles.js'
+import roleDebugRoutes, { handleRoleDebugWsUpgrade } from './api/routes/role-debug.js'
 import { restoreEmployees } from './services/employee-manager.js'
 import { initDatabase, closeDatabase } from './db/index.js'
 
@@ -50,6 +52,8 @@ app.route('/', marketplaceRoutes)
 app.route('/', matrixRoutes)
 app.route('/', employeeConfigRoutes)
 app.route('/', picoclawRoutes)
+app.route('/', rolesRoutes)
+app.route('/', roleDebugRoutes)
 
 // 404 handler
 app.notFound((c) => {
@@ -73,6 +77,8 @@ async function initialize() {
       const url = req.url || ''
       if (url.startsWith('/api/picoclaw/') && url.endsWith('/ws')) {
         handlePicoWsUpgrade(req, socket, head)
+      } else if (url.startsWith('/api/roles/') && url.includes('/debug/ws')) {
+        handleRoleDebugWsUpgrade(req, socket, head)
       }
     })
     logger.info(`Server started on port ${port}`)

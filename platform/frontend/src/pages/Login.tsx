@@ -37,7 +37,7 @@ export function Login() {
         method: 'POST',
         body: JSON.stringify({ password: adminPassword }),
       });
-      localStorage.setItem('nexus_org', JSON.stringify(result.data));
+      localStorage.setItem('nexus_user', JSON.stringify(result.data));
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : '登录失败');
@@ -55,7 +55,7 @@ export function Login() {
         method: 'POST',
         body: JSON.stringify({ slug: orgSlug, password: orgPassword }),
       });
-      localStorage.setItem('nexus_org', JSON.stringify(result.data));
+      localStorage.setItem('nexus_user', JSON.stringify(result.data));
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : '登录失败');
@@ -84,7 +84,7 @@ export function Login() {
         method: 'POST',
         body: JSON.stringify({ slug, password: regPassword }),
       });
-      localStorage.setItem('nexus_org', JSON.stringify(result));
+      localStorage.setItem('nexus_user', JSON.stringify(result));
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : '注册失败');

@@ -153,3 +153,30 @@ export interface PicoClawFile {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface User {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface Role {
+  id: string;
+  userId: string;
+  name: string;
+  description: string;
+  variant: 'base' | 'full' | 'heavy';
+  status: 'stopped' | 'running' | 'error';
+  containerId: string | null;
+  containerPort: number | null;
+  isPublic: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RoleFile {
+  path: string;
+  filename: string;
+  content: string;
+  language: string | null;
+}

@@ -63,6 +63,31 @@ export const picoclawWorkspaces = pgTable('picoclawWorkspaces', {
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });
 
+// Users table
+export const users = pgTable('users', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  password: text('password').notNull(), // bcrypt hashed
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+});
+
+// Roles table
+export const roles = pgTable('roles', {
+  id: text('id').primaryKey().default(sql<any>`gen_random_uuid()`),
+  userId: text('user_id').notNull().references(() => users.id),
+  name: text('name').notNull(),
+  description: text('description'),
+  variant: text('variant').notNull().default('full'),
+  status: text('status').notNull().default('stopped'),
+  containerId: text('container_id'),
+  containerPort: integer('container_port'),
+  isPublic: text('is_public').notNull().default('true'),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+});
+
 // Skills table - Skills 市场技能包
 export const skills = pgTable('skills', {
   id: text('id').primaryKey(),
@@ -104,15 +129,17 @@ export const marketplaceRoles = pgTable('marketplace_roles', {
 // Type exports
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
+export type Employee = typeof employees.$inferSelect;
+export type NewEmployee = typeof employees.$inferInsert;
+export type PicoClawWorkspace = typeof picoclawWorkspaces.$inferSelect;
+export type NewPicoClawWorkspace = typeof picoclawWorkspaces.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type Role = typeof roles.$inferSelect;
+export type NewRole = typeof roles.$inferInsert;
 export type Skill = typeof skills.$inferSelect;
 export type NewSkill = typeof skills.$inferInsert;
 export type Mcp = typeof mcps.$inferSelect;
 export type NewMcp = typeof mcps.$inferInsert;
 export type MarketplaceRole = typeof marketplaceRoles.$inferSelect;
 export type NewMarketplaceRole = typeof marketplaceRoles.$inferInsert;
-
-export type Employee = typeof employees.$inferSelect;
-export type NewEmployee = typeof employees.$inferInsert;
-
-export type PicoClawWorkspace = typeof picoclawWorkspaces.$inferSelect;
-export type NewPicoClawWorkspace = typeof picoclawWorkspaces.$inferInsert;

@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
 import logger from '../../lib/logger.js';
 import { handleError, apiSuccess, apiError } from '../../lib/format-error.js';
-import { getOrganizationBySlug, verifyPassword } from '../../services/org-service.js';
+import { verifyPassword } from '../../services/org-service.js';
 
 const auth = new Hono();
 
-// POST /api/auth/login - Organization login
+// POST /api/auth/login - User login
 auth.post('/api/auth/login', async (c) => {
   try {
     const body = await c.req.json();
@@ -25,38 +25,32 @@ auth.post('/api/auth/login', async (c) => {
       return c.json(apiError('password is required', 400), 400);
     }
 
-    // Find organization by slug
-    const org = await getOrganizationBySlug(identifier);
-    if (!org) {
-      return c.json(apiError('Invalid credentials', 401), 401);
-    }
-
-    // Verify password — need to fetch raw record with password hash
+    // Find user by slug
     const { initDatabase } = await import('../../db/index.js');
-    const { organizations } = await import('../../db/schema.js');
+    const { users } = await import('../../db/schema.js');
     const { eq } = await import('drizzle-orm');
     const db = await initDatabase();
     const records = await db
-      .select({ password: organizations.password })
-      .from(organizations)
-      .where(eq(organizations.id, org.id));
+      .select()
+      .from(users)
+      .where(eq(users.slug, identifier));
 
-    if (records.length === 0) {
+    const user = records[0];
+    if (!user) {
       return c.json(apiError('Invalid credentials', 401), 401);
     }
 
-    const valid = await verifyPassword(password, records[0].password);
+    // Verify password
+    const valid = await verifyPassword(password, user.password);
     if (!valid) {
       return c.json(apiError('Invalid credentials', 401), 401);
     }
 
     return c.json(apiSuccess({
-      id: org.id,
-      name: org.name,
-      slug: org.slug,
-      description: org.description,
-      role: 'org',
-      orgId: org.id,
+      id: user.id,
+      name: user.name,
+      slug: user.slug,
+      role: 'user',
     }));
   } catch (error: any) {
     logger.error(error, 'API error');

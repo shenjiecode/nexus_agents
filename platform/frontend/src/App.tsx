@@ -12,27 +12,29 @@ import { AgentDetail } from './pages/AgentDetail';
 import { Login } from './pages/Login';
 import { MarketplaceRoles } from './pages/MarketplaceRoles';
 import { Debug } from './pages/Debug';
+import { RoleDetail } from './pages/RoleDetail';
+import { RoleDebug } from './pages/RoleDebug';
 
-// Simple auth guard: check if org is stored in localStorage
+// Simple auth guard: check if user is stored in localStorage
 function useAuth() {
-  const [org, setOrg] = useState<{ id: string; name: string; slug: string } | null>(() => {
+  const [user, setUser] = useState<{ id: string; name: string; slug: string } | null>(() => {
     try {
-      const stored = localStorage.getItem('nexus_org');
+      const stored = localStorage.getItem('nexus_user');
       return stored ? JSON.parse(stored) : null;
     } catch { return null; }
   });
 
   useEffect(() => {
     const handler = (e: StorageEvent) => {
-      if (e.key === 'nexus_org') {
-        setOrg(e.newValue ? JSON.parse(e.newValue) : null);
+      if (e.key === 'nexus_user') {
+        setUser(e.newValue ? JSON.parse(e.newValue) : null);
       }
     };
     window.addEventListener('storage', handler);
     return () => window.removeEventListener('storage', handler);
   }, []);
 
-  return org;
+  return user;
 }
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -49,13 +51,13 @@ function Layout({ children }: { children: React.ReactNode }) {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const org = useAuth();
-  if (!org) return <Navigate to="/login" replace />;
+  const user = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
 function LogoutWrapper() {
-  localStorage.removeItem('nexus_org');
+  localStorage.removeItem('nexus_user');
   return <Navigate to="/login" replace />;
 }
 
@@ -69,6 +71,8 @@ function App() {
         <Route path="/organizations" element={<ProtectedRoute><Layout><Organizations /></Layout></ProtectedRoute>} />
         <Route path="/organizations/:slug" element={<ProtectedRoute><Layout><OrganizationDetail /></Layout></ProtectedRoute>} />
         <Route path="/roles" element={<ProtectedRoute><Layout><Roles /></Layout></ProtectedRoute>} />
+        <Route path="/roles/:id" element={<ProtectedRoute><Layout><RoleDetail /></Layout></ProtectedRoute>} />
+        <Route path="/roles/:id/debug" element={<ProtectedRoute><Layout><RoleDebug /></Layout></ProtectedRoute>} />
         <Route path="/employees" element={<ProtectedRoute><Layout><Employees /></Layout></ProtectedRoute>} />
         <Route path="/employees/:id" element={<ProtectedRoute><Layout><AgentDetail /></Layout></ProtectedRoute>} />
         <Route path="/skills" element={<ProtectedRoute><Layout><Skills /></Layout></ProtectedRoute>} />

@@ -8,6 +8,8 @@ import {
   employees,
   marketplaceRoles,
   picoclawWorkspaces,
+  users,
+  roles,
 } from './schema.js';
 
 const schema = {
@@ -17,6 +19,8 @@ const schema = {
   employees,
   marketplaceRoles,
   picoclawWorkspaces,
+  users,
+  roles,
 };
 
 const connectionString = process.env.DATABASE_URL || (() => { throw new Error('DATABASE_URL environment variable is required'); })();
@@ -56,4 +60,6 @@ export {
   employees,
   marketplaceRoles,
   picoclawWorkspaces,
+  users,
+  roles,
 };

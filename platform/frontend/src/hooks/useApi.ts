@@ -8,7 +8,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:1320
 /** Get stored user info from localStorage */
 function getStoredUser(): { role: string; id: string; orgId?: string } | null {
   try {
-    const stored = localStorage.getItem('nexus_org');
+    const stored = localStorage.getItem('nexus_user');
     if (!stored) return null;
     return JSON.parse(stored);
   } catch {
