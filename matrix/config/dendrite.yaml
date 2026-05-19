@@ -27,8 +27,8 @@ global:
 
   # Presence configuration
   presence:
-    enable_inbound: false
-    enable_outbound: false
+    enable_inbound: true
+    enable_outbound: true
 
 # Client API configuration
 client_api:
@@ -77,4 +77,4 @@ sync_api:
   max_limit: 100
   max_timeout: 30000
   purge_history: true
-  purge_age: 168h  # 7 days
+  purge_age: 720h  # 30 days

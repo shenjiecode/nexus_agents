@@ -84,3 +84,8 @@ deploy/*event*.sql
 deploy/*roomserver*.sql
 deploy/*syncapi*.sql
 deploy/auth.json
+
+# PicoClaw deployment
+**/.security.yml
+picoclaw-deploy/base/data/
+picoclaw-deploy/full/data/
