@@ -5,6 +5,7 @@ const navItems = [
   { path: '/', label: '控制台', icon: LayoutDashboardIcon },
   { path: '/organizations', label: '组织管理', icon: BuildingIcon },
   { path: '/employees', label: '智能体', icon: ContainerIcon },
+  { path: '/debug', label: '调试', icon: BugIcon },
 ];
 
 const marketplaceItems = [
@@ -37,6 +38,16 @@ function ContainerIcon() {
   );
 }
 
+function BugIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 2a2 2 0 100 4 2 2 0 000-4z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11h-2.5a2.5 2.5 0 00-5 0v4.5a2.5 2.5 0 005 0H19M5 11h2.5a2.5 2.5 0 015 0v4.5a2.5 2.5 0 01-5 0H5" />
+    </svg>
+  );
+}
+
 function TagIcon() {
   return (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -60,6 +71,7 @@ function UserGroupIcon() {
     </svg>
   );
 }
+
 function MarketplaceIcon() {
   return (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

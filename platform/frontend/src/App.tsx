@@ -11,6 +11,7 @@ import { Mcps } from './pages/Mcps';
 import { AgentDetail } from './pages/AgentDetail';
 import { Login } from './pages/Login';
 import { MarketplaceRoles } from './pages/MarketplaceRoles';
+import { Debug } from './pages/Debug';
 
 // Simple auth guard: check if org is stored in localStorage
 function useAuth() {
@@ -72,8 +73,9 @@ function App() {
         <Route path="/employees/:id" element={<ProtectedRoute><Layout><AgentDetail /></Layout></ProtectedRoute>} />
         <Route path="/skills" element={<ProtectedRoute><Layout><Skills /></Layout></ProtectedRoute>} />
         <Route path="/mcps" element={<ProtectedRoute><Layout><Mcps /></Layout></ProtectedRoute>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/debug" element={<ProtectedRoute><Layout><Debug /></Layout></ProtectedRoute>} />
         <Route path="/marketplace-roles" element={<ProtectedRoute><Layout><MarketplaceRoles /></Layout></ProtectedRoute>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

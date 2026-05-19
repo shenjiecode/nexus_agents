@@ -125,3 +125,31 @@ export interface MarketplaceRole {
   createdAt: number;
   updatedAt: number;
 }
+
+export type PicoClawVariant = 'base' | 'full' | 'heavy';
+
+export type WorkspaceStatus = 'stopped' | 'running' | 'error';
+
+export interface PicoClawWorkspace {
+  id: string;
+  userId: string;
+  name: string;
+  variant: PicoClawVariant;
+  containerId: string | null;
+  containerPort: number | null;
+  status: WorkspaceStatus;
+  workspacePath: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PicoClawFile {
+  id: string;
+  workspaceId: string;
+  filename: string;
+  path: string;
+  content: string;
+  language: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
