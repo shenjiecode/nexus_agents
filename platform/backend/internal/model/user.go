@@ -10,8 +10,11 @@ import (
 // User represents a user in the system.
 type User struct {
 	ID        string    `gorm:"primaryKey" json:"id"`
+	Username  string    `gorm:"uniqueIndex" json:"username"`  // unique username for login
+	Email     string    `gorm:"uniqueIndex" json:"email"`     // unique email for login
 	Name      string    `json:"name"`
 	Slug      string    `gorm:"uniqueIndex" json:"slug"`
+	Nickname  string    `json:"nickname"`
 	Password  string    `json:"-"` // bcrypt hash, never serialized
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
