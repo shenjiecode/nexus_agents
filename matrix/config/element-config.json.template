@@ -1,7 +1,7 @@
 {
   "default_server_config": {
     "m.homeserver": {
-      "base_url": "http://${MATRIX_SERVER_NAME}:${DENDRITE_HTTP_PORT}",
+      "base_url": "http://${MATRIX_SERVER_NAME}:${SYNAPSE_HTTP_PORT}",
       "server_name": "${MATRIX_SERVER_NAME}"
     }
   },

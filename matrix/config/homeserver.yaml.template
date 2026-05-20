@@ -1,0 +1,49 @@
+server_name: "${MATRIX_SERVER_NAME}"
+pid_file: /data/homeserver.pid
+
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    resources:
+      - names: [client]
+        compress: false
+
+database:
+  name: psycopg2
+  args:
+    user: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    database: ${POSTGRES_DB}
+    host: matrix-postgres
+    cp_min: 5
+    cp_max: 10
+
+log_config: "/data/log.config"
+
+media_store_path: /data/media_store
+max_upload_size: 50M
+
+registration_shared_secret: "${REGISTRATION_SHARED_SECRET}"
+enable_registration: false
+enable_registration_without_verification: false
+
+federation_domain_whitelist: []
+
+report_stats: false
+
+trusted_key_servers:
+  - server_name: "matrix.org"
+
+rc_registration:
+  per_second: 0.17
+  burst_count: 3
+
+rc_login:
+  account:
+    per_second: 0.17
+    burst_count: 3
+  address:
+    per_second: 0.17
+    burst_count: 3

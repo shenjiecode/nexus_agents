@@ -1,0 +1,4 @@
+{
+  "restrictBaseUrl": ["http://${MATRIX_SERVER_NAME}:${SYNAPSE_HTTP_PORT}"],
+  "corsCredentials": "include"
+}

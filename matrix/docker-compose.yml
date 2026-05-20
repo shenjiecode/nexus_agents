@@ -1,11 +1,11 @@
-# Matrix Stack - Dendrite Homeserver + Element Web
-# 
+# Matrix Stack - Synapse Homeserver + Ketesa Admin + Element Web
+#
 # Usage:
 #   ./start.sh    - Generate configs and start services
 #   ./stop.sh     - Stop services
-#   docker-compose logs - View logs
+#   docker compose logs - View logs
 #
-# DO NOT run docker-compose up directly - use start.sh instead
+# DO NOT run docker compose up directly - use start.sh instead
 
 services:
   # Matrix database
@@ -15,35 +15,55 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-dendrite}
+      POSTGRES_USER: ${POSTGRES_USER:-synapse}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
-      POSTGRES_DB: ${POSTGRES_DB:-dendrite}
+      POSTGRES_DB: ${POSTGRES_DB:-synapse}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     networks:
       - matrix-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dendrite}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-synapse}"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
 
-  # Dendrite Homeserver
-  dendrite:
-    image: matrixdotorg/dendrite-monolith:latest
-    container_name: matrix-dendrite
+  # Synapse Homeserver
+  synapse:
+    image: matrixdotorg/synapse:latest
+    container_name: matrix-synapse
     ports:
-      - "${DENDRITE_HTTP_PORT:-8008}:8008"
-      - "${DENDRITE_HTTPS_PORT:-8448}:8448"
+      - "${SYNAPSE_HTTP_PORT:-8008}:8008"
+      - "${SYNAPSE_HTTPS_PORT:-8448}:8448"
     volumes:
-      - ./config:/etc/dendrite
-      - ./data/media:/var/dendrite/media
-      - ./data/jetstream:/var/dendrite/jetstream
+      - ./config:/data
     networks:
       - matrix-net
     depends_on:
       matrix-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8008/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # Ketesa Admin UI
+  ketesa:
+    image: ghcr.io/etkecc/ketesa:latest
+    container_name: matrix-ketesa
+    ports:
+      - "${KETESA_PORT:-8081}:8080"
+    volumes:
+      - ./config/ketesa-config.json:/var/public/config.json:ro
+    networks:
+      - matrix-net
+    depends_on:
+      synapse:
         condition: service_healthy
     restart: unless-stopped
 
@@ -56,7 +76,7 @@ services:
     networks:
       - matrix-net
     depends_on:
-      - dendrite
+      - synapse
     volumes:
       - ./config/element-config.json:/app/config.json:ro
     restart: unless-stopped
