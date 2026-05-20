@@ -51,8 +51,9 @@ func TestLogin_Success(t *testing.T) {
 	// Create test user
 	hashedPassword := hashPassword(t, "testpass")
 	user := model.User{
+		Username: "testuser",
+		Email:    "test@example.com",
 		Name:     "Test User",
-		Slug:     "testuser",
 		Password: hashedPassword,
 	}
 	if err := db.Create(&user).Error; err != nil {
@@ -62,9 +63,9 @@ func TestLogin_Success(t *testing.T) {
 	// Reset viper for test
 	viper.Reset()
 
-	// Create request
+	// Create request - login with username
 	body := LoginRequest{
-		Slug:     "testuser",
+		Login:    "testuser",
 		Password: "testpass",
 	}
 	jsonBody, _ := json.Marshal(body)
@@ -96,14 +97,11 @@ func TestLogin_Success(t *testing.T) {
 	if data["id"] != user.ID {
 		t.Errorf("Expected id %s, got %v", user.ID, data["id"])
 	}
-	if data["name"] != "Test User" {
-		t.Errorf("Expected name 'Test User', got %v", data["name"])
+	if data["username"] != "testuser" {
+		t.Errorf("Expected username 'testuser', got %v", data["username"])
 	}
-	if data["slug"] != "testuser" {
-		t.Errorf("Expected slug 'testuser', got %v", data["slug"])
-	}
-	if data["role"] != "user" {
-		t.Errorf("Expected role 'user', got %v", data["role"])
+	if data["email"] != "test@example.com" {
+		t.Errorf("Expected email 'test@example.com', got %v", data["email"])
 	}
 }
 
@@ -116,8 +114,9 @@ func TestLogin_WrongPassword(t *testing.T) {
 	// Create test user
 	hashedPassword := hashPassword(t, "testpass")
 	user := model.User{
+		Username: "testuser2",
+		Email:    "test2@example.com",
 		Name:     "Test User",
-		Slug:     "testuser2",
 		Password: hashedPassword,
 	}
 	if err := db.Create(&user).Error; err != nil {
@@ -129,7 +128,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 
 	// Create request with wrong password
 	body := LoginRequest{
-		Slug:     "testuser2",
+		Login:    "testuser2",
 		Password: "wrongpassword",
 	}
 	jsonBody, _ := json.Marshal(body)
@@ -172,7 +171,7 @@ func TestLogin_UserNotFound(t *testing.T) {
 
 	// Create request for non-existent user
 	body := LoginRequest{
-		Slug:     "nonexistent",
+		Login:    "nonexistent",
 		Password: "testpass",
 	}
 	jsonBody, _ := json.Marshal(body)
@@ -204,7 +203,7 @@ func TestLogin_UserNotFound(t *testing.T) {
 	}
 }
 
-func TestLogin_MissingSlug(t *testing.T) {
+func TestLogin_MissingLogin(t *testing.T) {
 	// Setup
 	gin.SetMode(gin.TestMode)
 	db := setupTestDB(t)
@@ -213,7 +212,7 @@ func TestLogin_MissingSlug(t *testing.T) {
 	// Reset viper for test
 	viper.Reset()
 
-	// Create request with missing slug
+	// Create request with missing login
 	body := map[string]string{
 		"password": "testpass",
 	}
@@ -241,8 +240,8 @@ func TestLogin_MissingSlug(t *testing.T) {
 	if response["success"] != false {
 		t.Errorf("Expected success to be false, got %v", response["success"])
 	}
-	if response["error"] != "slug is required" {
-		t.Errorf("Expected error 'slug is required', got %v", response["error"])
+	if response["error"] != "login is required" {
+		t.Errorf("Expected error 'login is required', got %v", response["error"])
 	}
 }
 
@@ -257,7 +256,7 @@ func TestLogin_MissingPassword(t *testing.T) {
 
 	// Create request with missing password
 	body := map[string]string{
-		"slug": "testuser",
+		"login": "testuser",
 	}
 	jsonBody, _ := json.Marshal(body)
 
@@ -268,185 +267,6 @@ func TestLogin_MissingPassword(t *testing.T) {
 
 	// Call handler
 	Login(c)
-
-	// Assert
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("Expected status 400, got %d", w.Code)
-		t.Logf("Response: %s", w.Body.String())
-	}
-
-	var response map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
-
-	if response["success"] != false {
-		t.Errorf("Expected success to be false, got %v", response["success"])
-	}
-	if response["error"] != "password is required" {
-		t.Errorf("Expected error 'password is required', got %v", response["error"])
-	}
-}
-
-func TestAdminLogin_Success(t *testing.T) {
-	// Setup
-	gin.SetMode(gin.TestMode)
-	db := setupTestDB(t)
-	model.SetTestDB(db)
-
-	// Reset viper and set admin password
-	viper.Reset()
-	viper.Set("ADMIN_PASSWORD", "adminsecret")
-
-	// Create request
-	body := AdminLoginRequest{
-		Password: "adminsecret",
-	}
-	jsonBody, _ := json.Marshal(body)
-
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request, _ = http.NewRequest("POST", "/api/auth/admin-login", bytes.NewBuffer(jsonBody))
-	c.Request.Header.Set("Content-Type", "application/json")
-
-	// Call handler
-	AdminLogin(c)
-
-	// Assert
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", w.Code)
-		t.Logf("Response: %s", w.Body.String())
-	}
-
-	var response map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
-
-	if response["success"] != true {
-		t.Errorf("Expected success to be true, got %v", response["success"])
-	}
-
-	data := response["data"].(map[string]interface{})
-	if data["id"] != "admin" {
-		t.Errorf("Expected id 'admin', got %v", data["id"])
-	}
-	if data["name"] != "Admin" {
-		t.Errorf("Expected name 'Admin', got %v", data["name"])
-	}
-	if data["slug"] != "admin" {
-		t.Errorf("Expected slug 'admin', got %v", data["slug"])
-	}
-	if data["role"] != "admin" {
-		t.Errorf("Expected role 'admin', got %v", data["role"])
-	}
-}
-
-func TestAdminLogin_WrongPassword(t *testing.T) {
-	// Setup
-	gin.SetMode(gin.TestMode)
-	db := setupTestDB(t)
-	model.SetTestDB(db)
-
-	// Reset viper and set admin password
-	viper.Reset()
-	viper.Set("ADMIN_PASSWORD", "adminsecret")
-
-	// Create request with wrong password
-	body := AdminLoginRequest{
-		Password: "wrongpassword",
-	}
-	jsonBody, _ := json.Marshal(body)
-
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request, _ = http.NewRequest("POST", "/api/auth/admin-login", bytes.NewBuffer(jsonBody))
-	c.Request.Header.Set("Content-Type", "application/json")
-
-	// Call handler
-	AdminLogin(c)
-
-	// Assert
-	if w.Code != http.StatusUnauthorized {
-		t.Errorf("Expected status 401, got %d", w.Code)
-		t.Logf("Response: %s", w.Body.String())
-	}
-
-	var response map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
-
-	if response["success"] != false {
-		t.Errorf("Expected success to be false, got %v", response["success"])
-	}
-	if response["error"] != "Invalid credentials" {
-		t.Errorf("Expected error 'Invalid credentials', got %v", response["error"])
-	}
-}
-
-func TestAdminLogin_NotConfigured(t *testing.T) {
-	// Setup
-	gin.SetMode(gin.TestMode)
-	db := setupTestDB(t)
-	model.SetTestDB(db)
-
-	// Reset viper - don't set admin password
-	viper.Reset()
-
-	// Create request
-	body := AdminLoginRequest{
-		Password: "anypassword",
-	}
-	jsonBody, _ := json.Marshal(body)
-
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request, _ = http.NewRequest("POST", "/api/auth/admin-login", bytes.NewBuffer(jsonBody))
-	c.Request.Header.Set("Content-Type", "application/json")
-
-	// Call handler
-	AdminLogin(c)
-
-	// Assert
-	if w.Code != http.StatusServiceUnavailable {
-		t.Errorf("Expected status 503, got %d", w.Code)
-		t.Logf("Response: %s", w.Body.String())
-	}
-
-	var response map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
-
-	if response["success"] != false {
-		t.Errorf("Expected success to be false, got %v", response["success"])
-	}
-	if response["error"] != "Admin login not configured" {
-		t.Errorf("Expected error 'Admin login not configured', got %v", response["error"])
-	}
-}
-
-func TestAdminLogin_MissingPassword(t *testing.T) {
-	// Setup
-	gin.SetMode(gin.TestMode)
-	db := setupTestDB(t)
-	model.SetTestDB(db)
-
-	// Reset viper
-	viper.Reset()
-
-	// Create request with missing password
-	body := map[string]string{}
-	jsonBody, _ := json.Marshal(body)
-
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request, _ = http.NewRequest("POST", "/api/auth/admin-login", bytes.NewBuffer(jsonBody))
-	c.Request.Header.Set("Content-Type", "application/json")
-
-	// Call handler
-	AdminLogin(c)
 
 	// Assert
 	if w.Code != http.StatusBadRequest {

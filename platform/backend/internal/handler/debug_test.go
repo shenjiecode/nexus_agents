@@ -182,20 +182,19 @@ func createTestRole(t *testing.T, db *gorm.DB, id, userID, name, variant string)
 
 // newDebugContext creates a Gin context with a test request.
 func newDebugContext(t *testing.T, method, path, roleID string, userID string) (*httptest.ResponseRecorder, *gin.Context) {
-	t.Helper()
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request, _ = http.NewRequest(method, path, nil)
-	if roleID != "" {
-		c.Params = gin.Params{{Key: "id", Value: roleID}}
-	}
-	if userID != "" {
-		c.Set("user", &middleware.UserContext{
-			ID:   userID,
-			Role: "user",
-		})
-	}
-	return w, c
+t.Helper()
+w := httptest.NewRecorder()
+c, _ := gin.CreateTestContext(w)
+c.Request, _ = http.NewRequest(method, path, nil)
+if roleID != "" {
+c.Params = gin.Params{{Key: "id", Value: roleID}}
+}
+if userID != "" {
+		c.Set("user", middleware.UserContext{
+ID: userID,
+})
+}
+return w, c
 }
 
 // parseResponse is a helper to unmarshal JSON response.

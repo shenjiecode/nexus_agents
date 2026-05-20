@@ -31,12 +31,11 @@ func setupRolesTestDB(t *testing.T) *gorm.DB {
 }
 
 // setUser sets the user in the Gin context for testing.
-func setUser(c *gin.Context, userID, role string) {
-	user := middleware.UserContext{
-		ID:   userID,
-		Role: role,
-	}
-	c.Set("user", &user)
+func setUser(c *gin.Context, userID string) {
+user := middleware.UserContext{
+ID: userID,
+}
+	c.Set("user", user)
 }
 
 // Test_ListPublicRoles tests GET /api/roles - List all public roles
@@ -175,7 +174,7 @@ func Test_ListMyRoles_Success(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Request, _ = http.NewRequest("GET", "/api/roles/mine", nil)
-	setUser(c, "user-1", "user")
+	setUser(c, "user-1")
 
 	// Call handler
 	ListMyRoles(c)
@@ -252,7 +251,7 @@ func Test_CreateRole_MissingName(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 	c.Request, _ = http.NewRequest("POST", "/api/roles", bytes.NewBuffer(jsonBody))
 	c.Request.Header.Set("Content-Type", "application/json")
-	setUser(c, "user-1", "user")
+	setUser(c, "user-1")
 
 	// Call handler
 	CreateRole(c)
@@ -294,7 +293,7 @@ func Test_CreateRole_Success(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 	c.Request, _ = http.NewRequest("POST", "/api/roles", bytes.NewBuffer(jsonBody))
 	c.Request.Header.Set("Content-Type", "application/json")
-	setUser(c, "user-1", "user")
+	setUser(c, "user-1")
 
 	// Call handler
 	CreateRole(c)
@@ -436,7 +435,7 @@ func Test_UpdateRole_NotFound(t *testing.T) {
 	c.Request, _ = http.NewRequest("PUT", "/api/roles/nonexistent", bytes.NewBuffer(jsonBody))
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Params = gin.Params{{Key: "id", Value: "nonexistent"}}
-	setUser(c, "user-1", "user")
+	setUser(c, "user-1")
 
 	// Call handler
 	UpdateRole(c)
@@ -484,7 +483,7 @@ func Test_UpdateRole_Forbidden(t *testing.T) {
 	c.Request, _ = http.NewRequest("PUT", "/api/roles/role-1", bytes.NewBuffer(jsonBody))
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Params = gin.Params{{Key: "id", Value: "role-1"}}
-	setUser(c, "user-1", "user") // Different user
+	setUser(c, "user-1") // Different user
 
 	// Call handler
 	UpdateRole(c)
@@ -537,7 +536,7 @@ func Test_UpdateRole_Success(t *testing.T) {
 	c.Request, _ = http.NewRequest("PUT", "/api/roles/role-1", bytes.NewBuffer(jsonBody))
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Params = gin.Params{{Key: "id", Value: "role-1"}}
-	setUser(c, "user-1", "user")
+	setUser(c, "user-1")
 
 	// Call handler
 	UpdateRole(c)
@@ -581,7 +580,7 @@ func Test_DeleteRole_NotFound(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 	c.Request, _ = http.NewRequest("DELETE", "/api/roles/nonexistent", nil)
 	c.Params = gin.Params{{Key: "id", Value: "nonexistent"}}
-	setUser(c, "user-1", "user")
+	setUser(c, "user-1")
 
 	// Call handler
 	DeleteRole(c)
@@ -623,7 +622,7 @@ func Test_DeleteRole_Forbidden(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 	c.Request, _ = http.NewRequest("DELETE", "/api/roles/role-1", nil)
 	c.Params = gin.Params{{Key: "id", Value: "role-1"}}
-	setUser(c, "user-1", "user") // Different user
+	setUser(c, "user-1") // Different user
 
 	// Call handler
 	DeleteRole(c)
@@ -668,7 +667,7 @@ func Test_DeleteRole_Success(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 	c.Request, _ = http.NewRequest("DELETE", "/api/roles/role-1", nil)
 	c.Params = gin.Params{{Key: "id", Value: "role-1"}}
-	setUser(c, "user-1", "user")
+	setUser(c, "user-1")
 
 	// Call handler
 	DeleteRole(c)
