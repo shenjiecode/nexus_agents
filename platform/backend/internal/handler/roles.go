@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -11,6 +12,15 @@ import (
 	"github.com/nexus-agents/backend/internal/model"
 	"github.com/nexus-agents/backend/internal/service"
 )
+
+// OSS service for role package storage
+// Must be set via SetOSSService before handlers are called.
+var ossService *service.OSSService
+
+// SetOSSService sets the OSS service instance for role handlers.
+func SetOSSService(s *service.OSSService) {
+	ossService = s
+}
 
 // RoleResponse represents the role data returned in responses.
 type RoleResponse struct {
@@ -433,4 +443,174 @@ func DeleteRole(c *gin.Context) {
 // deleteRoleDirRecursive deletes a directory and all its contents
 func deleteRoleDirRecursive(path string) error {
 	return service.DeleteRoleDir(path)
+}
+
+// UploadRole handles POST /api/roles/:id/upload - Generate presigned URL for uploading role package to OSS
+// Frontend can use the returned URL to upload the zip file directly to OSS
+func UploadRole(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":  "Unauthorized",
+		})
+		return
+	}
+
+	// Check OSS service is configured
+	if ossService == nil || !ossService.IsConfigured() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"success": false,
+			"error":  "OSS storage is not configured",
+		})
+		return
+	}
+
+	roleID := c.Param("id")
+	if roleID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":  "Role ID is required",
+		})
+		return
+	}
+
+	// Validate role ownership
+	db := model.GetDB()
+	var role model.Role
+	result := db.First(&role, "id = ?", roleID)
+	if result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":  "Role not found",
+		})
+		return
+	}
+
+	if role.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":  "Forbidden: you can only upload your own roles",
+		})
+		return
+	}
+
+	// Generate OSS path for role package
+	// Format: roles/{userID}/{roleID}/package.zip
+	ossPath := fmt.Sprintf("roles/%s/%s/package.zip", user.ID, roleID)
+
+	// Generate presigned upload URL (expires in 1 hour)
+	presignedURL, err := ossService.GeneratePresignedUploadURL(ossPath, time.Hour)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":  "Failed to generate upload URL",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"uploadUrl": presignedURL,
+			"ossPath":   ossPath,
+			"expiresIn": 3600,
+			"roleId":    roleID,
+		},
+	})
+}
+
+// DownloadRole handles GET /api/roles/:id/download - Generate presigned URL for downloading role package from OSS
+// Frontend can use the returned URL to download the zip file directly from OSS
+func DownloadRole(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":  "Unauthorized",
+		})
+		return
+	}
+
+	// Check OSS service is configured
+	if ossService == nil || !ossService.IsConfigured() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"success": false,
+			"error":  "OSS storage is not configured",
+		})
+		return
+	}
+
+	roleID := c.Param("id")
+	if roleID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":  "Role ID is required",
+		})
+		return
+	}
+
+	// Validate role ownership (or check if role is public)
+	db := model.GetDB()
+	var role model.Role
+	result := db.First(&role, "id = ?", roleID)
+	if result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":  "Role not found",
+		})
+		return
+	}
+
+	// Allow download if user owns the role or if role is public
+	if role.UserID != user.ID && role.IsPublic != "true" {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":  "Forbidden: you can only download your own roles or public roles",
+		})
+		return
+	}
+
+	// Generate OSS path for role package
+	// Format: roles/{userID}/{roleID}/package.zip
+	ossPath := fmt.Sprintf("roles/%s/%s/package.zip", role.UserID, roleID)
+
+	// Check if package exists in OSS
+	exists, err := ossService.ObjectExists(ossPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":  "Failed to check package existence",
+		})
+		return
+	}
+
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":  "Role package not found in storage",
+		})
+		return
+	}
+
+	// Generate presigned download URL (expires in 1 hour)
+	presignedURL, err := ossService.GeneratePresignedDownloadURL(ossPath, time.Hour)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":  "Failed to generate download URL",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"downloadUrl": presignedURL,
+			"ossPath":     ossPath,
+			"expiresIn":   3600,
+			"roleId":      roleID,
+			"roleName":    role.Name,
+		},
+	})
 }

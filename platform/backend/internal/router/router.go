@@ -64,6 +64,15 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 	// Set container pool and logger for debug handlers
 	handler.SetContainerPool(pool)
 	handler.SetDebugLogger(log)
+	// Initialize OSS service (optional - may be nil if not configured)
+	ossSvc, err := service.NewOSSService(cfg)
+	if err != nil {
+		log.Warn("Failed to initialize OSS service", zap.Error(err))
+	}
+	if ossSvc != nil {
+		handler.SetOSSService(ossSvc)
+		log.Info("OSS service initialized")
+	}
 
 	// Create engine
 	engine := gin.New()
@@ -131,6 +140,10 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 			// Export role (public - no auth required)
 			roles.GET("/:id/export", handler.ExportRole)    // GET /api/roles/:id/export
 
+			// OSS storage routes (protected - require auth)
+			roles.POST("/:id/upload", handler.UploadRole)     // POST /api/roles/:id/upload - get presigned upload URL
+			roles.GET("/:id/download", handler.DownloadRole) // GET /api/roles/:id/download - get presigned download URL
+
 			// Debug routes (protected - require auth)
 			debug := roles.Group("/:id/debug")
 			{
@@ -144,6 +157,10 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 		// Marketplace routes (public - no auth required)
 		api.GET("/skills", handler.GetSkills)               // GET /api/skills
 		api.GET("/mcps", handler.GetMCPs)                  // GET /api/mcps
+
+		// Marketplace roles routes (public - no auth required)
+		api.GET("/marketplace/roles", handler.ListMarketplaceRoles)                      // GET /api/marketplace/roles
+		api.GET("/marketplace/roles/:id/download", handler.GetMarketplaceRoleDownload) // GET /api/marketplace/roles/:id/download
 	}
 
 	// 404 handler
