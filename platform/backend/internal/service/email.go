@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"net/smtp"
 	"text/template"
@@ -115,14 +116,11 @@ func (s *EmailService) SendPasswordResetEmail(to, resetToken string) error {
 	subject := "Reset Your Nexus Agents Password"
 	headers := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n",
 		s.config.SMTPFrom, to, subject)
-	
+
 	message := headers + body.String()
 
-	// Send email via SMTP
-	addr := fmt.Sprintf("%s:%d", s.config.SMTPHost, s.config.SMTPPort)
-	auth := smtp.PlainAuth("", s.config.SMTPUser, s.config.SMTPPassword, s.config.SMTPHost)
-
-	if err := smtp.SendMail(addr, auth, s.config.SMTPFrom, []string{to}, []byte(message)); err != nil {
+	// Send email via SMTP with SSL support (port 465)
+	if err := s.sendMailSSL(to, []byte(message)); err != nil {
 		s.logger.Error("Failed to send password reset email",
 			zap.String("to", to),
 			zap.Error(err),
@@ -137,10 +135,68 @@ func (s *EmailService) SendPasswordResetEmail(to, resetToken string) error {
 	return nil
 }
 
+// sendMailSSL sends an email using SMTP with SSL connection (port 465).
+// Go's standard smtp.SendMail doesn't support SSL directly, so we use tls.Dial.
+func (s *EmailService) sendMailSSL(to string, message []byte) error {
+	host := s.config.SMTPHost
+	addr := fmt.Sprintf("%s:%d", host, s.config.SMTPPort)
+
+	// Dial with TLS (for port 465 - SMTPS)
+	tlsConfig := &tls.Config{
+		ServerName: host,
+	}
+
+	conn, err := tls.Dial("tcp", addr, tlsConfig)
+	if err != nil {
+		return fmt.Errorf("TLS dial failed: %w", err)
+	}
+	defer conn.Close()
+
+	// Create SMTP client
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return fmt.Errorf("SMTP client creation failed: %w", err)
+	}
+	defer client.Close()
+
+	// Authenticate
+	auth := smtp.PlainAuth("", s.config.SMTPUser, s.config.SMTPPassword, host)
+	if err := client.Auth(auth); err != nil {
+		return fmt.Errorf("SMTP auth failed: %w", err)
+	}
+
+	// Set sender
+	if err := client.Mail(s.config.SMTPFrom); err != nil {
+		return fmt.Errorf("SMTP MAIL failed: %w", err)
+	}
+
+	// Set recipient
+	if err := client.Rcpt(to); err != nil {
+		return fmt.Errorf("SMTP RCPT failed: %w", err)
+	}
+
+	// Send data
+	writer, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("SMTP DATA failed: %w", err)
+	}
+
+	_, err = writer.Write(message)
+	if err != nil {
+		return fmt.Errorf("SMTP write failed: %w", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("SMTP writer close failed: %w", err)
+	}
+
+	return client.Quit()
+}
+
 // IsConfigured returns true if SMTP is properly configured.
 func (s *EmailService) IsConfigured() bool {
-	return s.config.SMTPHost != "" && 
-		s.config.SMTPUser != "" && 
+	return s.config.SMTPHost != "" &&
+		s.config.SMTPUser != "" &&
 		s.config.SMTPPassword != "" &&
 		s.config.SMTPFrom != ""
 }
