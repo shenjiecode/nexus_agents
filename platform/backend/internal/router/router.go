@@ -48,9 +48,7 @@ func DefaultCORSConfig() CORSConfig {
 			"Content-Type",
 			"Accept",
 			"Authorization",
-			"X-User-Role",
 			"X-User-Id",
-			"X-User-OrgId",
 		},
 		ExposeHeaders: []string{
 			"Content-Length",
@@ -111,7 +109,9 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 		auth := api.Group("/auth")
 		{
 			auth.POST("/login", handler.Login)
-			auth.POST("/admin-login", handler.AdminLogin)
+			auth.POST("/register", handler.Register)
+			auth.POST("/forgot-password", handler.ForgotPassword)
+			auth.POST("/reset-password", handler.ResetPassword)
 		}
 
 		// Roles routes
