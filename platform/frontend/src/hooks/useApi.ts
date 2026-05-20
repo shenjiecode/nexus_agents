@@ -6,11 +6,12 @@ import type { ApiResponse } from '../types';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:13207';
 
 /** Get stored user info from localStorage */
-function getStoredUser(): { role: string; id: string; orgId?: string } | null {
+function getStoredUser(): { id: string; username: string } | null {
   try {
     const stored = localStorage.getItem('nexus_user');
     if (!stored) return null;
-    return JSON.parse(stored);
+    const user = JSON.parse(stored);
+    return { id: user.id, username: user.username };
   } catch {
     return null;
   }
@@ -21,9 +22,7 @@ function getAuthHeaders(existing?: HeadersInit): HeadersInit {
   const user = getStoredUser();
   const headers: Record<string, string> = { ...(existing as Record<string, string>) };
   if (user) {
-    headers['X-User-Role'] = user.role;
     headers['X-User-Id'] = user.id;
-    if (user.orgId) headers['X-User-OrgId'] = user.orgId;
   }
   return headers;
 }

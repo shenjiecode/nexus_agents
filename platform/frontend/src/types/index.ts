@@ -4,6 +4,14 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
+// User - matches backend UserResponse
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  nickname?: string;
+  token?: string;
+}
 // Skill - matches backend marketplace.go mock data
 export interface Skill {
   id: string;

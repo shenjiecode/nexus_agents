@@ -7,6 +7,7 @@ import { Mcps } from './pages/Mcps';
 import { Login } from './pages/Login';
 import { Roles } from './pages/Roles';
 import { RoleDebug } from './pages/RoleDebug';
+import { ResetPassword } from './pages/ResetPassword';
 
 // Simple auth guard: check if user is stored in localStorage
 function useAuth() {
@@ -59,8 +60,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/logout" element={<LogoutWrapper />} />
-        <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/skills" element={<ProtectedRoute><Layout><Skills /></Layout></ProtectedRoute>} />
         <Route path="/mcps" element={<ProtectedRoute><Layout><Mcps /></Layout></ProtectedRoute>} />
         <Route path="/roles" element={<ProtectedRoute><Layout><Roles /></Layout></ProtectedRoute>} />
