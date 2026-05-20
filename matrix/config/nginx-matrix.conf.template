@@ -5,6 +5,24 @@
 # Deploy to: /etc/nginx/conf.d/matrix.conf
 # Then: nginx -t && nginx -s reload
 
+# Map directive must be in http context (conf.d files are included in http block)
+# This creates $cors_origin variable that reflects allowed origins back to client
+map $http_origin $cors_origin {
+    default "";
+    # Ketesa Admin UI
+    "~^http://${MATRIX_SERVER_NAME}:8011$" $http_origin;
+    # Element Web
+    "~^http://${MATRIX_SERVER_NAME}:8010$" $http_origin;
+    # Synapse API (same server)
+    "~^http://${MATRIX_SERVER_NAME}:8008$" $http_origin;
+    # Production frontend
+    "~^http://${MATRIX_SERVER_NAME}:13208$" $http_origin;
+    # Local development (Vite default port)
+    "~^http://localhost:5173$" $http_origin;
+    # Local production build
+    "~^http://localhost:13208$" $http_origin;
+}
+
 # Synapse reverse proxy with proper CORS headers
 # External port 8008 → internal Synapse on 18008
 server {
@@ -16,14 +34,26 @@ server {
     proxy_hide_header Access-Control-Allow-Headers;
     proxy_hide_header Access-Control-Expose-Headers;
 
-    # Allow credentials from Ketesa Admin (port 8011) and Element Web (port 8010)
-    add_header Access-Control-Allow-Origin "http://${MATRIX_SERVER_NAME}:8011" always;
+    # CORS headers for all responses (using map-defined $cors_origin)
+    add_header Access-Control-Allow-Origin $cors_origin always;
     add_header Access-Control-Allow-Methods "GET, HEAD, POST, PUT, DELETE, OPTIONS" always;
-    add_header Access-Control-Allow-Headers "X-Requested-With, Content-Type, Authorization, Date" always;
+    add_header Access-Control-Allow-Headers "X-Requested-With, Content-Type, Authorization, Date, X-Matrix-Device-Id, X-Matrix-Access-Token" always;
     add_header Access-Control-Allow-Credentials "true" always;
     add_header Access-Control-Expose-Headers "Synapse-Trace-Id, Server" always;
 
     location / {
+        # Handle OPTIONS preflight requests (safe use of if with return)
+        if ($request_method = OPTIONS) {
+            add_header Access-Control-Allow-Origin $cors_origin always;
+            add_header Access-Control-Allow-Methods "GET, HEAD, POST, PUT, DELETE, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "X-Requested-With, Content-Type, Authorization, Date, X-Matrix-Device-Id, X-Matrix-Access-Token" always;
+            add_header Access-Control-Allow-Credentials "true" always;
+            add_header Access-Control-Max-Age 86400 always;
+            add_header Content-Length 0 always;
+            add_header Content-Type "text/plain" always;
+            return 204;
+        }
+
         proxy_pass http://127.0.0.1:${SYNAPSE_HTTP_PORT};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
