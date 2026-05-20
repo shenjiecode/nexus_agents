@@ -5,22 +5,9 @@
 # Deploy to: /etc/nginx/conf.d/matrix.conf
 # Then: nginx -t && nginx -s reload
 
-# Map directive must be in http context (conf.d files are included in http block)
-# This creates $cors_origin variable that reflects allowed origins back to client
+# Map directive - reflect any origin (required for credentials mode, cannot use *)
 map $http_origin $cors_origin {
-    default "";
-    # Ketesa Admin UI
-    "~^http://${MATRIX_SERVER_NAME}:8011$" $http_origin;
-    # Element Web
-    "~^http://${MATRIX_SERVER_NAME}:8010$" $http_origin;
-    # Synapse API (same server)
-    "~^http://${MATRIX_SERVER_NAME}:8008$" $http_origin;
-    # Production frontend
-    "~^http://${MATRIX_SERVER_NAME}:13208$" $http_origin;
-    # Local development (Vite default port)
-    "~^http://localhost:5173$" $http_origin;
-    # Local production build
-    "~^http://localhost:13208$" $http_origin;
+    default $http_origin;
 }
 
 # Synapse reverse proxy with proper CORS headers
