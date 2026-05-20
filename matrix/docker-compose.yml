@@ -57,7 +57,7 @@ services:
     image: ghcr.io/etkecc/ketesa:latest
     container_name: matrix-ketesa
     ports:
-      - "${KETESA_PORT:-8081}:8080"
+      - "${KETESA_PORT:-8011}:8080"
     volumes:
       - ./config/ketesa-config.json:/var/public/config.json:ro
     networks:
@@ -73,7 +73,7 @@ services:
     container_name: matrix-element-web
     user: "0:0"
     ports:
-      - "${ELEMENT_PORT:-8080}:80"
+      - "${ELEMENT_PORT:-8010}:80"
     networks:
       - matrix-net
     depends_on:

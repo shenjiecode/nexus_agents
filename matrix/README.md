@@ -12,7 +12,7 @@
         ▼                 ▼                  ▼
 ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐
 │  Element Web │  │ Ketesa Admin │  │   Synapse API    │
-│    :8080     │  │    :8081     │  │     :8008        │
+│    :8010     │  │    :8011     │  │     :8008        │
 │  Web 聊天    │  │  管理界面    │  │  Homeserver      │
 └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘
        │                 │                    │
@@ -36,8 +36,8 @@
 | 服务 | 容器名 | 端口 | 说明 |
 |------|--------|------|------|
 | Synapse | matrix-synapse | 8008 (HTTP) / 8448 (HTTPS) | Matrix Homeserver，处理消息、用户认证、房间管理 |
-| Ketesa | matrix-ketesa | 8081 → 8080 | Synapse 管理 UI，提供用户/房间/媒体的 Web 管理界面 |
-| Element Web | matrix-element-web | 8080 → 80 | Web 聊天客户端，给用户使用 |
+| Ketesa | matrix-ketesa | 8011 → 8080 | Synapse 管理 UI，提供用户/房间/媒体的 Web 管理界面 |
+| Element Web | matrix-element-web | 8010 → 80 | Web 聊天客户端，给用户使用 |
 | PostgreSQL | matrix-postgres | 5432 | Synapse 数据库 |
 
 ### 权限模型
@@ -108,8 +108,8 @@ chmod +x start.sh
 | 服务 | 地址 | 验证方式 |
 |------|------|----------|
 | Synapse API | `http://{SERVER}:8008/health` | 返回 `OK` |
-| Element Web | `http://{SERVER}:8080` | 浏览器打开显示登录页 |
-| Ketesa Admin | `http://{SERVER}:8081` | 浏览器打开，用 admin 账户登录 |
+| Element Web | `http://{SERVER}:8010` | 浏览器打开显示登录页 |
+| Ketesa Admin | `http://{SERVER}:8011` | 浏览器打开，用 admin 账户登录 |
 
 ---
 
@@ -124,8 +124,8 @@ chmod +x start.sh
 | `POSTGRES_PORT` | PostgreSQL 端口 | `5432` |
 | `SYNAPSE_HTTP_PORT` | Synapse HTTP 端口 | `8008` |
 | `SYNAPSE_HTTPS_PORT` | Synapse HTTPS 端口 | `8448` |
-| `ELEMENT_PORT` | Element Web 端口 | `8080` |
-| `KETESA_PORT` | Ketesa Admin 端口 | `8081` |
+| `ELEMENT_PORT` | Element Web 端口 | `8010` |
+| `KETESA_PORT` | Ketesa Admin 端口 | `8011` |
 | `REGISTRATION_SHARED_SECRET` | 注册密钥（必须） | - |
 | `ADMIN_USERNAME` | 初始管理员用户名 | `admin` |
 | `ADMIN_PASSWORD` | 初始管理员密码（必须） | - |
@@ -204,7 +204,7 @@ Backend 通过 `REGISTRATION_SHARED_SECRET` 调用 Synapse 的共享密钥注册
 
 ## 管理功能
 
-通过 Ketesa Admin UI (`http://{MATRIX_SERVER_NAME}:8081`) 可以：
+通过 Ketesa Admin UI (`http://{MATRIX_SERVER_NAME}:8011`) 可以：
 
 | 功能 | 说明 |
 |------|------|
@@ -255,8 +255,8 @@ rm config/*.signing.key
 
 ```bash
 netstat -tlnp | grep 8008
-netstat -tlnp | grep 8080
-netstat -tlnp | grep 8081
+netstat -tlnp | grep 8010
+netstat -tlnp | grep 8011
 ```
 
 ---
