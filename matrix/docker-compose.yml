@@ -71,6 +71,7 @@ services:
   element-web:
     image: vectorim/element-web:latest
     container_name: matrix-element-web
+    user: "0:0"
     ports:
       - "${ELEMENT_PORT:-8080}:80"
     networks:

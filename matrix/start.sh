@@ -85,6 +85,11 @@ if [ ! -f config/matrix_key.pem ] || [ ! -f config/log.config ]; then
     envsubst '${MATRIX_SERVER_NAME} ${POSTGRES_USER} ${POSTGRES_PASSWORD} ${POSTGRES_DB} ${REGISTRATION_SHARED_SECRET}' \
       < config/homeserver.yaml.template > config/homeserver.yaml
 
+    # Fix log path: generate uses /homeserver.log but we need /data/homeserver.log
+    sed -i 's|filename: /homeserver.log|filename: /data/homeserver.log|' config/log.config
+
+    # Fix permissions: generate sets 991:991 but envsubst writes as current user
+    chown -R 991:991 config/
     echo "Signing key generated."
 else
     echo "Signing key already exists, skipping generation."
