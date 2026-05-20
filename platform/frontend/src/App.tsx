@@ -61,10 +61,12 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
         <Route path="/skills" element={<ProtectedRoute><Layout><Skills /></Layout></ProtectedRoute>} />
         <Route path="/mcps" element={<ProtectedRoute><Layout><Mcps /></Layout></ProtectedRoute>} />
         <Route path="/roles" element={<ProtectedRoute><Layout><Roles /></Layout></ProtectedRoute>} />
         <Route path="/roles/:id/debug" element={<ProtectedRoute><Layout><RoleDebug /></Layout></ProtectedRoute>} />
+        <Route path="/logout" element={<LogoutWrapper />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
