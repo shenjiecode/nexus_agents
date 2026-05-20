@@ -30,7 +30,6 @@ enable_registration: false
 enable_registration_without_verification: false
 
 federation_domain_whitelist: []
-
 report_stats: false
 
 trusted_key_servers:

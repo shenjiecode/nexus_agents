@@ -39,9 +39,9 @@ if [ -z "$ADMIN_PASSWORD" ] || [ "$ADMIN_PASSWORD" = "CHANGE_ME_TO_ADMIN_PASSWOR
 fi
 
 # Apply defaults
-SYNAPSE_HTTP_PORT="${SYNAPSE_HTTP_PORT:-8008}"
+SYNAPSE_HTTP_PORT="${SYNAPSE_HTTP_PORT:-18008}"
 ELEMENT_PORT="${ELEMENT_PORT:-8010}"
-KETESA_PORT="${KETESA_PORT:-8011}"
+KETESA_PORT="${KETESA_PORT:-8012}"
 ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
 POSTGRES_USER="${POSTGRES_USER:-synapse}"
 POSTGRES_DB="${POSTGRES_DB:-synapse}"
@@ -67,8 +67,17 @@ envsubst '${MATRIX_SERVER_NAME} ${SYNAPSE_HTTP_PORT}' \
 
 # Generate ketesa-config.json from template
 echo "Generating ketesa-config.json..."
-envsubst '${MATRIX_SERVER_NAME} ${SYNAPSE_HTTP_PORT}' \
+envsubst '${MATRIX_SERVER_NAME}' \
   < config/ketesa-config.json.template > config/ketesa-config.json
+
+# Generate nginx config (CORS reverse proxy)
+echo "Generating nginx config..."
+envsubst '${MATRIX_SERVER_NAME} ${SYNAPSE_HTTP_PORT} ${KETESA_PORT}' \
+  < config/nginx-matrix.conf.template > /etc/nginx/conf.d/matrix.conf 2>/dev/null && \
+  nginx -t 2>/dev/null && nginx -s reload 2>/dev/null && \
+  echo "Nginx CORS proxy configured." || \
+  echo "NOTE: Nginx not available - skipping CORS proxy setup."
+  echo "       For production, deploy config/nginx-matrix.conf.template to nginx."
 
 # Generate signing key if not exists
 # Synapse `generate` creates homeserver.yaml + log.config + signing key
@@ -142,9 +151,9 @@ echo "Matrix server is running!"
 echo "=========================================="
 echo ""
 echo "Access addresses:"
-echo "  - Synapse API:   http://${MATRIX_SERVER_NAME}:${SYNAPSE_HTTP_PORT}"
+echo "  - Synapse API:   http://${MATRIX_SERVER_NAME}:8008"
 echo "  - Element Web:   http://${MATRIX_SERVER_NAME}:${ELEMENT_PORT}"
-echo "  - Ketesa Admin:  http://${MATRIX_SERVER_NAME}:${KETESA_PORT}"
+echo "  - Ketesa Admin:  http://${MATRIX_SERVER_NAME}:8011"
 echo ""
 echo "Admin user: $ADMIN_USERNAME"
 echo "Registration secret (for Backend config):"

@@ -1,0 +1,73 @@
+# Nginx reverse proxy for Matrix services
+# - Overrides Synapse CORS headers (Synapse hardcodes Access-Control-Allow-Origin: *)
+# - Proxies Ketesa Admin UI on same origin as Synapse API (avoids CORS entirely)
+#
+# Deploy to: /etc/nginx/conf.d/matrix.conf
+# Then: nginx -t && nginx -s reload
+
+# Synapse reverse proxy with proper CORS headers
+# External port 8008 → internal Synapse on 18008
+server {
+    listen 8008;
+    server_name _;
+
+    # Hide Synapse's hardcoded CORS headers and set our own
+    proxy_hide_header Access-Control-Allow-Origin;
+    proxy_hide_header Access-Control-Allow-Headers;
+    proxy_hide_header Access-Control-Expose-Headers;
+
+    # Allow credentials from Ketesa Admin (port 8011) and Element Web (port 8010)
+    add_header Access-Control-Allow-Origin "http://${MATRIX_SERVER_NAME}:8011" always;
+    add_header Access-Control-Allow-Methods "GET, HEAD, POST, PUT, DELETE, OPTIONS" always;
+    add_header Access-Control-Allow-Headers "X-Requested-With, Content-Type, Authorization, Date" always;
+    add_header Access-Control-Allow-Credentials "true" always;
+    add_header Access-Control-Expose-Headers "Synapse-Trace-Id, Server" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:${SYNAPSE_HTTP_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+
+# Ketesa Admin UI + same-origin Synapse API proxy
+# External port 8011 → Ketesa UI on 8012, Synapse API on 18008
+server {
+    listen 8011;
+    server_name _;
+
+    # Ketesa Admin UI
+    location / {
+        proxy_pass http://127.0.0.1:${KETESA_PORT}/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Synapse Client API (same origin, no CORS needed)
+    location /_matrix/ {
+        proxy_pass http://127.0.0.1:${SYNAPSE_HTTP_PORT}/_matrix/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # Synapse Admin API (same origin)
+    location /_synapse/ {
+        proxy_pass http://127.0.0.1:${SYNAPSE_HTTP_PORT}/_synapse/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # Well-known discovery (same origin)
+    location /.well-known/ {
+        proxy_pass http://127.0.0.1:${SYNAPSE_HTTP_PORT}/.well-known/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+}

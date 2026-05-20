@@ -35,8 +35,7 @@ services:
     image: matrixdotorg/synapse:latest
     container_name: matrix-synapse
     ports:
-      - "${SYNAPSE_HTTP_PORT:-8008}:8008"
-      - "${SYNAPSE_HTTPS_PORT:-8448}:8448"
+      - "${SYNAPSE_HTTP_PORT:-18008}:8008"
     volumes:
       - ./config:/data
     networks:
@@ -57,9 +56,9 @@ services:
     image: ghcr.io/etkecc/ketesa:latest
     container_name: matrix-ketesa
     ports:
-      - "${KETESA_PORT:-8011}:8080"
+      - "${KETESA_PORT:-8012}:80"
     volumes:
-      - ./config/ketesa-config.json:/var/public/config.json:ro
+      - ./config/ketesa-config.json:/app/config.json:ro
     networks:
       - matrix-net
     depends_on:

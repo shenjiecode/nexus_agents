@@ -1,44 +1,72 @@
 # Matrix Server
 
-独立的 Matrix 消息服务器，基于 Synapse + Ketesa Admin + Element Web。
+独立的 Matrix 消息服务器，基于 Synapse + Ketesa Admin + Element Web，使用 nginx 反向代理解决 CORS 跨域问题。
+
+
 
 ## 架构概览
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      用户浏览器                          │
-└───────┬─────────────────┬──────────────────┬───────────┘
-        │                 │                  │
-        ▼                 ▼                  ▼
-┌──────────────┐  ┌──────────────┐  ┌──────────────────┐
-│  Element Web │  │ Ketesa Admin │  │   Synapse API    │
-│    :8010     │  │    :8011     │  │     :8008        │
-│  Web 聊天    │  │  管理界面    │  │  Homeserver      │
-└──────┬───────┘  └──────┬───────┘  └────────┬─────────┘
-       │                 │                    │
-       └─────────────────┼────────────────────┘
-                         │  Client API + Admin API
-                         ▼
-                ┌──────────────────┐
-                │     Synapse      │
-                │  (matrix-synapse)│
-                └────────┬─────────┘
-                         │
-                         ▼
-                ┌──────────────────┐
-                │   PostgreSQL     │
-                │     :5432        │
-                └──────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                          用户浏览器                              │
+└───────────────────┬─────────────────┬───────────────────────────┘
+                    │                 │
+        ┌───────────┴─────────────────┴───────────┐
+        │           Nginx 反向代理层               │
+        │  :8008 → Synapse / :8011 → Ketesa       │
+        │  (处理 CORS 头部、请求路由)               │
+        └──────┬──────────────┬────────────────────┘
+               │              │
+               ▼              ▼
+┌──────────────────┐  ┌──────────────────┐
+│     Synapse      │  │     Ketesa       │
+│   :18008 (内部)   │  │   :8012 (内部)    │
+│  Homeserver API  │  │   Admin UI       │
+└────────┬─────────┘  └────────┬─────────┘
+         │                     │
+         └──────────┬──────────┘
+                    │
+                    ▼
+           ┌──────────────────┐
+           │     Element      │
+           │     :8010        │
+           │   Web 聊天客户端  │
+           └──────────────────┘
+                    │
+                    ▼
+           ┌──────────────────┐
+           │   PostgreSQL     │
+           │     :5432        │
+           └──────────────────┘
 ```
+
 
 ### 服务组成
 
-| 服务 | 容器名 | 端口 | 说明 |
-|------|--------|------|------|
-| Synapse | matrix-synapse | 8008 (HTTP) / 8448 (HTTPS) | Matrix Homeserver，处理消息、用户认证、房间管理 |
-| Ketesa | matrix-ketesa | 8011 → 8080 | Synapse 管理 UI，提供用户/房间/媒体的 Web 管理界面 |
-| Element Web | matrix-element-web | 8010 → 80 | Web 聊天客户端，给用户使用 |
-| PostgreSQL | matrix-postgres | 5432 | Synapse 数据库 |
+| 服务 | 容器名 | 外部端口 | 内部端口 | 说明 |
+|------|--------|----------|----------|------|
+| Nginx | (宿主机) | 8008 / 8011 | - | 反向代理层，处理 CORS 和请求路由 |
+| Synapse | matrix-synapse | 8008 (via nginx) | 18008 | Matrix Homeserver，处理消息、用户认证、房间管理 |
+| Synapse | matrix-synapse | 8448 | 8448 | Matrix HTTPS 端口（直接暴露，不经过 nginx） |
+| Ketesa | matrix-ketesa | 8011 (via nginx) | 8012 | Synapse 管理 UI，提供用户/房间/媒体的 Web 管理界面 |
+| Element Web | matrix-element-web | 8010 | 80 | Web 聊天客户端，给用户使用 |
+| PostgreSQL | matrix-postgres | - | 5432 | Synapse 数据库 |
+
+
+### 为什么需要 Nginx 反向代理
+
+Ketesa Admin 使用 `credentials: "include"` 发送跨域请求到 Synapse API，但 Synapse 在源码中硬编码了 `Access-Control-Allow-Origin: *`，浏览器会拒绝带有凭据的请求使用通配符 `*` 的 CORS 响应。
+
+解决方案：在 Synapse 前放置 nginx 反向代理，拦截并替换 CORS 头部：
+
+```
+用户浏览器 → nginx:8008 → Synapse:18008  (带正确 CORS 头部)
+用户浏览器 → nginx:8011 → Ketesa:8012   (UI 访问)
+                 ↳ nginx:8011/_matrix/* → Synapse:18008  (同源代理)
+```
+
+这样 Ketesa 与 Synapse 的通信变成了**同源请求**，完全避免了 CORS 限制。
+
 
 ### 权限模型
 
@@ -88,7 +116,28 @@ nano .env  # 编辑配置
 | `REGISTRATION_SHARED_SECRET` | 注册密钥 | `openssl rand -hex 32` |
 | `ADMIN_PASSWORD` | 管理员密码 | 设置强密码 |
 
-### 2. 启动服务
+### 2. 部署 Nginx 配置
+
+将 nginx 配置文件部署到宿主机（需要 sudo 权限）：
+
+```bash
+sudo mkdir -p /etc/nginx/conf.d
+envsubst < config/nginx-matrix.conf.template > /tmp/matrix.conf
+sudo cp /tmp/matrix.conf /etc/nginx/conf.d/matrix.conf
+sudo nginx -s reload  # 或 systemctl restart nginx
+```
+
+没有 nginx？安装：
+
+```bash
+# Ubuntu/Debian
+sudo apt update && sudo apt install nginx
+
+# CentOS/RHEL
+sudo yum install nginx
+```
+
+### 3. 启动服务
 
 ```bash
 chmod +x start.sh
@@ -97,13 +146,13 @@ chmod +x start.sh
 
 `start.sh` 会自动：
 1. 验证 `.env` 必填变量
-2. 从模板生成 `homeserver.yaml`、`ketesa-config.json`、`element-config.json`
+2. 从模板生成 `homeserver.yaml`、`ketesa-config.json`、`element-config.json`、`nginx-matrix.conf.template`
 3. 首次运行时生成 Synapse 签名密钥
 4. 启动所有容器
 5. 等待 Synapse 健康检查通过
 6. 创建 admin 用户（幂等，已存在则跳过）
 
-### 3. 验证
+### 4. 验证
 
 | 服务 | 地址 | 验证方式 |
 |------|------|----------|
@@ -122,10 +171,10 @@ chmod +x start.sh
 | `POSTGRES_PASSWORD` | 数据库密码（必须） | - |
 | `POSTGRES_DB` | 数据库名 | `synapse` |
 | `POSTGRES_PORT` | PostgreSQL 端口 | `5432` |
-| `SYNAPSE_HTTP_PORT` | Synapse HTTP 端口 | `8008` |
+| `SYNAPSE_HTTP_PORT` | Synapse HTTP 端口（内部） | `18008` |
 | `SYNAPSE_HTTPS_PORT` | Synapse HTTPS 端口 | `8448` |
 | `ELEMENT_PORT` | Element Web 端口 | `8010` |
-| `KETESA_PORT` | Ketesa Admin 端口 | `8011` |
+| `KETESA_PORT` | Ketesa 内部端口（外部仍使用 8011） | `8012` |
 | `REGISTRATION_SHARED_SECRET` | 注册密钥（必须） | - |
 | `ADMIN_USERNAME` | 初始管理员用户名 | `admin` |
 | `ADMIN_PASSWORD` | 初始管理员密码（必须） | - |
@@ -148,8 +197,11 @@ matrix/
 │   ├── ketesa-config.json           # 生成的配置（勿手动编辑）
 │   ├── element-config.json.template # Element 配置模板
 │   ├── element-config.json          # 生成的配置（勿手动编辑）
+│   ├── nginx-matrix.conf.template   # Nginx 配置模板
 │   ├── *.signing.key                # 签名密钥（首次启动自动生成）
 │   └── log.config                   # 日志配置（首次启动自动生成）
+
+
 ├── data/
 │   ├── postgres/                    # PostgreSQL 数据
 │   └── media_store/                 # 媒体文件
@@ -243,6 +295,28 @@ docker compose logs synapse
 ### Element Web 无法启动 (Permission denied on port 80)
 
 Element Web 最新镜像以非 root 运行，无法绑定 80 端口。已在 `docker-compose.yml` 中添加 `user: "0:0"` 解决。
+
+### Ketesa 登录失败 / CORS 错误
+
+现象：浏览器控制台显示 `Access-Control-Allow-Origin` 相关错误，或 Ketesa 无法登录。
+
+原因：Synapse 硬编码返回 `Access-Control-Allow-Origin: *`，与 Ketesa 的 `credentials: include` 请求冲突。
+
+检查：
+
+```bash
+# 1. 确认 nginx 正在运行
+sudo systemctl status nginx
+
+# 2. 检查 nginx 配置已部署
+ls -la /etc/nginx/conf.d/matrix.conf
+cat /etc/nginx/conf.d/matrix.conf | grep -A5 "Access-Control-Allow-Origin"
+
+# 3. 确认容器使用内部端口
+docker compose ps  # Synapse 应映射 :18008，Ketesa 应映射 :8012
+```
+
+解决：确保在 `./start.sh` 之前已经正确部署 nginx 配置（见部署步骤 2）。
 
 ### 重新生成签名密钥
 
