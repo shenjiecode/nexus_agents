@@ -11,12 +11,18 @@ import (
 // Config holds all configuration for the application.
 // All fields are loaded from environment variables with defaults.
 type Config struct {
-	Port           int    `mapstructure:"PORT"`
-	DatabaseURL    string `mapstructure:"DATABASE_URL"`
-	DockerHost     string `mapstructure:"DOCKER_HOST"`
-	LogLevel      string `mapstructure:"LOG_LEVEL"`
-	AdminPassword string `mapstructure:"ADMIN_PASSWORD"`
-	Environment   string `mapstructure:"ENVIRONMENT"`
+	Port        int    `mapstructure:"PORT"`
+	DatabaseURL string `mapstructure:"DATABASE_URL"`
+	DockerHost  string `mapstructure:"DOCKER_HOST"`
+	LogLevel    string `mapstructure:"LOG_LEVEL"`
+	Environment string `mapstructure:"ENVIRONMENT"`
+	// SMTP Configuration
+	SMTPHost     string `mapstructure:"SMTP_HOST"`
+	SMTPPort     int    `mapstructure:"SMTP_PORT"`
+	SMTPUser     string `mapstructure:"SMTP_USER"`
+	SMTPPassword string `mapstructure:"SMTP_PASSWORD"`
+	SMTPFrom     string `mapstructure:"SMTP_FROM"`
+	FrontendURL  string `mapstructure:"FRONTEND_URL"`
 }
 
 // Default values
@@ -36,11 +42,17 @@ func Load() (*Config, error) {
 	viper.BindEnv("DATABASE_URL")
 	viper.BindEnv("DOCKER_HOST")
 	viper.BindEnv("LOG_LEVEL")
-	viper.BindEnv("ADMIN_PASSWORD")
 	viper.BindEnv("ENVIRONMENT")
+	viper.BindEnv("SMTP_HOST")
+	viper.BindEnv("SMTP_PORT")
+	viper.BindEnv("SMTP_USER")
+	viper.BindEnv("SMTP_PASSWORD")
+	viper.BindEnv("SMTP_FROM")
+	viper.BindEnv("FRONTEND_URL")
 	viper.SetDefault("PORT", DefaultPort)
 	viper.SetDefault("LOG_LEVEL", DefaultLogLevel)
 	viper.SetDefault("ENVIRONMENT", DefaultEnvironment)
+	viper.SetDefault("SMTP_PORT", 587)
 
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
@@ -49,9 +61,6 @@ func Load() (*Config, error) {
 
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
-	}
-	if cfg.AdminPassword == "" {
-		return nil, fmt.Errorf("ADMIN_PASSWORD is required")
 	}
 	return &cfg, nil
 }
