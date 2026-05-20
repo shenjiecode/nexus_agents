@@ -32,7 +32,7 @@
 ┌─────────────┐      ┌─────────────────┐      ┌─────────────────┐
 │   Frontend  │      │    Backend      │      │ Matrix Server   │
 │   :13208    │─────▶│    :13207       │◀────▶│    :8008        │
-│ React+Vite  │ API  │ Hono+Drizzle    │      │ Dendrite       │
+│ React+Vite  │ API  │ Gin+GORM       │      │ Synapse        │
 └─────────────┘      └────────┬────────┘      └────────┬────────┘
                               │                        │
                      ┌────────┴────────┐              │
@@ -181,29 +181,30 @@ agent/src/
 | 项目 | 说明 |
 |------|------|
 | 路径 | `matrix/` |
-| 端口 | Dendrite `8008/8448`, Element Web `8080`, PostgreSQL `5432` |
-| 技术栈 | Dendrite + PostgreSQL + Element Web |
+| 端口 | Synapse `8008/8448`, Ketesa Admin `8081`, Element Web `8080`, PostgreSQL `5432` |
+| 技术栈 | Synapse + Ketesa + PostgreSQL + Element Web |
 
 **服务组成**：
 
 | 服务 | 端口 | 说明 |
 |------|------|------|
-| Dendrite | 8008 (HTTP) / 8448 (HTTPS) | Matrix Homeserver |
+| Synapse | 8008 (HTTP) / 8448 (HTTPS) | Matrix Homeserver |
 | PostgreSQL | 5432 | 数据库 |
 | Element Web | 8080 | Web 聊天客户端 |
+| Ketesa Admin | 8081 | Synapse 管理 UI |
 
 **目录结构**：
 ```
 matrix/
 ├── docker-compose.yml     # 容器编排
 ├── config/
-│   ├── dendrite.yaml      # Dendrite 服务器配置
+│   ├── homeserver.yaml   # Synapse 服务器配置
 │   ├── element-config.json # Element Web 客户端配置
+│   ├── ketesa-config.json # Ketesa Admin 配置
 │   └── matrix_key.pem     # 签名密钥（首次启动自动生成）
-└── data/
+    └── data/
     ├── postgres/          # PostgreSQL 数据
-    ├── media/             # 媒体文件
-    └── jetstream/         # Dendrite 消息队列
+    └── media_store/       # 媒体文件
 ```
 
 ---
@@ -333,7 +334,7 @@ docker build -t localhost/nexus-base:latest images/base/
 pnpm install
 
 # 2. 启动 Matrix（独立终端）
-cd matrix && docker-compose up -d && cd ..
+cd matrix && chmod +x start.sh && ./start.sh && cd ..
 
 # 3. 启动 Backend（独立终端）
 cd backend && docker-compose up -d && pnpm db:push && pnpm dev
@@ -385,25 +386,22 @@ MATRIX_REGISTRATION_SECRET=dev-secret-change-in-production
 DATABASE_URL=postgresql://nexus:nexussecret@localhost:5433/nexus
 ```
 
-**Matrix `dendrite.yaml` 关键配置**：
+**Matrix `homeserver.yaml` 关键配置**：
 ```yaml
-global:
-  server_name: localhost
-  disable_federation: true
-
-client_api:
-  registration_disabled: true
-  registration_shared_secret: "dev-secret-change-in-production"
+server_name: localhost
+registration_shared_secret: "dev-secret-change-in-production"
+enable_registration: false
+federation_domain_whitelist: []
 ```
 
 **Matrix 环境变量**：
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `POSTGRES_USER` | dendrite | 数据库用户 |
+| `POSTGRES_USER` | synapse | 数据库用户 |
 | `POSTGRES_PASSWORD` | itsasecret | 数据库密码 |
-| `POSTGRES_DB` | dendrite | 数据库名 |
-| `DENDRITE_HTTP_PORT` | 8008 | Dendrite HTTP 端口 |
+| `POSTGRES_DB` | synapse | 数据库名 |
+| `SYNAPSE_HTTP_PORT` | 8008 | Synapse HTTP 端口 |
 | `ELEMENT_PORT` | 8080 | Element Web 端口 |
 
 ### 6.3 端口汇总
@@ -413,9 +411,10 @@ client_api:
 | Frontend | 13208 | React + Vite |
 | Backend | 13207 | Hono API |
 | Backend PostgreSQL | 5433 | 业务数据库 |
-| Matrix Dendrite | 8008 | Matrix Homeserver |
+| Matrix Synapse | 8008 | Matrix Homeserver |
 | Matrix PostgreSQL | 5432 | Matrix 数据库 |
 | Element Web | 8080 | Matrix 客户端 |
+| Ketesa Admin | 8081 | Synapse 管理 UI |
 | Agent 容器 | 4096 | opencode serve |
 
 ---
@@ -470,8 +469,8 @@ nexus_agents/
 │       └── config.ts      # 配置
 │
 ├── matrix/                # Matrix 消息服务（独立项目）
-│   ├── docker-compose.yml # Dendrite + PostgreSQL + Element Web
-│   ├── config/            # Dendrite 配置
+│   ├── docker-compose.yml # Synapse + PostgreSQL + Element Web + Ketesa
+│   ├── config/            # Synapse 配置
 │   └── README.md
 │
 ├── images/                # Agent 容器镜像
