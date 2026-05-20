@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 )
 
@@ -27,8 +28,16 @@ const (
 
 // Load reads configuration from environment variables.
 func Load() (*Config, error) {
-	viper.SetEnvPrefix("")
+	// Load .env file into process environment (silent fail if missing)
+	_ = godotenv.Load()
+
 	viper.AutomaticEnv()
+	viper.BindEnv("PORT")
+	viper.BindEnv("DATABASE_URL")
+	viper.BindEnv("DOCKER_HOST")
+	viper.BindEnv("LOG_LEVEL")
+	viper.BindEnv("ADMIN_PASSWORD")
+	viper.BindEnv("ENVIRONMENT")
 	viper.SetDefault("PORT", DefaultPort)
 	viper.SetDefault("LOG_LEVEL", DefaultLogLevel)
 	viper.SetDefault("ENVIRONMENT", DefaultEnvironment)
