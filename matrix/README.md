@@ -55,7 +55,7 @@
 
 ### 为什么需要 Nginx 反向代理
 
-Ketesa Admin 使用 `credentials: "include"` 发送跨域请求到 Synapse API，但 Synapse 在源码中硬编码了 `Access-Control-Allow-Origin: *`，浏览器会拒绝带有凭据的请求使用通配符 `*` 的 CORS 响应。
+Synapse 在源码中硬编码了 `Access-Control-Allow-Origin: *`，浏览器会拒绝带有凭据（credentials）的请求使用通配符 `*` 的 CORS 响应。
 
 解决方案：在 Synapse 前放置 nginx 反向代理，拦截并替换 CORS 头部：
 
@@ -65,8 +65,23 @@ Ketesa Admin 使用 `credentials: "include"` 发送跨域请求到 Synapse API�
                  ↳ nginx:8011/_matrix/* → Synapse:18008  (同源代理)
 ```
 
-这样 Ketesa 与 Synapse 的通信变成了**同源请求**，完全避免了 CORS 限制。
+**当前 CORS 配置：完全开放模式**
 
+使用 `map` 指令反射任意来源，支持所有客户端直接访问：
+
+```nginx
+map $http_origin $cors_origin {
+    default $http_origin;  # 反射请求的 Origin
+}
+```
+
+支持的特性：
+- 任意来源（localhost、生产域名、第三方应用）
+- 凭据模式（Access-Control-Allow-Credentials: true）
+- OPTIONS 预检请求处理（返回 204）
+- 所有 Matrix API 端点
+
+Ketesa 与 Synapse 的通信通过同源代理（8011端口）避免 CORS 限制。
 
 ### 权限模型
 
@@ -155,11 +170,27 @@ chmod +x start.sh
 ### 4. 验证
 
 | 服务 | 地址 | 验证方式 |
-|------|------|----------|
-| Synapse API | `http://{SERVER}:8008/health` | 返回 `OK` |
+|------|------|----------||
+ Synapse API | `http://{SERVER}:8008/health` | 返回 `OK` |
 | Element Web | `http://{SERVER}:8010` | 浏览器打开显示登录页 |
 | Ketesa Admin | `http://{SERVER}:8011` | 浏览器打开，用 admin 账户登录 |
 
+**CORS 验证命令**：
+
+```bash
+# 测试 OPTIONS 预检请求（任意来源）
+curl -I -X OPTIONS http://{SERVER}:8008/_matrix/client/versions \\n  -H "Origin: http://localhost:5173"
+
+# 预期返回：
+# HTTP/1.1 204 No Content
+# Access-Control-Allow-Origin: http://localhost:5173
+# Access-Control-Allow-Methods: GET, HEAD, POST, PUT, DELETE, OPTIONS
+# Access-Control-Allow-Credentials: true
+
+# 测试实际 API 调用
+curl http://{SERVER}:8008/_matrix/client/versions | jq '.versions[-1]'
+# 返回: "v1.12"
+```
 ---
 
 ## 环境变量
