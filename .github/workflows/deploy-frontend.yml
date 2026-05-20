@@ -5,7 +5,8 @@ on:
     branches: [deploy]
     paths:
       - 'platform/frontend/**'
-
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch:
 jobs:
   deploy:
     runs-on: ubuntu-latest
