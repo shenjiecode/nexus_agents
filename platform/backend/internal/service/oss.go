@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"strings"
 	"context"
 	"errors"
 	"fmt"
@@ -51,8 +52,14 @@ func NewOSSService(cfg *config.Config) (*OSSService, error) {
 	}
 
 	// Create S3 client with custom endpoint
+	endpoint := cfg.OSSEndpoint
+	// Ensure endpoint has https:// prefix (AWS SDK v2 requires full URL)
+	if !strings.HasPrefix(endpoint, "https://") && !strings.HasPrefix(endpoint, "http://") {
+		endpoint = "https://" + endpoint
+	}
+
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.BaseEndpoint = aws.String(cfg.OSSEndpoint)
+		o.BaseEndpoint = aws.String(endpoint)
 		o.UsePathStyle = false
 	})
 
