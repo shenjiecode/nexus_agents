@@ -4,7 +4,7 @@ on:
   push:
     branches: [deploy]
     paths:
-      - 'platform/backend-go/**'
+      - 'platform/backend/**'
 
 jobs:
   deploy:
@@ -15,11 +15,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
-          cache-dependency-path: platform/backend-go/go.sum
+          cache-dependency-path: platform/backend/go.sum
 
       - name: Build
         run: |
-          cd platform/backend-go
+          cd platform/backend
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o nexus-backend cmd/server/main.go
 
       - name: Upload binary
@@ -28,7 +28,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          source: "platform/backend-go/nexus-backend"
+          source: "platform/backend/nexus-backend"
           target: "/opt/nexus/backend"
           strip_components: 2
 

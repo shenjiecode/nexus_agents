@@ -4,13 +4,12 @@
   "private": true,
   "description": "Nexus Agents - Role Container Management System",
   "scripts": {
-    "dev": "pnpm --filter @nexus/backend dev",
-    "dev:backend": "pnpm --filter @nexus/backend dev",
+    "dev": "pnpm --filter @nexus/frontend dev",
     "dev:frontend": "pnpm --filter @nexus/frontend dev",
-    "dev:all": "pnpm run --parallel '/^dev$/'",
     "build": "pnpm -r build",
-    "build:backend": "pnpm --filter @nexus/backend build",
-    "build:frontend": "pnpm --filter @nexus/frontend build"
+    "build:frontend": "pnpm --filter @nexus/frontend build",
+    "build:backend": "cd platform/backend && go build -o nexus-backend cmd/server/main.go",
+    "dev:backend": "cd platform/backend && go run cmd/server/main.go"
   },
   "engines": {
     "node": ">=20.0.0"

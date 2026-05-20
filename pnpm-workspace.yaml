@@ -1,8 +1,5 @@
 packages:
-  - "platform/backend"
   - "platform/frontend"
-  - "backend"
-  - "frontend"
 allowBuilds:
   cpu-features: false
   esbuild: false

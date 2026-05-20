@@ -43,17 +43,10 @@ npm-debug.log*
 data/mysql/
 
 # Platform binaries
-platform/backend/opc-aicom
+platform/backend/nexus-backend
 platform/backend/server
 platform/backend/bin/
 platform/frontend/dist/
-
-# Data directory
-data/
-
-# Role build artifacts
-platform/backend/roles/
-
 # Matrix sensitive files
 matrix/config/matrix_key.pem
 matrix/.env
@@ -89,4 +82,4 @@ deploy/auth.json
 **/.security.yml
 picoclaw-deploy/base/data/
 picoclaw-deploy/full/data/
-platform/backend-go/server
+data/

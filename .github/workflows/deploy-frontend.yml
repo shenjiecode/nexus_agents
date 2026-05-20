@@ -47,4 +47,4 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           script_stop: true
           script: |
-            docker exec nexus-frontend nginx -s reload
+            nginx -s reload
