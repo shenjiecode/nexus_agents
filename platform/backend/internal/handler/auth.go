@@ -256,13 +256,14 @@ func Register(c *gin.Context) {
 	}
 
 	// Create user
-	user := model.User{
-		Username: req.Username,
-		Email:    strings.ToLower(req.Email),
-		Password: hashedPassword,
-		Name:     req.Nickname,
-		Nickname: req.Nickname,
-	}
+		user := model.User{
+			Username: req.Username,
+			Email:    strings.ToLower(req.Email),
+			Password: hashedPassword,
+			Slug:     req.Username,
+			Name:     req.Nickname,
+			Nickname: req.Nickname,
+		}
 
 	if result := db.Create(&user); result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
