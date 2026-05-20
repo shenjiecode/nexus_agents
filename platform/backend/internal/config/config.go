@@ -11,21 +11,25 @@ import (
 // Config holds all configuration for the application.
 // All fields are loaded from environment variables with defaults.
 type Config struct {
-	Port        int    `mapstructure:"PORT"`
-	DatabaseURL string `mapstructure:"DATABASE_URL"`
-	DockerHost  string `mapstructure:"DOCKER_HOST"`
-	LogLevel    string `mapstructure:"LOG_LEVEL"`
-	Environment string `mapstructure:"ENVIRONMENT"`
-	// SMTP Configuration
-	SMTPHost     string `mapstructure:"SMTP_HOST"`
-	SMTPPort     int    `mapstructure:"SMTP_PORT"`
-	SMTPUser     string `mapstructure:"SMTP_USER"`
-	SMTPPassword string `mapstructure:"SMTP_PASSWORD"`
-	SMTPFrom     string `mapstructure:"SMTP_FROM"`
+Port        int    `mapstructure:"PORT"`
+DatabaseURL string `mapstructure:"DATABASE_URL"`
+DockerHost  string `mapstructure:"DOCKER_HOST"`
+LogLevel    string `mapstructure:"LOG_LEVEL"`
+Environment string `mapstructure:"ENVIRONMENT"`
+// SMTP Configuration
+SMTPHost     string `mapstructure:"SMTP_HOST"`
+SMTPPort     int    `mapstructure:"SMTP_PORT"`
+SMTPUser     string `mapstructure:"SMTP_USER"`
+SMTPPassword string `mapstructure:"SMTP_PASSWORD"`
+SMTPFrom     string `mapstructure:"SMTP_FROM"`
 	FrontendURL  string `mapstructure:"FRONTEND_URL"`
+	// OSS Configuration
+	OSSEndpoint        string `mapstructure:"OSS_ENDPOINT"`
+	OSSBucket          string `mapstructure:"OSS_BUCKET"`
+	OSSAccessKeyID     string `mapstructure:"OSS_ACCESS_KEY_ID"`
+	OSSAccessKeySecret string `mapstructure:"OSS_ACCESS_KEY_SECRET"`
+	OSSRegion          string `mapstructure:"OSS_REGION"`
 }
-
-// Default values
 const (
 	DefaultPort        = 13207
 	DefaultLogLevel    = "info"
@@ -49,6 +53,11 @@ func Load() (*Config, error) {
 	viper.BindEnv("SMTP_PASSWORD")
 	viper.BindEnv("SMTP_FROM")
 	viper.BindEnv("FRONTEND_URL")
+	viper.BindEnv("OSS_ENDPOINT")
+	viper.BindEnv("OSS_BUCKET")
+	viper.BindEnv("OSS_ACCESS_KEY_ID")
+	viper.BindEnv("OSS_ACCESS_KEY_SECRET")
+	viper.BindEnv("OSS_REGION")
 	viper.SetDefault("PORT", DefaultPort)
 	viper.SetDefault("LOG_LEVEL", DefaultLogLevel)
 	viper.SetDefault("ENVIRONMENT", DefaultEnvironment)
