@@ -14,6 +14,7 @@
 - **容器化员工**：每个员工运行在独立 Docker 容器中
 - **Matrix 消息协议**：实时双向通信
 - **Marketplace**：技能包/MCP 服务器市场
+- **角色市场**：用户可上传/下载角色包到京东云OSS
 
 ---
 
@@ -54,6 +55,20 @@
                                     Matrix API
 ```
 
+### OSS 存储架构
+
+角色包使用京东云OSS存储，采用 **Presigned URL** 模式（前端直传，后端仅生成签名URL）：
+
+```
+Frontend ──获取上传URL──▶ Backend ──生成Presigned URL──▶ 返回
+Frontend ──PUT直传──────▶ 京东云OSS ◀────GET直传────── Frontend (下载)
+Frontend ──获取下载URL──▶ Backend ──生成Presigned URL──▶ 返回
+
+OSS路径规则：
+  用户角色: roles/{userId}/{roleId}/package.zip
+  市场角色: marketplace/{roleId}.zip
+```
+
 ### 消息流程
 
 ```
@@ -74,24 +89,25 @@
 
 | 项目 | 说明 |
 |------|------|
-| 路径 | `frontend/` |
+| 路径 | `platform/frontend/` |
 | 端口 | `13208` |
 | 技术栈 | React 18 + TypeScript + Vite + Tailwind CSS + React Router v6 |
 
 **核心功能**：
 - Dashboard：系统统计、快捷操作
 - Organizations：组织管理
-- Roles：角色模板管理
+- Roles：角色模板管理 + 角色市场双Tab（角色市场/我的角色）
 - Employees：员工生命周期管理
-- Marketplace：技能包/MCP 市场
+- Marketplace：技能包/MCP 市场 + 角色下载
+- 上传/下载：京东云OSS Presigned URL交互
 
 **目录结构**：
 ```
-frontend/src/
+platform/frontend/src/
 ├── components/    # CyberCard, CyberButton, CyberModal, StatusDot, Sidebar
 ├── pages/         # Dashboard, Organizations, OrganizationDetail, Roles, Containers
 ├── hooks/         # useApi
-└── types/         # TypeScript 类型定义
+└── types/         # TypeScript 类型定义 (User, Role, MarketplaceRole, Skill, Mcp)
 ```
 
 **设计主题**：赛博朋克风格
@@ -105,36 +121,85 @@ frontend/src/
 
 | 项目 | 说明 |
 |------|------|
-| 路径 | `backend/` |
+| 路径 | `platform/backend/` |
 | 端口 | `13207` |
-| 技术栈 | Hono + Drizzle ORM + PostgreSQL + Pino + Dockerode |
+| 技术栈 | Gin + GORM + PostgreSQL + Zap + AWS SDK v2 (S3兼容) |
 
 **核心功能**：
-- 组织 CRUD + Auth 配置
+- 用户认证（注册/登录/密码重置 + SMTP邮件）
 - 角色模板管理 + 版本控制
-- 员工生命周期（雇佣/启停/删除）
-- AI 对话会话管理
+- 角色市场（京东云OSS存储 + Presigned URL上传/下载）
 - Marketplace（Skills/MCP）
+- 角色调试（WebSocket容器交互）
 
 **目录结构**：
 ```
-backend/src/
-├── api/routes/    # 6 个路由模块
-├── db/            # Drizzle schema + 连接
-├── services/      # 7 个业务服务
-├── integrations/  # OpenCode 集成
-└── lib/           # Pino 日志
+platform/backend/internal/
+├── handler/     # API处理器 (auth, roles, marketplace, debug)
+├── service/     # 业务服务 (OSS, Email)
+├── model/       # GORM模型 (User, Role, PasswordResetToken)
+├── middleware/   # 中间件 (Auth - X-User-Id头)
+├── config/      # 配置加载 (Viper + godotenv)
+└── router/      # 路由定义
 ```
 
 **API 路由**：
 
-| 模块 | 路径前缀 | 说明 |
-|------|---------|------|
-| Organizations | `/api/organizations` | 组织 CRUD + Auth 配置 |
-| Roles | `/api/roles` | 角色模板管理 + 版本 |
-| Employees | `/api/orgs/:slug/employees` | 员工生命周期 |
-| Sessions | `/api/orgs/:slug/employees/:id/sessions` | AI 对话会话 |
-| Marketplace | `/api/skills`, `/api/mcps` | 技能/MCP 市场 |
+| 模块 | 路径前缀 | 认证 | 说明 |
+|------|---------|------|------|
+| Auth | `/api/auth` | 无 | 注册/登录/密码重置 |
+| Roles | `/api/roles` | 部分需认证 | 角色CRUD + 导入导出 |
+| Roles OSS | `/api/roles/:id/upload`, `/api/roles/:id/download` | 需认证 | OSS上传/下载Presigned URL |
+| Debug | `/api/roles/:id/debug` | 需认证 | 容器调试WebSocket |
+| Marketplace Roles | `/api/marketplace/roles` | 无 | 角色市场列表/下载 |
+| Skills | `/api/skills` | 无 | 技能包市场 |
+| MCPs | `/api/mcps` | 无 | MCP服务器市场 |
+
+**详细API列表**：
+
+**Auth（无需认证）**：
+
+| Method | Path | 说明 |
+|--------|------|------|
+| POST | `/api/auth/register` | 用户注册 |
+| POST | `/api/auth/login` | 用户登录 |
+| POST | `/api/auth/forgot-password` | 忘记密码（发送重置邮件） |
+| POST | `/api/auth/reset-password` | 重置密码 |
+
+**Roles（角色管理）**：
+
+| Method | Path | 认证 | 说明 |
+|--------|------|------|------|
+| GET | `/api/roles` | 无 | 列出公开角色 |
+| POST | `/api/roles` | 需认证 | 创建角色 |
+| GET | `/api/roles/mine` | 需认证 | 列出我的角色 |
+| GET | `/api/roles/:id` | 需认证 | 获取角色详情 |
+| PUT | `/api/roles/:id` | 需认证 | 更新角色 |
+| DELETE | `/api/roles/:id` | 需认证 | 删除角色 |
+| POST | `/api/roles/import` | 无 | 导入角色（multipart） |
+| GET | `/api/roles/:id/export` | 无 | 导出角色 |
+| POST | `/api/roles/:id/upload` | 需认证 | 获取OSS上传Presigned URL |
+| GET | `/api/roles/:id/download` | 需认证 | 获取OSS下载Presigned URL |
+
+**Marketplace（市场，无需认证）**：
+
+| Method | Path | 说明 |
+|--------|------|------|
+| GET | `/api/marketplace/roles` | 列出市场角色 |
+| GET | `/api/marketplace/roles/:id/download` | 获取市场角色下载Presigned URL |
+| GET | `/api/skills` | 列出技能包 |
+| GET | `/api/mcps` | 列出MCP服务器 |
+
+**Debug（调试，需认证）**：
+
+| Method | Path | 说明 |
+|--------|------|------|
+| POST | `/api/roles/:id/debug/start` | 启动调试容器 |
+| POST | `/api/roles/:id/debug/stop` | 停止调试容器 |
+| GET | `/api/roles/:id/debug/status` | 获取调试状态 |
+| GET | `/api/roles/:id/debug/ws` | 调试WebSocket |
+
+**认证机制**：使用 `X-User-Id` 请求头传递用户ID，后端Auth中间件解析后注入Gin Context。
 
 ---
 
@@ -193,20 +258,6 @@ agent/src/
 | Element Web | 8080 | Web 聊天客户端 |
 | Ketesa Admin | 8081 | Synapse 管理 UI |
 
-**目录结构**：
-```
-matrix/
-├── docker-compose.yml     # 容器编排
-├── config/
-│   ├── homeserver.yaml   # Synapse 服务器配置
-│   ├── element-config.json # Element Web 客户端配置
-│   ├── ketesa-config.json # Ketesa Admin 配置
-│   └── matrix_key.pem     # 签名密钥（首次启动自动生成）
-    └── data/
-    ├── postgres/          # PostgreSQL 数据
-    └── media_store/       # 媒体文件
-```
-
 ---
 
 ### 3.5 Images（容器镜像）
@@ -233,121 +284,71 @@ matrix/
 
 | 表名 | 说明 |
 |------|------|
+| `users` | 用户表：id, username, email, password, nickname, slug |
+| `roles` | 角色表：id, userId, name, description, variant, status, isPublic |
+| `password_reset_tokens` | 密码重置令牌：userId, token, expiresAt |
 | `organizations` | 组织表：id, name, slug, password, matrix credentials |
 | `employees` | 员工表：id, slug, organizationId, containerId, status, matrix credentials |
-| `skills` | 技能包：id, name, slug, category, storageKey |
-| `mcps` | MCP 服务器：id, name, slug, category, storageKey |
-| `marketplace_roles` | 角色模板：id, name, slug, config(JSON) |
 
 ### 4.2 技术选型对比
 
 | 领域 | 选择 | 原因 |
 |------|------|------|
-| 后端框架 | Hono | 轻量级、类型安全、边缘友好 |
-| ORM | Drizzle | 类型安全、轻量、无运行时开销 |
-| Matrix 客户端 | 原生 fetch | 无 native 依赖、构建简单 |
-| 日志 | Pino | 结构化日志、高性能 |
-| 容器管理 | Dockerode | 纯 JS、Docker/Podman 兼容 |
+| 后端框架 | Gin | 高性能HTTP框架，生态成熟 |
+| ORM | GORM | Go最流行的ORM，功能完整 |
+| 对象存储 | AWS SDK v2 (S3兼容) | 京东云OSS S3兼容，Presigned URL模式 |
+| 认证 | X-User-Id头 | 轻量级认证，前端传递用户ID |
+| 日志 | Zap | 结构化日志、高性能 |
+| 容器管理 | Docker/Podman | 标准容器运行时 |
+
+### 4.3 OSS 存储
+
+- **提供商**：京东云OSS（S3兼容）
+- **SDK**：AWS SDK Go v2 (`github.com/aws/aws-sdk-go-v2`)
+- **模式**：Presigned URL（后端签名，前端直传/直下载）
+- **签名有效期**：1小时
+- **优雅降级**：OSS未配置时服务正常启动，marketplace返回503
+
+**关键文件**：
+- `platform/backend/internal/service/oss.go` - OSS服务（ListObjects, PresignedUpload/DownloadURL, ObjectExists）
+- `platform/backend/internal/handler/marketplace.go` - 市场API（ListMarketplaceRoles, GetMarketplaceRoleDownload）
+- `platform/backend/internal/handler/roles.go` - 角色上传/下载API（UploadRole, DownloadRole）
+- `platform/frontend/src/pages/Roles.tsx` - 双Tab UI（角色市场 + 我的角色）
 
 ---
 
 ## 五、部署方案
 
-### 5.1 Matrix Server（独立部署）
+### 5.1 Backend（本地开发）
 
-```powershell
+```bash
+cd platform/backend
+
+# 1. 配置环境变量
+cp .env.example .env
+# 编辑 .env 填入数据库、OSS等配置
+
+# 2. 启动开发服务器
+go run cmd/server/main.go    # http://localhost:13207
+```
+
+### 5.2 Frontend（本地开发）
+
+```bash
+cd platform/frontend
+pnpm dev                     # http://localhost:13208
+```
+
+### 5.3 Matrix Server（独立部署）
+
+```bash
 cd matrix
-
-# 首次初始化（生成配置）
-.\init.ps1
-
-# 启动服务
 docker-compose up -d
-
-# 验证
-docker-compose ps
 ```
 
 **访问地址**：
 - Element Web: http://localhost:8080
-- Dendrite API: http://localhost:8008
-
----
-
-### 5.2 Backend（本地开发）
-
-```powershell
-cd backend
-
-# 1. 启动 PostgreSQL 依赖
-docker-compose up -d
-
-# 2. 同步数据库表结构
-pnpm db:push
-
-# 3. 启动开发服务器（热重载）
-pnpm dev                 # http://localhost:13207
-```
-
-**生产部署**：
-```powershell
-pnpm build
-node dist/index.js
-```
-
----
-
-### 5.3 Frontend（本地开发）
-
-```powershell
-cd frontend
-pnpm dev                 # http://localhost:13208
-```
-
-**生产构建**：
-```powershell
-pnpm build
-pnpm preview             # 预览生产构建
-```
-
----
-
-### 5.4 Agent 容器（运行时创建）
-
-**不需要手动部署**。Backend 通过 Dockerode 在用户"雇佣员工"时自动创建：
-
-1. 构建角色镜像：`nexus-role-{slug}:{version}`
-2. 创建容器，注入 Matrix 凭据和环境变量
-3. 容器启动：`opencode serve` + `agent.ts`
-
-**手动构建基础镜像**：
-```powershell
-docker build -t localhost/nexus-base:latest images/base/
-```
-
----
-
-### 5.5 完整启动流程
-
-```powershell
-# 1. 安装依赖（项目根目录）
-pnpm install
-
-# 2. 启动 Matrix（独立终端）
-cd matrix && chmod +x start.sh && ./start.sh && cd ..
-
-# 3. 启动 Backend（独立终端）
-cd backend && docker-compose up -d && pnpm db:push && pnpm dev
-
-# 4. 启动 Frontend（独立终端）
-cd frontend && pnpm dev
-```
-
-或使用根目录脚本：
-```powershell
-# 同时启动 Backend + Frontend
-pnpm dev:all
-```
+- Synapse API: http://localhost:8008
 
 ---
 
@@ -360,8 +361,19 @@ pnpm dev:all
 | `PORT` | Backend | 后端端口 | `13207` |
 | `DATABASE_URL` | Backend | PostgreSQL 连接 | `postgresql://nexus:nexussecret@localhost:5433/nexus` |
 | `LOG_LEVEL` | Backend | 日志级别 | `info` |
-| `NODE_ENV` | Backend | 环境 | `development` |
+| `ENVIRONMENT` | Backend | 环境 | `development` |
 | `DOCKER_HOST` | Backend | Docker socket | `/var/run/docker.sock` |
+| `OSS_ENDPOINT` | Backend | 京东云OSS Endpoint | - |
+| `OSS_BUCKET` | Backend | OSS Bucket名称 | - |
+| `OSS_ACCESS_KEY_ID` | Backend | OSS Access Key ID | - |
+| `OSS_ACCESS_KEY_SECRET` | Backend | OSS Access Key Secret | - |
+| `OSS_REGION` | Backend | OSS Region | `cn-east-1` |
+| `SMTP_HOST` | Backend | SMTP服务器地址 | - |
+| `SMTP_PORT` | Backend | SMTP端口 | `587` |
+| `SMTP_USER` | Backend | SMTP用户名 | - |
+| `SMTP_PASSWORD` | Backend | SMTP密码 | - |
+| `SMTP_FROM` | Backend | 邮件发件人 | - |
+| `FRONTEND_URL` | Backend | 前端URL（密码重置链接） | - |
 | `MATRIX_HOMESERVER_URL` | Backend/Agent | Matrix 服务器 | `http://localhost:8008` |
 | `MATRIX_REGISTRATION_SECRET` | Backend | Matrix 注册密钥 | `dev-secret-change-in-production` |
 | `OPENCODE_PROVIDER_NAME` | Backend | AI Provider | `tencent-coding-plan` |
@@ -374,6 +386,24 @@ pnpm dev:all
 
 **Backend `.env`**：
 ```env
+# Database
+DATABASE_URL=postgresql://nexus:nexussecret@localhost:5433/nexus
+
+# OSS (京东云)
+OSS_ENDPOINT=s3.cn-east-1.jdcloud-oss.com
+OSS_BUCKET=agent-resource
+OSS_ACCESS_KEY_ID=your_access_key
+OSS_ACCESS_KEY_SECRET=your_secret_key
+OSS_REGION=cn-east-1
+
+# SMTP
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your_email@example.com
+SMTP_PASSWORD=your_password
+SMTP_FROM=noreply@example.com
+FRONTEND_URL=http://localhost:13208
+
 # OpenCode Provider
 OPENCODE_PROVIDER_NAME=tencent-coding-plan
 OPENCODE_API_KEY=sk-sp-xxxxxxxx
@@ -381,35 +411,14 @@ OPENCODE_API_KEY=sk-sp-xxxxxxxx
 # Matrix
 MATRIX_HOMESERVER_URL=http://localhost:8008
 MATRIX_REGISTRATION_SECRET=dev-secret-change-in-production
-
-# Database
-DATABASE_URL=postgresql://nexus:nexussecret@localhost:5433/nexus
 ```
-
-**Matrix `homeserver.yaml` 关键配置**：
-```yaml
-server_name: localhost
-registration_shared_secret: "dev-secret-change-in-production"
-enable_registration: false
-federation_domain_whitelist: []
-```
-
-**Matrix 环境变量**：
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `POSTGRES_USER` | synapse | 数据库用户 |
-| `POSTGRES_PASSWORD` | itsasecret | 数据库密码 |
-| `POSTGRES_DB` | synapse | 数据库名 |
-| `SYNAPSE_HTTP_PORT` | 8008 | Synapse HTTP 端口 |
-| `ELEMENT_PORT` | 8080 | Element Web 端口 |
 
 ### 6.3 端口汇总
 
 | 服务 | 端口 | 说明 |
 |------|------|------|
 | Frontend | 13208 | React + Vite |
-| Backend | 13207 | Hono API |
+| Backend | 13207 | Gin API |
 | Backend PostgreSQL | 5433 | 业务数据库 |
 | Matrix Synapse | 8008 | Matrix Homeserver |
 | Matrix PostgreSQL | 5432 | Matrix 数据库 |
@@ -421,79 +430,58 @@ federation_domain_whitelist: []
 
 ## 七、项目结构
 
+```
 nexus_agents/
 ├── platform/
-│   ├── frontend/              # React 前端 (@nexus/frontend)
+│   ├── frontend/                    # React 前端
 │   │   ├── src/
-│   │   │   ├── components/    # 通用组件 (CyberCard, CyberButton...)
-│   │   │   ├── pages/         # 页面 (Dashboard, Organizations...)
-│   │   │   ├── hooks/         # useApi
-│   │   │   └── types/         # TS 类型定义
-│   │   └── vite.config.ts     # API 代理 → localhost:13207
+│   │   │   ├── components/          # CyberCard, CyberButton, CyberModal, StatusDot, Sidebar
+│   │   │   ├── pages/               # Dashboard, Organizations, Roles(双Tab), Containers
+│   │   │   ├── hooks/               # useApi
+│   │   │   └── types/               # TypeScript 类型定义
+│   │   └── vite.config.ts           # API 代理 → localhost:13207
 │   │
-│   └── backend/               # Hono API 服务 (@nexus/backend)
-│       ├── src/
-│       │   ├── api/routes/    # 6 个路由模块
-│       │   ├── db/            # Drizzle schema + 连接
-│       │   ├── services/      # 7 个业务服务
-│       │   ├── integrations/  # OpenCode 集成
-│       │   └── lib/           # Pino 日志
-│       ├── docker-compose.yml # 开发用 PostgreSQL
-│       ├── drizzle.config.ts  # Drizzle Kit 配置
-│       └── .env               # 环境变量
-
-nexus_agents/
-├── frontend/              # React 前端 (@nexus/frontend)
-│   ├── src/
-│   │   ├── components/    # 通用组件 (CyberCard, CyberButton...)
-│   │   ├── pages/         # 页面 (Dashboard, Organizations...)
-│   │   ├── hooks/         # useApi
-│   │   └── types/         # TS 类型定义
-│   └── vite.config.ts     # API 代理 → localhost:13207
+│   └── backend/                     # Go API 服务
+│       ├── cmd/server/main.go       # 入口
+│       ├── internal/
+│       │   ├── handler/             # API处理器 (auth, roles, marketplace, debug)
+│       │   ├── service/             # 业务服务 (OSS, Email)
+│       │   ├── model/               # GORM模型
+│       │   ├── middleware/          # 中间件 (Auth)
+│       │   ├── config/              # 配置加载
+│       │   └── router/              # 路由定义
+│       ├── go.mod                   # Go依赖 (Gin, GORM, AWS SDK v2)
+│       └── .env                     # 环境变量
 │
-├── backend/               # Hono API 服务 (@nexus/backend)
-│   ├── src/
-│   │   ├── api/routes/    # 6 个路由模块
-│   │   ├── db/            # Drizzle schema + 连接
-│   │   ├── services/      # 7 个业务服务
-│   │   ├── integrations/  # OpenCode 集成
-│   │   └── lib/           # Pino 日志
-│   ├── docker-compose.yml # 开发用 PostgreSQL
-│   ├── drizzle.config.ts  # Drizzle Kit 配置
-│   └── .env               # 环境变量
-│
-├── agent/                 # 容器内 Agent 程序
+├── agent/                           # 容器内 Agent 程序
 │   └── src/
-│       ├── agent.ts       # Matrix 客户端 (原生 fetch)
-│       ├── serve-client.ts # OpenCode API 客户端
-│       └── config.ts      # 配置
+│       ├── agent.ts                 # Matrix 客户端 (原生 fetch)
+│       ├── serve-client.ts          # OpenCode API 客户端
+│       └── config.ts                # 配置
 │
-├── matrix/                # Matrix 消息服务（独立项目）
-│   ├── docker-compose.yml # Synapse + PostgreSQL + Element Web + Ketesa
-│   ├── config/            # Synapse 配置
-│   └── README.md
+├── matrix/                          # Matrix 消息服务
+│   ├── docker-compose.yml           # Synapse + PostgreSQL + Element Web + Ketesa
+│   └── config/                      # Synapse 配置
 │
-├── images/                # Agent 容器镜像
-│   ├── base/              # 基础镜像 (Ubuntu + Node.js + opencode-ai)
-│   └── role/              # 角色镜像模板
+├── images/                          # Agent 容器镜像
+│   ├── base/                        # 基础镜像 (Ubuntu + Node.js + opencode-ai)
+│   └── role/                        # 角色镜像模板
 │
-├── roles/                 # 角色定义文件
-│   └── researcher/        # 预置研究员角色
+├── roles/                           # 角色定义文件
+│   └── researcher/                  # 预置研究员角色
 │
-├── docs/                  # 文档
-│   └── rules/             # 开发规范
+├── docs/                            # 文档
+│   └── rules/                       # 开发规范
 │
-├── pnpm-workspace.yaml    # monorepo (platform/backend + platform/frontend)
-├── pnpm-workspace.yaml    # monorepo (backend + frontend)
-├── package.json           # 根 package.json
-└── .env.example           # 环境变量模板
+├── AGENTS.md                        # 开发规范入口
+└── README.md                        # 本文件
 ```
 
 ---
 
 ## 八、参见
 
-- [Backend README](backend/README.md) - API 文档、日志规范
+- [Frontend README](platform/frontend/README.md) - 前端架构、组件规范
 - [Agent README](agent/README.md) - 容器架构
-- [Matrix README](matrix/README.md) - Matrix 消息服务（独立项目）
+- [Matrix README](matrix/README.md) - Matrix 消息服务
 - [AGENTS.md](AGENTS.md) - 开发规范
