@@ -813,7 +813,7 @@ export function RoleDebug() {
             <p className="text-cyber-muted mb-6">只有角色所有者可以进行调试</p>
             <CyberButton
               variant="ghost"
-              onClick={() => navigate(`/roles/${id}`)}
+              onClick={() => navigate('/roles')}
               icon={<ArrowLeftIcon className="w-4 h-4" />}
             >
               返回角色详情
@@ -833,7 +833,7 @@ export function RoleDebug() {
             {/* Left: Role Info */}
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate(`/roles/${id}`)}
+                onClick={() => navigate('/roles')}
                 className="p-2 rounded-lg bg-cyber-dark-lighter text-cyber-muted hover:text-cyber-cyan hover:bg-cyber-cyan/10 transition-colors"
               >
                 <ArrowLeftIcon className="w-5 h-5" />

@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import { CyberCard } from '../components/CyberCard';
 import { CyberButton } from '../components/CyberButton';
 import { CyberModal } from '../components/CyberModal';
-import { StatusDot } from '../components/StatusDot';
 import { useApi, apiRequest } from '../hooks/useApi';
 import type { Mcp } from '../types';
 
@@ -140,11 +139,9 @@ export function Mcps() {
   }, [mcps, searchQuery, selectedCategory]);
 
   // Check if user can manage a MCP
-  const canManageMcp = (mcp: Mcp): boolean => {
+  const canManageMcp = (_mcp: Mcp): boolean => {
     if (!user) return false;
-    if (user.role === 'admin') return true;
-    if (user.role === 'org' && mcp.organizationId === user.id) return true;
-    return false;
+    return user.role === 'admin';
   };
 
   // Check if user is logged in as org
@@ -329,19 +326,11 @@ export function Mcps() {
                 <p className="mt-2 text-sm text-cyber-muted line-clamp-2">{mcp.description}</p>
 
                 <div className="mt-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <StatusDot
-                      status={mcp.organizationId ? 'active' : 'running'}
-                      size="sm"
-                      showLabel={false}
-                    />
-                    <span className="text-xs text-cyber-muted">
-                      {mcp.organizationId ? '私有' : '公共'}
+                  {mcp.category && (
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-cyber-cyan/20 text-cyber-cyan">
+                      {mcp.category}
                     </span>
-                  </div>
-                  <span className="text-xs text-cyber-muted font-mono">
-                    {new Date(mcp.createdAt).toLocaleDateString()}
-                  </span>
+                  )}
                 </div>
               </div>
             </CyberCard>
@@ -522,31 +511,10 @@ export function Mcps() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-mono text-cyber-muted uppercase">可见性</label>
-                <div className="mt-1 flex items-center gap-2">
-                  <StatusDot
-                    status={selectedMcp.organizationId ? 'active' : 'running'}
-                    size="sm"
-                  />
-                  <span className="text-cyber-white">
-                    {selectedMcp.organizationId ? '私有' : '公共'}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-mono text-cyber-muted uppercase">创建时间</label>
-                <p className="mt-1 text-cyber-white font-mono text-sm">
-                  {new Date(selectedMcp.createdAt).toLocaleString()}
-                </p>
-              </div>
-            </div>
-
             <div>
-              <label className="text-xs font-mono text-cyber-muted uppercase">Storage Key</label>
+              <label className="text-xs font-mono text-cyber-muted uppercase">ID</label>
               <code className="block mt-1 px-2 py-1 rounded bg-cyber-dark text-cyber-muted font-mono text-xs break-all">
-                {selectedMcp.storageKey}
+                {selectedMcp.id}
               </code>
             </div>
           </div>

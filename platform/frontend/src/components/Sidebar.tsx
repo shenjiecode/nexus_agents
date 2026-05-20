@@ -1,45 +1,21 @@
 import { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 
+
 const navItems = [
-  { path: '/', label: '控制台', icon: LayoutDashboardIcon },
-  { path: '/roles', label: '我的角色', icon: BuildingIcon },
-  { path: '/debug', label: '调试', icon: BugIcon },
+  { path: '/', label: '首页', icon: HomeIcon },
+  { path: '/skills', label: '技能', icon: TagIcon },
+  { path: '/mcps', label: '服务', icon: ServerIcon },
+  { path: '/roles', label: '角色', icon: UserGroupIcon },
 ];
 
-const marketplaceItems = [
-  { path: '/skills', label: 'Skills', icon: TagIcon },
-  { path: '/mcps', label: 'MCPs', icon: ServerIcon },
-  { path: '/marketplace-roles', label: 'Roles', icon: UserGroupIcon },
-];
-
-function LayoutDashboardIcon() {
+function HomeIcon() {
   return (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
     </svg>
   );
 }
-
-function BuildingIcon() {
-  return (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-    </svg>
-  );
-}
-
-
-function BugIcon() {
-  return (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 2a2 2 0 100 4 2 2 0 000-4z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11h-2.5a2.5 2.5 0 00-5 0v4.5a2.5 2.5 0 005 0H19M5 11h2.5a2.5 2.5 0 015 0v4.5a2.5 2.5 0 01-5 0H5" />
-    </svg>
-  );
-}
-
 function TagIcon() {
   return (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -64,13 +40,6 @@ function UserGroupIcon() {
   );
 }
 
-function MarketplaceIcon() {
-  return (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-    </svg>
-  );
-}
 
 export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -142,49 +111,6 @@ export function Sidebar() {
             )}
           </NavLink>
         ))}
-
-        {/* Marketplace Section */}
-        <div className="pt-4 mt-4 border-t border-cyber-cyan/20">
-          {!isCollapsed && (
-            <div className="px-3 py-2 text-xs font-semibold text-cyber-muted uppercase tracking-wider">
-              Marketplace
-            </div>
-          )}
-          {isCollapsed && (
-            <div className="flex justify-center py-2">
-              <MarketplaceIcon />
-            </div>
-          )}
-          <div className="space-y-1">
-            {marketplaceItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={({ isActive }) => `
-                  flex items-center gap-3 px-3 py-2 rounded-lg
-                  transition-all duration-300 group relative
-                  ${isActive
-                    ? 'bg-cyber-cyan/10 text-cyber-cyan border-l-2 border-cyber-cyan shadow-cyber-glow'
-                    : 'text-cyber-muted hover:text-cyber-white hover:bg-cyber-cyan/5'
-                  }
-                  ${isCollapsed ? 'justify-center' : ''}
-                `}
-              >
-                <span className={`transition-colors ${location.pathname === item.path ? 'text-cyber-cyan' : 'group-hover:text-cyber-cyan'}`}>
-                  <item.icon />
-                </span>
-                {!isCollapsed && (
-                  <span className="font-medium text-sm">{item.label}</span>
-                )}
-                {isCollapsed && (
-                  <div className="absolute left-full ml-2 px-2 py-1 bg-cyber-dark-card border border-cyber-cyan/30 rounded text-sm text-cyber-white opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50">
-                    {item.label}
-                  </div>
-                )}
-              </NavLink>
-            ))}
-          </div>
-        </div>
       </nav>
 
       {/* Bottom section */}

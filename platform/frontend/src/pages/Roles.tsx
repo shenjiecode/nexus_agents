@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CyberCard } from '../components/CyberCard';
 import { CyberButton } from '../components/CyberButton';
 import { CyberModal } from '../components/CyberModal';
+import { StatusDot } from '../components/StatusDot';
 import { useApi, apiRequest } from '../hooks/useApi';
-import type { Role, CreateRoleRequest, Skill, Mcp } from '../types';
+import type { Role } from '../types';
 
-function UserIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-    </svg>
-  );
+interface StoredUser {
+  id: string;
+  name: string;
+  slug: string;
+  role: 'admin' | 'org';
+  orgId?: string;
 }
 
 function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -21,18 +23,10 @@ function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-function TagIcon(props: React.SVGProps<SVGSVGElement>) {
+function UserGroupIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-    </svg>
-  );
-}
-
-function EditIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
     </svg>
   );
 }
@@ -45,217 +39,159 @@ function SearchIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+
+function GlobeIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+function OrganizationIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+    </svg>
+  );
+}
+
+
+
+
 export function Roles() {
-  const { data: roles, loading, error, refetch } = useApi<Role[]>('/api/roles');
-  const { data: skills, loading: skillsLoading } = useApi<Skill[]>('/api/skills');
-  const { data: mcps, loading: mcpsLoading } = useApi<Mcp[]>('/api/mcps');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [user, setUser] = useState<StoredUser | null>(null);
+  const [activeTab, setActiveTab] = useState<'public' | 'my'>('public');
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedRole, setExpandedRole] = useState<string | null>(null);
-  const [editingRole, setEditingRole] = useState<Role | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editFormData, setEditFormData] = useState<{ selectedSkills: string[]; selectedMcps: string[] }>({
-    selectedSkills: [],
-    selectedMcps: [],
-  });
-  const [isEditLoading, setIsEditLoading] = useState(false);
-  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
-  const [formData, setFormData] = useState<CreateRoleRequest & { selectedSkills: string[]; selectedMcps: string[] }>({
+  const navigate = useNavigate();
+
+  // Create form state
+  const [formData, setFormData] = useState({
     name: '',
-    slug: '',
     description: '',
-    selectedSkills: [],
-    selectedMcps: [],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const filteredRoles = roles?.filter(role =>
-    role.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    role.slug.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Get user from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('nexus_org');
+    if (stored) {
+      try {
+        setUser(JSON.parse(stored));
+      } catch {
+        setUser(null);
+      }
+    }
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Fetch roles based on context
+  const endpoint = useMemo(() => {
+    return '/api/roles';
+  }, []);
+
+  const { data: roles, loading, error, refetch } = useApi<Role[]>(endpoint);
+  const { data: myRoles } = useApi<Role[]>('/api/roles/mine');
+
+  // Filter roles
+  const filteredRoles = useMemo(() => {
+    if (!roles) return [];
+    return roles.filter(role => {
+      return role.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        role.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+  }, [roles, searchQuery]);
+
+  const isOrg = user?.role === 'org';
+  const isAdmin = user?.role === 'admin';
+  const canCreate = isOrg || isAdmin;
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitError(null);
-
     try {
-      const response = await apiRequest<Role>('/api/roles', {
+      await apiRequest<Role>('/api/roles', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formData.name,
-          slug: formData.slug,
           description: formData.description,
+          variant: 'base',
+          isPublic: 'false',
         }),
       });
-
-      if (!response.success || !response.data) {
-        throw new Error(response.message || '创建 Role 失败');
-      }
-
-      const role = response.data;
-
-      // Associate selected skills
-      if (formData.selectedSkills.length > 0) {
-        for (const skillSlug of formData.selectedSkills) {
-          await apiRequest(`/api/roles/${role.slug}/skills/${skillSlug}`, {
-            method: 'POST',
-          });
-        }
-      }
-
-      // Associate selected MCPs
-      if (formData.selectedMcps.length > 0) {
-        for (const mcpSlug of formData.selectedMcps) {
-          await apiRequest(`/api/roles/${role.slug}/mcps/${mcpSlug}`, {
-            method: 'POST',
-          });
-        }
-      }
-
-      setIsModalOpen(false);
-      setFormData({ name: '', slug: '', description: '', selectedSkills: [], selectedMcps: [] });
+      setIsCreateModalOpen(false);
+      setFormData({ name: '', description: '' });
       refetch();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : '创建 Role 失败');
+      setSubmitError(err instanceof Error ? err.message : '创建失败');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const generateSlug = (name: string) => {
-    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  };
-
-  const handleEditOpen = async (role: Role) => {
-    setEditingRole(role);
-    setIsEditModalOpen(true);
-    setIsEditLoading(true);
-    setEditError(null);
-    setEditFormData({ selectedSkills: [], selectedMcps: [] });
-
-    try {
-      // Fetch current skills and mcps for this role
-      const [skillsResponse, mcpsResponse] = await Promise.all([
-        apiRequest<Skill[]>(`/api/roles/${role.slug}/skills`),
-        apiRequest<Mcp[]>(`/api/roles/${role.slug}/mcps`),
-      ]);
-
-      if (skillsResponse.success && skillsResponse.data) {
-        setEditFormData(prev => ({
-          ...prev,
-          selectedSkills: skillsResponse.data!.map(s => s.slug),
-        }));
-      }
-
-      if (mcpsResponse.success && mcpsResponse.data) {
-        setEditFormData(prev => ({
-          ...prev,
-          selectedMcps: mcpsResponse.data!.map(m => m.slug),
-        }));
-      }
-    } catch (err) {
-      setEditError(err instanceof Error ? err.message : '加载角色配置失败');
-    } finally {
-      setIsEditLoading(false);
-    }
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingRole) return;
-
-    setIsEditSubmitting(true);
-    setEditError(null);
-
-    try {
-      // Get current skills and mcps
-      const [currentSkillsRes, currentMcpsRes] = await Promise.all([
-        apiRequest<Skill[]>(`/api/roles/${editingRole.slug}/skills`),
-        apiRequest<Mcp[]>(`/api/roles/${editingRole.slug}/mcps`),
-      ]);
-
-      const currentSkills = currentSkillsRes.success && currentSkillsRes.data
-        ? currentSkillsRes.data.map(s => s.slug)
-        : [];
-      const currentMcps = currentMcpsRes.success && currentMcpsRes.data
-        ? currentMcpsRes.data.map(m => m.slug)
-        : [];
-
-      // Calculate differences for skills
-      const skillsToAdd = editFormData.selectedSkills.filter(s => !currentSkills.includes(s));
-      const skillsToRemove = currentSkills.filter(s => !editFormData.selectedSkills.includes(s));
-
-      // Calculate differences for mcps
-      const mcpsToAdd = editFormData.selectedMcps.filter(m => !currentMcps.includes(m));
-      const mcpsToRemove = currentMcps.filter(m => !editFormData.selectedMcps.includes(m));
-
-      // Apply changes for skills
-      await Promise.all([
-        ...skillsToAdd.map(skillSlug =>
-          apiRequest(`/api/roles/${editingRole.slug}/skills/${skillSlug}`, { method: 'POST' })
-        ),
-        ...skillsToRemove.map(skillSlug =>
-          apiRequest(`/api/roles/${editingRole.slug}/skills/${skillSlug}`, { method: 'DELETE' })
-        ),
-      ]);
-
-      // Apply changes for mcps
-      await Promise.all([
-        ...mcpsToAdd.map(mcpSlug =>
-          apiRequest(`/api/roles/${editingRole.slug}/mcps/${mcpSlug}`, { method: 'POST' })
-        ),
-        ...mcpsToRemove.map(mcpSlug =>
-          apiRequest(`/api/roles/${editingRole.slug}/mcps/${mcpSlug}`, { method: 'DELETE' })
-        ),
-      ]);
-
-      setIsEditModalOpen(false);
-      setEditingRole(null);
-      setEditFormData({ selectedSkills: [], selectedMcps: [] });
-    } catch (err) {
-      setEditError(err instanceof Error ? err.message : '更新角色配置失败');
-    } finally {
-      setIsEditSubmitting(false);
-    }
-  };
 
   return (
     <div className="page-transition space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="AI 角色">
-            AI 角色
+          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="Roles">
+            Roles
           </h1>
-          <p className="text-cyber-muted mt-1">定义和管理 AI 代理 Role</p>
+          <p className="text-cyber-muted mt-1">浏览和管理 Marketplace Roles</p>
         </div>
-        <CyberButton
-          onClick={() => setIsModalOpen(true)}
-          icon={<PlusIcon className="w-5 h-5" />}
-        >
-          创建角色
-        </CyberButton>
+        {canCreate && (
+          <CyberButton
+            onClick={() => setIsCreateModalOpen(true)}
+            icon={<PlusIcon className="w-5 h-5" />}
+          >
+            创建 Role
+          </CyberButton>
+        )}
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-cyber-muted" />
-        <input
-          type="text"
-          placeholder="搜索 Role..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 rounded-lg bg-cyber-dark-card border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none focus:ring-1 focus:ring-cyber-cyan"
-        />
+      {/* Tabs */}
+      {isOrg && (
+        <div className="flex gap-2">
+          <CyberButton
+            variant={activeTab === 'public' ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('public')}
+            icon={<GlobeIcon className="w-4 h-4" />}
+          >
+            公共 Roles
+          </CyberButton>
+          <CyberButton
+            variant={activeTab === 'my' ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('my')}
+            icon={<OrganizationIcon className="w-4 h-4" />}
+          >
+            我的 Roles
+          </CyberButton>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1 max-w-md">
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-cyber-muted" />
+          <input
+            type="text"
+            placeholder="搜索 Roles..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 rounded-lg bg-cyber-dark-card border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none focus:ring-1 focus:ring-cyber-cyan"
+          />
+        </div>
       </div>
 
       {/* Roles Grid */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => (
+          {[1, 2, 3, 4, 5, 6].map(i => (
             <CyberCard key={i} className="h-48">
               <div className="p-6 skeleton h-full" />
             </CyberCard>
@@ -263,80 +199,109 @@ export function Roles() {
         </div>
       ) : error ? (
         <CyberCard>
-          <div className="p-8 text-center text-cyber-error">
-            加载 Role 失败：{error}
-          </div>
+          <div className="p-8 text-center text-cyber-error">加载失败：{error}</div>
         </CyberCard>
-      ) : filteredRoles?.length === 0 ? (
+      ) : activeTab === 'my' && myRoles ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {myRoles.filter(role =>
+            role.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            role.description?.toLowerCase().includes(searchQuery.toLowerCase())
+          ).map(role => (
+            <CyberCard
+              key={role.id}
+              className="cursor-pointer hover:border-cyber-cyan/50 transition-colors group"
+            >
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="p-3 rounded-lg bg-cyber-cyan/10 text-cyber-cyan group-hover:bg-cyber-cyan/20 transition-colors">
+                    <UserGroupIcon className="w-6 h-6" />
+                  </div>
+                  <CyberButton
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => navigate(`/roles/${role.id}/debug`)}
+                  >
+                    调试
+                  </CyberButton>
+                </div>
+
+                <h3 className="text-lg font-display font-semibold text-cyber-white group-hover:text-cyber-cyan transition-colors mb-1">
+                  {role.name}
+                </h3>
+
+                <p className="mt-2 text-sm text-cyber-muted line-clamp-2">{role.description}</p>
+
+                <div className="mt-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <StatusDot
+                      status={role.status === 'running' ? 'running' : 'stopped'}
+                      size="sm"
+                      showLabel={false}
+                    />
+                    <span className="text-xs text-cyber-muted">
+                      {role.status === 'running' ? '运行中' : '已停止'}
+                    </span>
+                  </div>
+                  <span className="text-xs text-cyber-muted font-mono">
+                    {new Date(role.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            </CyberCard>
+          ))}
+        </div>
+      ) : filteredRoles.length === 0 ? (
         <CyberCard>
           <div className="p-8 text-center text-cyber-muted">
-            未找到 Role
+            {searchQuery ? '没有找到匹配的 Roles' : '暂无 Roles'}
           </div>
         </CyberCard>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredRoles?.map((role) => (
-            <CyberCard key={role.id} className="group" hoverEffect>
+          {filteredRoles.map(role => (
+            <CyberCard
+              key={role.id}
+              className="cursor-pointer hover:border-cyber-cyan/50 transition-colors group"
+            >
               <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 rounded-lg bg-cyber-purple/10 text-cyber-purple group-hover:bg-cyber-purple/20 transition-colors">
-                    <UserIcon className="w-6 h-6" />
+                <div className="flex items-start justify-between mb-3">
+                  <div className="p-3 rounded-lg bg-cyber-cyan/10 text-cyber-cyan group-hover:bg-cyber-cyan/20 transition-colors">
+                    <UserGroupIcon className="w-6 h-6" />
                   </div>
-                  <span className="text-xs font-mono text-cyber-muted">
-                    {role.versions.length} 个版本
-                  </span>
+                  <CyberButton
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => navigate(`/roles/${role.id}/debug`)}
+                  >
+                    调试
+                  </CyberButton>
                 </div>
-
-                <h3 className="text-lg font-display font-semibold text-cyber-white group-hover:text-cyber-cyan transition-colors">
+                <h3 className="text-lg font-display font-semibold text-cyber-white group-hover:text-cyber-cyan transition-colors mb-1">
                   {role.name}
                 </h3>
-                <code className="text-sm text-cyber-muted font-mono">{role.slug}</code>
-
-                {role.description && (
-                  <p className="mt-2 text-cyber-muted text-sm line-clamp-2">{role.description}</p>
-                )}
-
-                {/* Version History */}
-                {role.versions.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-cyber-cyan/10">
-                    <button
-                      onClick={() => setExpandedRole(expandedRole === role.id ? null : role.id)}
-                      className="text-xs text-cyber-cyan hover:text-cyber-white transition-colors flex items-center gap-1"
-                    >
-                      <TagIcon className="w-3 h-3" />
-                      {expandedRole === role.id ? '隐藏版本' : '显示版本'}
-                    </button>
-
-                    {expandedRole === role.id && (
-                      <div className="mt-2 space-y-2">
-                        {role.versions.map((version) => (
-                          <div
-                            key={version.id}
-                            className="flex items-center justify-between p-2 rounded bg-cyber-dark text-sm"
-                          >
-                            <div>
-                              <span className="text-cyber-purple font-mono">v{version.version}</span>
-                              <span className="text-cyber-muted ml-2">{version.imageName}</span>
-                            </div>
-                            <span className="text-xs text-cyber-muted">
-                              {new Date(version.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                <p className="mt-2 text-sm text-cyber-muted line-clamp-2">{role.description}</p>
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-cyber-cyan/10 text-cyber-cyan">
+                    {role.variant}
+                  </span>
+                  <StatusDot
+                    status={role.status === 'running' ? 'running' : 'stopped'}
+                    size="sm"
+                    showLabel={false}
+                  />
+                  <span className="text-xs text-cyber-muted">
+                    {role.status === 'running' ? '运行中' : '已停止'}
+                  </span>
+                </div>
+                <div className="mt-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-cyber-muted">
+                      {role.isPublic === 'true' ? '公共' : '私有'}
+                    </span>
                   </div>
-                )}
-
-                {/* Edit Configuration */}
-                <div className="mt-4 pt-4 border-t border-cyber-cyan/10">
-                  <button
-                    onClick={() => handleEditOpen(role)}
-                    className="text-xs text-cyber-purple hover:text-cyber-white transition-colors flex items-center gap-1"
-                  >
-                    <EditIcon className="w-3 h-3" />
-                    编辑配置
-                  </button>
+                  <span className="text-xs text-cyber-muted font-mono">
+                    {new Date(role.createdAt).toLocaleDateString()}
+                  </span>
                 </div>
               </div>
             </CyberCard>
@@ -346,56 +311,46 @@ export function Roles() {
 
       {/* Create Modal */}
       <CyberModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isCreateModalOpen}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setSubmitError(null);
+          setFormData({ name: '', description: '' });
+        }}
         title="创建 Role"
         footer={
           <>
-            <CyberButton variant="ghost" onClick={() => setIsModalOpen(false)}>
+            <CyberButton variant="ghost" onClick={() => {
+              setIsCreateModalOpen(false);
+              setSubmitError(null);
+              setFormData({ name: '', description: '' });
+            }}>
               取消
             </CyberButton>
             <CyberButton
               type="submit"
-              form="role-form"
-              disabled={isSubmitting || !formData.name || !formData.slug}
+              form="role-create-form"
+              disabled={isSubmitting || !formData.name}
             >
-              {isSubmitting ? '创建中...' : '创建 Role'}
+              {isSubmitting ? '创建中...' : '创建'}
             </CyberButton>
           </>
         }
       >
-        <form id="role-form" onSubmit={handleSubmit} className="space-y-4">
+        <form id="role-create-form" onSubmit={handleCreate} className="space-y-4">
           {submitError && (
             <div className="p-3 rounded-lg bg-cyber-error/10 border border-cyber-error/30 text-cyber-error text-sm">
               {submitError}
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-cyber-muted mb-1">Role 名称</label>
+            <label className="block text-sm font-medium text-cyber-muted mb-1">名称</label>
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => {
-                const name = e.target.value;
-                setFormData(prev => ({
-                  ...prev,
-                  name,
-                  slug: prev.slug || generateSlug(name),
-                }));
-              }}
-              placeholder="例如：Customer Support Agent"
+              onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="Role 名称"
               className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-cyber-muted mb-1">Slug</label>
-            <input
-              type="text"
-              value={formData.slug}
-              onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-              placeholder="例如：customer-support"
-              className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none font-mono"
               required
             />
           </div>
@@ -403,224 +358,15 @@ export function Roles() {
             <label className="block text-sm font-medium text-cyber-muted mb-1">描述</label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="描述此 AI 代理的职责..."
+              onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="描述此 Role 的功能..."
               rows={3}
               className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none resize-none"
             />
           </div>
-
-          {/* Skills Section */}
-          <div>
-            <label className="block text-sm font-medium text-cyber-muted mb-2">选择 Skills</label>
-            {skillsLoading ? (
-              <div className="p-4 skeleton h-32 rounded-lg" />
-            ) : skills && skills.length > 0 ? (
-              <div className="max-h-40 overflow-y-auto space-y-2 p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20">
-                {skills.map((skill) => (
-                  <label key={skill.id} className="flex items-start gap-3 cursor-pointer hover:bg-cyber-dark-card/50 p-2 rounded transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={formData.selectedSkills.includes(skill.slug)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setFormData(prev => ({
-                            ...prev,
-                            selectedSkills: [...prev.selectedSkills, skill.slug]
-                          }));
-                        } else {
-                          setFormData(prev => ({
-                            ...prev,
-                            selectedSkills: prev.selectedSkills.filter(s => s !== skill.slug)
-                          }));
-                        }
-                      }}
-                      className="mt-1 w-4 h-4 rounded border-cyber-cyan/30 bg-cyber-dark text-cyber-cyan focus:ring-cyber-cyan"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-cyber-white">{skill.name}</div>
-                      <div className="text-xs text-cyber-muted truncate">{skill.description}</div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <div className="p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-muted text-sm">
-                暂无可用 Skills
-              </div>
-            )}
-          </div>
-
-          {/* MCPs Section */}
-          <div>
-            <label className="block text-sm font-medium text-cyber-muted mb-2">选择 MCPs</label>
-            {mcpsLoading ? (
-              <div className="p-4 skeleton h-32 rounded-lg" />
-            ) : mcps && mcps.length > 0 ? (
-              <div className="max-h-40 overflow-y-auto space-y-2 p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20">
-                {mcps.map((mcp) => (
-                  <label key={mcp.id} className="flex items-start gap-3 cursor-pointer hover:bg-cyber-dark-card/50 p-2 rounded transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={formData.selectedMcps.includes(mcp.slug)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setFormData(prev => ({
-                            ...prev,
-                            selectedMcps: [...prev.selectedMcps, mcp.slug]
-                          }));
-                        } else {
-                          setFormData(prev => ({
-                            ...prev,
-                            selectedMcps: prev.selectedMcps.filter(m => m !== mcp.slug)
-                          }));
-                        }
-                      }}
-                      className="mt-1 w-4 h-4 rounded border-cyber-cyan/30 bg-cyber-dark text-cyber-cyan focus:ring-cyber-cyan"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-cyber-white">{mcp.name}</div>
-                      <div className="text-xs text-cyber-muted truncate">{mcp.description}</div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            ) : (
-              <div className="p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-muted text-sm">
-                暂无可用 MCPs
-              </div>
-            )}
-          </div>
         </form>
       </CyberModal>
 
-      {/* Edit Modal */}
-      <CyberModal
-        isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setEditingRole(null);
-          setEditError(null);
-        }}
-        title={`编辑角色配置${editingRole ? ` - ${editingRole.name}` : ''}`}
-        footer={
-          <>
-            <CyberButton variant="ghost" onClick={() => {
-              setIsEditModalOpen(false);
-              setEditingRole(null);
-              setEditError(null);
-            }}>
-              取消
-            </CyberButton>
-            <CyberButton
-              type="submit"
-              form="edit-role-form"
-              disabled={isEditSubmitting || isEditLoading}
-            >
-              {isEditSubmitting ? '保存中...' : '保存配置'}
-            </CyberButton>
-          </>
-        }
-      >
-        <form id="edit-role-form" onSubmit={handleEditSubmit} className="space-y-4">
-          {editError && (
-            <div className="p-3 rounded-lg bg-cyber-error/10 border border-cyber-error/30 text-cyber-error text-sm">
-              {editError}
-            </div>
-          )}
-
-          {isEditLoading ? (
-            <div className="space-y-4">
-              <div className="p-4 skeleton h-32 rounded-lg" />
-              <div className="p-4 skeleton h-32 rounded-lg" />
-            </div>
-          ) : (
-            <>
-              {/* Skills Section */}
-              <div>
-                <label className="block text-sm font-medium text-cyber-muted mb-2">选择 Skills</label>
-                {skillsLoading ? (
-                  <div className="p-4 skeleton h-32 rounded-lg" />
-                ) : skills && skills.length > 0 ? (
-                  <div className="max-h-40 overflow-y-auto space-y-2 p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20">
-                    {skills.map((skill) => (
-                      <label key={skill.id} className="flex items-start gap-3 cursor-pointer hover:bg-cyber-dark-card/50 p-2 rounded transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={editFormData.selectedSkills.includes(skill.slug)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setEditFormData(prev => ({
-                                ...prev,
-                                selectedSkills: [...prev.selectedSkills, skill.slug]
-                              }));
-                            } else {
-                              setEditFormData(prev => ({
-                                ...prev,
-                                selectedSkills: prev.selectedSkills.filter(s => s !== skill.slug)
-                              }));
-                            }
-                          }}
-                          className="mt-1 w-4 h-4 rounded border-cyber-cyan/30 bg-cyber-dark text-cyber-cyan focus:ring-cyber-cyan"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-cyber-white">{skill.name}</div>
-                          <div className="text-xs text-cyber-muted truncate">{skill.description}</div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-muted text-sm">
-                    暂无可用 Skills
-                  </div>
-                )}
-              </div>
-
-              {/* MCPs Section */}
-              <div>
-                <label className="block text-sm font-medium text-cyber-muted mb-2">选择 MCPs</label>
-                {mcpsLoading ? (
-                  <div className="p-4 skeleton h-32 rounded-lg" />
-                ) : mcps && mcps.length > 0 ? (
-                  <div className="max-h-40 overflow-y-auto space-y-2 p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20">
-                    {mcps.map((mcp) => (
-                      <label key={mcp.id} className="flex items-start gap-3 cursor-pointer hover:bg-cyber-dark-card/50 p-2 rounded transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={editFormData.selectedMcps.includes(mcp.slug)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setEditFormData(prev => ({
-                                ...prev,
-                                selectedMcps: [...prev.selectedMcps, mcp.slug]
-                              }));
-                            } else {
-                              setEditFormData(prev => ({
-                                ...prev,
-                                selectedMcps: prev.selectedMcps.filter(m => m !== mcp.slug)
-                              }));
-                            }
-                          }}
-                          className="mt-1 w-4 h-4 rounded border-cyber-cyan/30 bg-cyber-dark text-cyber-cyan focus:ring-cyber-cyan"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-cyber-white">{mcp.name}</div>
-                          <div className="text-xs text-cyber-muted truncate">{mcp.description}</div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-muted text-sm">
-                    暂无可用 MCPs
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </form>
-      </CyberModal>
     </div>
   );
 }

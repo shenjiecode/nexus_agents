@@ -1,248 +1,112 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CyberCard } from '../components/CyberCard';
-import { useApi } from '../hooks/useApi';
-import type { Organization, Role, Employee, SystemStats } from '../types';
 
-function StatCard({ title, value, subtitle, icon: Icon, color }: {
-  title: string;
-  value: number;
-  subtitle?: string;
-  icon: React.ElementType;
-  color: 'cyan' | 'purple' | 'success';
-}) {
-  const colorClasses = {
-    cyan: 'from-cyber-cyan/20 to-cyber-cyan/5 border-cyber-cyan/30 text-cyber-cyan',
-    purple: 'from-cyber-purple/20 to-cyber-purple/5 border-cyber-purple/30 text-cyber-purple',
-    success: 'from-cyber-success/20 to-cyber-success/5 border-cyber-success/30 text-cyber-success',
-  };
-
-  return (
-    <CyberCard className="h-full" hoverEffect>
-      <div className="p-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-cyber-muted text-sm font-medium mb-1">{title}</p>
-            <h3 className="text-3xl font-display font-bold text-cyber-white">{value}</h3>
-            {subtitle && <p className="text-cyber-muted text-xs mt-1">{subtitle}</p>}
-          </div>
-          <div className={`p-3 rounded-lg bg-gradient-to-br ${colorClasses[color]}`}>
-            <Icon className="w-6 h-6" />
-          </div>
-        </div>
-      </div>
-    </CyberCard>
-  );
-}
-
-function ActivityItem({ activity }: { activity: { message: string; timestamp: string; type: string } }) {
-  const typeIcons: Record<string, string> = {
-    org_created: '🏢',
-    role_created: '👤',
-    employee_hired: '🚀',
-    employee_removed: '🗑️',
-    employee_status_changed: '🔄',
-  };
-
-  return (
-    <div className="flex items-start gap-3 py-3 border-b border-cyber-cyan/10 last:border-0">
-      <span className="text-lg">{typeIcons[activity.type] || '📋'}</span>
-      <div className="flex-1 min-w-0">
-        <p className="text-cyber-white text-sm truncate">{activity.message}</p>
-        <p className="text-cyber-muted text-xs mt-0.5">{activity.timestamp}</p>
-      </div>
-    </div>
-  );
-}
-
-function QuickActionCard({ title, description, to, icon: Icon }: {
-  title: string;
-  description: string;
-  to: string;
-  icon: React.ElementType;
-}) {
-  return (
-    <Link to={to}>
-      <CyberCard className="h-full group" hoverEffect>
-        <div className="p-5">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 rounded-lg bg-cyber-cyan/10 text-cyber-cyan group-hover:bg-cyber-cyan/20 transition-colors">
-              <Icon className="w-5 h-5" />
-            </div>
-            <h4 className="font-display font-semibold text-cyber-white group-hover:text-cyber-cyan transition-colors">
-              {title}
-            </h4>
-          </div>
-          <p className="text-cyber-muted text-sm">{description}</p>
-        </div>
-      </CyberCard>
-    </Link>
-  );
-}
-
-// Icons
-function BuildingIcon(props: React.SVGProps<SVGSVGElement>) {
+function PuzzleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.258.857 4.755a.75.75 0 01-.666 1.015H4.604c-.518 0-.926-.426-.876-.943.07-.727.242-1.426.502-2.078a.75.75 0 00-.375-1.003A2.25 2.25 0 012.25 6.75c0-1.036.84-1.875 1.875-1.875.48 0 .916.18 1.247.478a.75.75 0 001.05-.042c.5-.545 1.103-.99 1.778-1.297v0a.64.64 0 00.35-.56v0c0-.355-.186-.676-.401-.959" />
     </svg>
   );
 }
 
-function UserIcon(props: React.SVGProps<SVGSVGElement>) {
+function ServerIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21.75 17.25v-.228a4.5 4.5 0 00-.12-1.03l-2.268-9.64a3.375 3.375 0 00-3.285-2.602H7.923a3.375 3.375 0 00-3.285 2.602l-2.268 9.64a4.5 4.5 0 00-.12 1.03v.228m19.5 0a3 3 0 01-3 3H5.25a3 3 0 01-3-3m19.5 0a3 3 0 00-3-3H5.25a3 3 0 00-3 3m16.5 0h.008v.008h-.008v-.008zm-3 0h.008v.008h-.008v-.008z" />
     </svg>
   );
 }
 
-function ContainerIcon(props: React.SVGProps<SVGSVGElement>) {
+function MaskIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
     </svg>
   );
 }
 
-function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-    </svg>
-  );
-}
+const sections = [
+  {
+    title: '技能包',
+    subtitle: 'Skills',
+    description: '浏览和安装 AI Agent 技能包，赋予 Agent 新能力',
+    to: '/skills',
+    icon: PuzzleIcon,
+    color: 'cyber-cyan',
+    glow: 'group-hover:shadow-cyber-cyan/20',
+  },
+  {
+    title: '服务端',
+    subtitle: 'MCPs',
+    description: '发现和部署 MCP 服务器，扩展 Agent 工具链',
+    to: '/mcps',
+    icon: ServerIcon,
+    color: 'cyber-purple',
+    glow: 'group-hover:shadow-cyber-purple/20',
+  },
+  {
+    title: '角色',
+    subtitle: 'Roles',
+    description: '选择预置角色模板，快速部署专业化 AI Agent',
+    to: '/roles',
+    icon: MaskIcon,
+    color: 'cyber-cyan',
+    glow: 'group-hover:shadow-cyber-cyan/20',
+  },
+] as const;
 
 export function Dashboard() {
-  const { data: organizations, loading: orgsLoading } = useApi<Organization[]>('/api/organizations');
-  const { data: roles, loading: rolesLoading } = useApi<Role[]>('/api/roles');
-  const { data: employees, loading: employeesLoading } = useApi<Employee[]>('/api/employees');
-  const [stats, setStats] = useState<SystemStats>({
-    totalOrganizations: 0,
-    totalRoles: 0,
-    runningEmployees: 0,
-    totalEmployees: 0,
-  });
-
-  useEffect(() => {
-    if (organizations && roles && employees) {
-      setStats({
-        totalOrganizations: organizations.length,
-        totalRoles: roles.length,
-        runningEmployees: employees.filter(c => c.status === 'running').length,
-        totalEmployees: employees.length,
-      });
-    }
-  }, [organizations, roles, employees]);
-
-  const loading = orgsLoading || rolesLoading || employeesLoading;
-
-  const activities = [
-    { message: '组织 "TechCorp" 已创建', timestamp: '2 分钟前', type: 'org_created' },
-    { message: '已为 Sales Role 雇佣智能体', timestamp: '15 分钟前', type: 'employee_hired' },
-    { message: '智能体状态已变为运行中', timestamp: '1 小时前', type: 'employee_status_changed' },
-    { message: '新 Role "Customer Support" 已添加', timestamp: '2 小时前', type: 'role_created' },
-  ];
-
   return (
-    <div className="page-transition space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="系统控制台">
-            系统控制台
-          </h1>
-          <p className="text-cyber-muted mt-1">AI 代理基础设施概览</p>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-cyber-muted font-mono">
-          <span className="w-2 h-2 rounded-full bg-cyber-success status-pulse" />
-          系统在线
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
-            <CyberCard key={i} className="h-32">
-              <div className="p-6 skeleton h-full" />
-            </CyberCard>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            title="组织"
-            value={stats.totalOrganizations}
-            icon={BuildingIcon}
-            color="cyan"
-          />
-          <StatCard
-            title="活跃角色"
-            value={stats.totalRoles}
-            icon={UserIcon}
-            color="purple"
-          />
-          <StatCard
-            title="运行智能体"
-            value={stats.runningEmployees}
-            subtitle={`共 ${stats.totalEmployees} 个`}
-            icon={ContainerIcon}
-            color="success"
-          />
-          <StatCard
-            title="系统运行时间"
-            value={99.9}
-            subtitle="过去30天"
-            icon={ContainerIcon}
-            color="cyan"
-          />
-        </div>
-      )}
-
-      {/* Quick Actions & Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Quick Actions */}
-        <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-xl font-display font-semibold text-cyber-white">快捷操作</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <QuickActionCard
-              title="添加组织"
-              description="创建新组织以管理智能体"
-              to="/organizations"
-              icon={PlusIcon}
-            />
-            <QuickActionCard
-              title="创建角色"
-              description="定义新的 AI 代理 Role"
-              to="/roles"
-              icon={UserIcon}
-            />
-            <QuickActionCard
-              title="查看智能体"
-              description="管理运行中的 AI 代理实例"
-              to="/employees"
-              icon={ContainerIcon}
-            />
-            <QuickActionCard
-              title="系统设置"
-              description="配置全局系统偏好设置"
-              to="/"
-              icon={ContainerIcon}
-            />
+    <div className="page-transition flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">
+      <div className="w-full max-w-4xl mx-auto px-4">
+        <div className="text-center mb-16">
+          <div className="inline-block mb-6 px-4 py-1.5 rounded-full border border-cyber-cyan/30 bg-cyber-cyan/5">
+            <span className="text-cyber-cyan text-xs font-mono tracking-wider uppercase">
+              Nexus Agents Platform
+            </span>
           </div>
+
+          <h1 className="text-5xl md:text-7xl font-display font-bold text-cyber-white mb-4 tracking-tight">
+            <span className="glitch" data-text="Nexus Agents">
+              Nexus Agents
+            </span>
+          </h1>
+
+          <p className="text-lg md:text-xl text-cyber-muted font-light max-w-lg mx-auto leading-relaxed">
+            容器即人 — AI Agent 管理平台
+          </p>
+
+          <div className="mt-6 w-24 h-px bg-gradient-to-r from-transparent via-cyber-cyan/50 to-transparent mx-auto" />
         </div>
 
-        {/* Recent Activity */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-display font-semibold text-cyber-white">最近活动</h2>
-          <CyberCard>
-            <div className="p-4">
-              {activities.map((activity, index) => (
-                <ActivityItem key={index} activity={activity} />
-              ))}
-            </div>
-          </CyberCard>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {sections.map((section) => (
+            <Link key={section.to} to={section.to} className="group">
+              <CyberCard className={`h-full ${section.glow}`} hoverEffect>
+                <div className="p-6 flex flex-col items-center text-center">
+                  <div className={`p-3 rounded-xl bg-${section.color}/10 text-${section.color} mb-4 group-hover:bg-${section.color}/20 transition-colors`}>
+                    <section.icon className="w-7 h-7" />
+                  </div>
+
+                  <h3 className="font-display font-semibold text-lg text-cyber-white group-hover:text-cyber-cyan transition-colors mb-1">
+                    {section.title}
+                  </h3>
+
+                  <p className="text-cyber-cyan/70 text-xs font-mono mb-3 tracking-wide">
+                    {section.subtitle}
+                  </p>
+
+                  <p className="text-cyber-muted text-sm leading-relaxed">
+                    {section.description}
+                  </p>
+
+                  <div className="mt-4 text-cyber-cyan/40 group-hover:text-cyber-cyan text-xs font-mono transition-colors">
+                    进入 →
+                  </div>
+                </div>
+              </CyberCard>
+            </Link>
+          ))}
         </div>
       </div>
     </div>

@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import { CyberCard } from '../components/CyberCard';
 import { CyberButton } from '../components/CyberButton';
 import { CyberModal } from '../components/CyberModal';
-import { StatusDot } from '../components/StatusDot';
 import { useApi, apiRequest } from '../hooks/useApi';
 import type { Skill } from '../types';
 
@@ -140,11 +139,9 @@ export function Skills() {
   }, [skills, searchQuery, selectedCategory]);
 
   // Check if user can manage a skill
-  const canManageSkill = (skill: Skill): boolean => {
+  const canManageSkill = (_skill: Skill): boolean => {
     if (!user) return false;
-    if (user.role === 'admin') return true;
-    if (user.role === 'org' && skill.organizationId === user.id) return true;
-    return false;
+    return user.role === 'admin';
   };
 
   // Check if user is logged in as org
@@ -329,19 +326,11 @@ export function Skills() {
                 <p className="mt-2 text-sm text-cyber-muted line-clamp-2">{skill.description}</p>
 
                 <div className="mt-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <StatusDot
-                      status={skill.organizationId ? 'active' : 'running'}
-                      size="sm"
-                      showLabel={false}
-                    />
-                    <span className="text-xs text-cyber-muted">
-                      {skill.organizationId ? '私有' : '公共'}
+                  {skill.category && (
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-cyber-purple/20 text-cyber-purple">
+                      {skill.category}
                     </span>
-                  </div>
-                  <span className="text-xs text-cyber-muted font-mono">
-                    {new Date(skill.createdAt).toLocaleDateString()}
-                  </span>
+                  )}
                 </div>
               </div>
             </CyberCard>
@@ -522,31 +511,10 @@ export function Skills() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-mono text-cyber-muted uppercase">可见性</label>
-                <div className="mt-1 flex items-center gap-2">
-                  <StatusDot
-                    status={selectedSkill.organizationId ? 'active' : 'running'}
-                    size="sm"
-                  />
-                  <span className="text-cyber-white">
-                    {selectedSkill.organizationId ? '私有' : '公共'}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-mono text-cyber-muted uppercase">创建时间</label>
-                <p className="mt-1 text-cyber-white font-mono text-sm">
-                  {new Date(selectedSkill.createdAt).toLocaleString()}
-                </p>
-              </div>
-            </div>
-
             <div>
-              <label className="text-xs font-mono text-cyber-muted uppercase">Storage Key</label>
+              <label className="text-xs font-mono text-cyber-muted uppercase">ID</label>
               <code className="block mt-1 px-2 py-1 rounded bg-cyber-dark text-cyber-muted font-mono text-xs break-all">
-                {selectedSkill.storageKey}
+                {selectedSkill.id}
               </code>
             </div>
           </div>

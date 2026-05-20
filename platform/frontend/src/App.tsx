@@ -2,17 +2,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './pages/Dashboard';
-import { Organizations } from './pages/Organizations';
-import { OrganizationDetail } from './pages/OrganizationDetail';
-import { Roles } from './pages/Roles';
-import { Employees } from './pages/Employees';
 import { Skills } from './pages/Skills';
 import { Mcps } from './pages/Mcps';
-import { AgentDetail } from './pages/AgentDetail';
 import { Login } from './pages/Login';
-import { MarketplaceRoles } from './pages/MarketplaceRoles';
-import { Debug } from './pages/Debug';
-import { RoleDetail } from './pages/RoleDetail';
+import { Roles } from './pages/Roles';
 import { RoleDebug } from './pages/RoleDebug';
 
 // Simple auth guard: check if user is stored in localStorage
@@ -68,17 +61,10 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/logout" element={<LogoutWrapper />} />
         <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
-        <Route path="/organizations" element={<ProtectedRoute><Layout><Organizations /></Layout></ProtectedRoute>} />
-        <Route path="/organizations/:slug" element={<ProtectedRoute><Layout><OrganizationDetail /></Layout></ProtectedRoute>} />
-        <Route path="/roles" element={<ProtectedRoute><Layout><Roles /></Layout></ProtectedRoute>} />
-        <Route path="/roles/:id" element={<ProtectedRoute><Layout><RoleDetail /></Layout></ProtectedRoute>} />
-        <Route path="/roles/:id/debug" element={<ProtectedRoute><Layout><RoleDebug /></Layout></ProtectedRoute>} />
-        <Route path="/employees" element={<ProtectedRoute><Layout><Employees /></Layout></ProtectedRoute>} />
-        <Route path="/employees/:id" element={<ProtectedRoute><Layout><AgentDetail /></Layout></ProtectedRoute>} />
         <Route path="/skills" element={<ProtectedRoute><Layout><Skills /></Layout></ProtectedRoute>} />
         <Route path="/mcps" element={<ProtectedRoute><Layout><Mcps /></Layout></ProtectedRoute>} />
-        <Route path="/debug" element={<ProtectedRoute><Layout><Debug /></Layout></ProtectedRoute>} />
-        <Route path="/marketplace-roles" element={<ProtectedRoute><Layout><MarketplaceRoles /></Layout></ProtectedRoute>} />
+        <Route path="/roles" element={<ProtectedRoute><Layout><Roles /></Layout></ProtectedRoute>} />
+        <Route path="/roles/:id/debug" element={<ProtectedRoute><Layout><RoleDebug /></Layout></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
