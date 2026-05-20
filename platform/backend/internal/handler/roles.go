@@ -614,3 +614,67 @@ func DownloadRole(c *gin.Context) {
 		},
 	})
 }
+
+// ListRoleFiles handles GET /api/roles/:id/files
+func ListRoleFiles(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+	roleID := c.Param("id")
+	files, err := service.GetRoleFiles(user.ID, roleID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": files})
+}
+
+// GetRoleFileContent handles GET /api/roles/:id/files/*path
+func GetRoleFileContent(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+	roleID := c.Param("id")
+	filePath := c.Param("path")
+	if len(filePath) > 0 && filePath[0] == '/' {
+		filePath = filePath[1:]
+	}
+	content, err := service.GetRoleFile(user.ID, roleID, filePath)
+	if err != nil {
+		code := http.StatusInternalServerError
+		c.JSON(code, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"path": filePath, "content": content}})
+}
+
+// SaveRoleFileContent handles PUT /api/roles/:id/files/*path
+func SaveRoleFileContent(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+	roleID := c.Param("id")
+	filePath := c.Param("path")
+	if len(filePath) > 0 && filePath[0] == '/' {
+		filePath = filePath[1:]
+	}
+	var body struct {
+		Content string `json:"content"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid request body"})
+		return
+	}
+	_, size, err := service.SaveRoleFile(user.ID, roleID, filePath, body.Content)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"path": filePath, "size": size}})
+}

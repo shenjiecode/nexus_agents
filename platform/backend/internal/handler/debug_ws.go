@@ -9,6 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
+
+	"github.com/nexus-agents/backend/internal/service"
 )
 
 // wsUpgrader is the WebSocket upgrader for debug connections.
@@ -34,8 +36,11 @@ func DebugWebSocket(c *gin.Context) {
 		return
 	}
 
-	// Get user from header (WebSocket upgrade cannot use body/cookies reliably)
+	// Get user from header or query param (WebSocket upgrade cannot always send custom headers)
 	userID := c.GetHeader("X-User-Id")
+	if userID == "" {
+		userID = c.Query("userId")
+	}
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
@@ -92,7 +97,11 @@ func DebugWebSocket(c *gin.Context) {
 
 	// Connect to container's pico channel
 	containerURL := fmt.Sprintf("ws://localhost:%d/pico/ws", role.ContainerPort)
-	containerConn, err := dialContainer(containerURL)
+
+	// Read pico token from .security.yml for authentication
+	picoToken, _ := service.GetPicoToken(userID, roleID)
+
+	containerConn, err := dialContainer(containerURL, picoToken)
 	if err != nil {
 		getDebugLogger().Error("failed to connect to container WebSocket",
 			zap.String("roleId", roleID),
@@ -163,11 +172,16 @@ func proxyMessages(direction string, src, dst *websocket.Conn, done chan<- struc
 }
 
 // dialContainer connects to the container's WebSocket with timeout.
-func dialContainer(url string) (*websocket.Conn, error) {
+func dialContainer(url, token string) (*websocket.Conn, error) {
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 10 * time.Second,
 	}
-	conn, _, err := dialer.Dial(url, nil)
+	// Prepare headers with Authorization if token is provided
+	headers := http.Header{}
+	if token != "" {
+		headers.Set("Authorization", "Bearer "+token)
+	}
+	conn, _, err := dialer.Dial(url, headers)
 	if err != nil {
 		return nil, fmt.Errorf("dial container WebSocket: %w", err)
 	}

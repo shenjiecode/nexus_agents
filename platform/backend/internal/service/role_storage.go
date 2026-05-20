@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -14,11 +16,12 @@ var (
 
 // RoleFileEntry represents a file entry in a role directory
 type RoleFileEntry struct {
-	Name       string `json:"name"`
-	Path       string `json:"path"`
-	Type       string `json:"type"` // "file" or "directory"
-	Size       int64  `json:"size,omitempty"`
-	ModifiedAt string `json:"modifiedAt,omitempty"`
+	Name       string          `json:"name"`
+	Path       string          `json:"path"`
+	Type       string          `json:"type"` // "file" or "directory"
+	Size       int64           `json:"size,omitempty"`
+	ModifiedAt string          `json:"modifiedAt,omitempty"`
+	Children   []RoleFileEntry `json:"children,omitempty"`
 }
 
 // RoleStorageError represents a role storage error
@@ -46,9 +49,49 @@ var requiredFilenames = []string{"config.json", ".security.yml"}
 // Allowed file extensions for workspace files
 var workspaceAllowedExtensions = []string{".md", ".yml", ".yaml", ".json"}
 
-// GetRoleDir returns the role directory path for the given user and role
+// GetRoleDir returns the absolute role directory path for the given user and role
 func GetRoleDir(userID, roleID string) string {
-	return filepath.Join(DataBasePath, userID, roleID)
+	relPath := filepath.Join(DataBasePath, userID, roleID)
+	absPath, _ := filepath.Abs(relPath)
+	return absPath
+}
+
+// PicoSecurityConfig represents the .security.yml structure
+type PicoSecurityConfig struct {
+	ChannelList struct {
+		Pico struct {
+			Settings struct {
+				Token string `yaml:"token"`
+			} `yaml:"settings"`
+		} `yaml:"pico"`
+	} `yaml:"channel_list"`
+}
+
+// GetPicoToken reads the pico channel token from .security.yml
+func GetPicoToken(userID, roleID string) (string, error) {
+	roleDir := GetRoleDir(userID, roleID)
+	securityPath := filepath.Join(roleDir, ".security.yml")
+
+	content, err := os.ReadFile(securityPath)
+	if err != nil {
+		return "", &RoleStorageError{
+			Message: "failed to read .security.yml: " + err.Error(),
+			Code:    ErrCodeFileNotFound,
+		}
+	}
+
+	var config PicoSecurityConfig
+	if err := parseSecurityYAML(content, &config); err != nil {
+		return "", err
+	}
+
+	return config.ChannelList.Pico.Settings.Token, nil
+}
+
+
+// parseSecurityYAML parses the .security.yml content using yaml.v3
+func parseSecurityYAML(content []byte, config *PicoSecurityConfig) error {
+	return yaml.Unmarshal(content, config)
 }
 
 // RoleDirExists checks if the role directory exists
@@ -78,33 +121,104 @@ func CreateRoleDir(userID, roleID string) (string, error) {
 		return "", err
 	}
 
-	// Write default config.json if not exists
+	// Write default config.json if not exists (picoclaw v3 format)
 	configPath := filepath.Join(rolePath, "config.json")
 	if !fileExists(configPath) {
 		defaultConfig := `{
-  "name": "new-role",
-  "variant": "full",
-  "model": "glm-4",
-  "provider": "tencent-coding-plan"
+  "version": 3,
+  "session": { "dimensions": ["chat"] },
+  "isolation": {},
+  "agents": {
+    "defaults": {
+      "workspace": "/root/.picoclaw/workspace",
+      "restrict_to_workspace": true,
+      "allow_read_outside_workspace": false,
+      "model_name": "tx/glm-5",
+      "max_tokens": 32768,
+      "max_tool_iterations": 50,
+      "summarize_message_threshold": 20,
+      "summarize_token_percent": 75,
+      "steering_mode": "one-at-a-time",
+      "tool_feedback": { "enabled": false, "max_args_length": 300, "separate_messages": false },
+      "split_on_marker": false
+    }
+  },
+  "model_list": [
+    {
+      "model_name": "glm-5-turbo",
+      "provider": "zhipu",
+      "model": "glm-5-turbo",
+      "api_base": "https://open.bigmodel.cn/api/coding/paas/v4"
+    },
+    {
+      "model_name": "deepseek-v4-flash",
+      "provider": "deepseek",
+      "model": "deepseek-v4-flash",
+      "api_base": "https://api.deepseek.com/v1"
+    },
+    {
+      "model_name": "deepseek-v4-pro",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "api_base": "https://api.deepseek.com/v1"
+    },
+    {
+      "model_name": "tx/glm-5",
+      "provider": "openai",
+      "model": "glm-5",
+      "api_base": "https://api.lkeap.cloud.tencent.com/coding/v3"
+    },
+    {
+      "model_name": "tx/kimi-k2.5",
+      "provider": "openai",
+      "model": "kimi-k2.5",
+      "api_base": "https://api.lkeap.cloud.tencent.com/coding/v3"
+    },
+    {
+      "model_name": "tx/minimax-m2.5",
+      "provider": "openai",
+      "model": "minimax-m2.5",
+      "api_base": "https://api.lkeap.cloud.tencent.com/coding/v3"
+    }
+  ],
+  "channel_list": {
+    "pico": {
+      "enabled": true,
+      "type": "pico",
+      "settings": { "ping_interval": 30, "read_timeout": 60, "write_timeout": 10, "max_connections": 100 }
+    }
+  },
+  "gateway": { "host": "0.0.0.0", "port": 18790, "hot_reload": false, "log_level": "warn" },
+  "tools": { "web": { "enabled": true, "duckduckgo": { "enabled": true, "max_results": 5 } } },
+  "heartbeat": { "enabled": true, "interval": 30 }
 }`
 		if err := os.WriteFile(configPath, []byte(defaultConfig), 0644); err != nil {
 			return "", err
 		}
 	}
 
-	// Write default .security.yml if not exists
+	// Write default .security.yml if not exists (picoclaw model API keys format)
 	securityPath := filepath.Join(rolePath, ".security.yml")
 	if !fileExists(securityPath) {
-		defaultSecurity := `permissions:
-  allow_file_read: true
-  allow_file_write: true
-  allow_execute: false
-  network_access: limited
-
-constraints:
-  max_file_size: 1048576
-  allowed_paths:
-    - workspace/
+		defaultSecurity := `model_list:
+  glm-5-turbo:0:
+    api_keys:
+      - CHANGE_ME
+  deepseek-v4-flash:0:
+    api_keys:
+      - CHANGE_ME
+  deepseek-v4-pro:0:
+    api_keys:
+      - CHANGE_ME
+  tx/glm-5:0:
+    api_keys:
+      - CHANGE_ME
+  tx/kimi-k2.5:0:
+    api_keys:
+      - CHANGE_ME
+  tx/minimax-m2.5:0:
+    api_keys:
+      - CHANGE_ME
 `
 		if err := os.WriteFile(securityPath, []byte(defaultSecurity), 0644); err != nil {
 			return "", err
@@ -219,8 +333,13 @@ func GetRoleFiles(userID, roleID string) ([]RoleFileEntry, error) {
 		}, nil
 	}
 
-	// List directory contents
-	entries, err := os.ReadDir(rolePath)
+	return listDirEntries(rolePath, "")
+}
+
+// listDirEntries recursively lists files and directories under basePath,
+// prefixing paths with the given relPrefix for nested entries.
+func listDirEntries(basePath, relPrefix string) ([]RoleFileEntry, error) {
+	entries, err := os.ReadDir(basePath)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +347,7 @@ func GetRoleFiles(userID, roleID string) ([]RoleFileEntry, error) {
 	var files []RoleFileEntry
 
 	for _, entry := range entries {
-		entryPath := filepath.Join(rolePath, entry.Name())
+		entryPath := filepath.Join(basePath, entry.Name())
 		entryInfo, err := os.Stat(entryPath)
 		if err != nil {
 			continue
@@ -239,7 +358,6 @@ func GetRoleFiles(userID, roleID string) ([]RoleFileEntry, error) {
 			continue
 		}
 
-		// Check entry type using Type() method
 		fileType := entry.Type()
 		isDir := fileType&os.ModeDir != 0
 		isRegular := fileType&os.ModeType == 0
@@ -265,16 +383,31 @@ func GetRoleFiles(userID, roleID string) ([]RoleFileEntry, error) {
 			size = entryInfo.Size()
 		}
 
-		files = append(files, RoleFileEntry{
+		relPath := entry.Name()
+		if relPrefix != "" {
+			relPath = relPrefix + "/" + entry.Name()
+		}
+
+
+		fileEntry := RoleFileEntry{
 			Name:       entry.Name(),
-			Path:       entry.Name(),
+			Path:       relPath,
 			Type:       entryType,
 			Size:       size,
 			ModifiedAt: entryInfo.ModTime().Format("2006-01-02T15:04:05Z07:00"),
-		})
+		}
+
+		// Recurse into subdirectories
+		if isDir {
+			children, err := listDirEntries(entryPath, relPath)
+			if err == nil && len(children) > 0 {
+				fileEntry.Children = children
+			}
+		}
+
+		files = append(files, fileEntry)
 	}
 
-	// Sort: directories first, then files, alphabetically
 	sortRoleFiles(files)
 
 	return files, nil

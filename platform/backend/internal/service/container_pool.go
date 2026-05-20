@@ -106,7 +106,7 @@ func (p *ContainerPool) AllocateContainer(ctx context.Context, roleID, roleDir, 
 	}
 
 	sshPort := port + 1000
-	imageName := fmt.Sprintf("sipeed/picoclaw:%s", variant)
+	imageName := fmt.Sprintf("localhost/picoclaw-%s:latest", variant)
 	containerName := fmt.Sprintf("%s-%s-%d", ContainerPrefix, roleID, port)
 
 	p.logger.Info("allocating container",
@@ -127,21 +127,19 @@ func (p *ContainerPool) AllocateContainer(ctx context.Context, roleID, roleDir, 
 	}
 
 	// Build port bindings
+	// Build port bindings - picoclaw gateway listens on 18790
 	portBindings := nat.PortMap{
-		"22/tcp": []nat.PortBinding{
-			{HostIP: "0.0.0.0", HostPort: strconv.Itoa(sshPort)},
-		},
-		"8080/tcp": []nat.PortBinding{
+		"18790/tcp": []nat.PortBinding{
 			{HostIP: "0.0.0.0", HostPort: strconv.Itoa(port)},
 		},
 	}
 
 	// Container config (matches Node.js picoclaw-pool.ts)
+	// Container config
 	containerConfig := &containertypes.Config{
 		Image: imageName,
 		ExposedPorts: nat.PortSet{
-			"22/tcp":   struct{}{},
-			"8080/tcp": struct{}{},
+			"18790/tcp": struct{}{},
 		},
 		Env: []string{
 			fmt.Sprintf("PIKOCLAW_MODE=%s", variant),
@@ -155,13 +153,14 @@ func (p *ContainerPool) AllocateContainer(ctx context.Context, roleID, roleDir, 
 			"nexus.picoclaw.variant":   variant,
 			"nexus.managed":            "true",
 		},
+		User: "root",
 	}
 
 	// Host config (matches Node.js picoclaw-pool.ts)
 	hostConfig := &containertypes.HostConfig{
 		PortBindings: portBindings,
 		Binds: []string{
-			fmt.Sprintf("%s:%s:rw", roleDir, ContainerMountPath),
+			fmt.Sprintf("%s:%s:rw,z", roleDir, ContainerMountPath),
 		},
 		RestartPolicy: containertypes.RestartPolicy{
 			Name: "unless-stopped",

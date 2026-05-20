@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CyberCard } from '../components/CyberCard';
 import { CyberButton } from '../components/CyberButton';
@@ -97,7 +97,33 @@ function LockIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function RefreshIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+  );
+}
+
 // File tree item type
+interface FileTreeItem {
+  name: string;
+  path: string;
+  type: 'file' | 'folder';
+  children?: FileTreeItem[];
+}
+
+// Map backend API response (type: "directory") to frontend type (type: "folder")
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapApiToFileTree(data: any[]): FileTreeItem[] {
+  return data.map((item) => ({
+    name: item.name,
+    path: item.path,
+    type: item.type === 'directory' ? 'folder' as const : 'file' as const,
+    children: item.children ? mapApiToFileTree(item.children) : undefined,
+  }));
+}
+
 interface FileTreeItem {
   name: string;
   path: string;
@@ -199,24 +225,37 @@ function FileTreeNode({
 // ChatPanel component
 interface ChatPanelProps {
   roleId: string;
+  containerStatus: ContainerStatus;
 }
 
-function ChatPanel({ roleId }: ChatPanelProps) {
+function ChatPanel({ roleId, containerStatus }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const [isSending, setIsSending] = useState(false);
-  const [ws, setWs] = useState<WebSocket | null>(null);
-  const messagesEndRef = { current: null as HTMLDivElement | null };
+  const wsRef = useRef<WebSocket | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   // Auto scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Connect WebSocket
-  useEffect(() => {
-    const wsUrl = `ws://localhost:13207/api/roles/${roleId}/debug/ws`;
+  // Connect / reconnect WebSocket
+  const connect = useCallback(() => {
+    // Close existing connection
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    if (containerStatus !== 'running') return;
+
+    const stored = localStorage.getItem('nexus_user');
+    const userId = stored ? JSON.parse(stored).id : '';
+    const wsUrl = `ws://localhost:13207/api/roles/${roleId}/debug/ws?userId=${userId}`;
+
+    setConnectionStatus('connecting');
     const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
@@ -226,22 +265,31 @@ function ChatPanel({ roleId }: ChatPanelProps) {
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        console.log('WebSocket message:', data);
+
         if (data.type === 'message.create') {
           const newMessage: ChatMessage = {
-            id: data.id || `${Date.now()}-${Math.random()}`,
-            content: data.content || data.message || '',
-            sender: data.sender === 'user' ? 'user' : 'agent',
+            id: data.message_id || `${Date.now()}-${Math.random()}`,
+            content: data.payload?.content || data.content || '',
+            sender: 'agent',
             timestamp: data.timestamp || Date.now(),
           };
           setMessages((prev) => [...prev, newMessage]);
+        } else if (data.type === 'typing.start') {
+          setIsSending(true);
+        } else if (data.type === 'typing.stop') {
+          setIsSending(false);
         } else if (data.type === 'message.update') {
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === data.id
-                ? { ...msg, content: data.content || msg.content, status: data.status as ChatMessage['status'] }
+                ? { ...msg, content: data.content || data.payload?.content || msg.content, status: data.status as ChatMessage['status'] }
                 : msg
             )
           );
+        } else if (data.type === 'error') {
+          console.error('Picoclaw error:', data);
+          setIsSending(false);
         }
       } catch (err) {
         console.error('Failed to parse WebSocket message:', err);
@@ -250,21 +298,40 @@ function ChatPanel({ roleId }: ChatPanelProps) {
 
     socket.onclose = () => {
       setConnectionStatus('disconnected');
+      // Auto-reconnect after 3 seconds if container is still running
+      if (containerStatus === 'running') {
+        setTimeout(() => {
+          if (wsRef.current === socket && containerStatus === 'running') {
+            connect();
+          }
+        }, 3000);
+      }
     };
 
     socket.onerror = () => {
       setConnectionStatus('disconnected');
     };
 
-    setWs(socket);
+    wsRef.current = socket;
+  }, [roleId, containerStatus]);
 
+  // Connect when container becomes running (with delay for container warmup)
+  useEffect(() => {
+    if (containerStatus !== 'running') return;
+    const timer = setTimeout(() => {
+      connect();
+    }, 2000);
     return () => {
-      socket.close();
+      clearTimeout(timer);
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
-  }, [roleId]);
+  }, [connect, containerStatus]);
 
   const handleSendMessage = () => {
-    if (!inputText.trim() || !ws || ws.readyState !== WebSocket.OPEN) {
+    if (!inputText.trim() || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       return;
     }
 
@@ -284,11 +351,13 @@ function ChatPanel({ roleId }: ChatPanelProps) {
     setIsSending(true);
 
     try {
-      ws.send(
+      wsRef.current!.send(
         JSON.stringify({
           type: 'message.send',
-          content: message,
           id: messageId,
+          payload: {
+            content: message,
+          },
         })
       );
 
@@ -330,7 +399,7 @@ function ChatPanel({ roleId }: ChatPanelProps) {
       case 'connecting':
         return '连接中...';
       case 'disconnected':
-        return '已断开';
+        return containerStatus === 'running' ? '已断开' : '容器未启动';
     }
   };
 
@@ -343,6 +412,13 @@ function ChatPanel({ roleId }: ChatPanelProps) {
             <h2 className="text-lg font-display font-semibold text-cyber-cyan">调试对话</h2>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={connect}
+              title="重新连接"
+              className="p-1.5 rounded-md text-cyber-muted hover:text-cyber-cyan hover:bg-cyber-cyan/10 transition-colors"
+            >
+              <RefreshIcon className="w-3.5 h-3.5" />
+            </button>
             <div
               className={`w-2.5 h-2.5 rounded-full ${getStatusColor()} ${
                 connectionStatus === 'connecting' ? 'animate-pulse' : ''
@@ -376,7 +452,9 @@ function ChatPanel({ roleId }: ChatPanelProps) {
                   />
                 </svg>
               </div>
-              <p className="text-sm">开始调试对话...</p>
+              <p className="text-sm">
+                {containerStatus === 'running' ? '开始调试对话...' : '启动容器后开始调试'}
+              </p>
             </div>
           ) : (
             messages.map((msg) => (
@@ -411,7 +489,7 @@ function ChatPanel({ roleId }: ChatPanelProps) {
               </div>
             ))
           )}
-          <div ref={(el) => (messagesEndRef.current = el)} />
+          <div ref={(el) => { messagesEndRef.current = el; }} />
         </div>
 
         {/* Input */}
@@ -722,9 +800,10 @@ export function RoleDebug() {
 
     const loadFileList = async () => {
       try {
-        const response = await apiRequest<FileTreeItem[]>(`/api/roles/${id}/files`);
-        if (response.success && response.data) {
-          setFileTree(response.data);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const response = await apiRequest<any>(`/api/roles/${id}/files`);
+        if (response.success && Array.isArray(response.data)) {
+          setFileTree(mapApiToFileTree(response.data));
         }
       } catch (err) {
         console.error('Failed to load file list:', err);
@@ -739,7 +818,7 @@ export function RoleDebug() {
 
     setOperationLoading(true);
     try {
-      const response = await apiRequest(`/api/roles/${id}/start`, {
+      const response = await apiRequest(`/api/roles/${id}/debug/start`, {
         method: 'POST',
       });
 
@@ -758,7 +837,7 @@ export function RoleDebug() {
 
     setOperationLoading(true);
     try {
-      const response = await apiRequest(`/api/roles/${id}/stop`, {
+      const response = await apiRequest(`/api/roles/${id}/debug/stop`, {
         method: 'POST',
       });
 
@@ -888,7 +967,7 @@ export function RoleDebug() {
         </CyberCard>
 
         {/* Right: Chat Panel */}
-        <ChatPanel roleId={id!} />
+        <ChatPanel roleId={id!} containerStatus={containerStatus} />
       </div>
     </div>
   );

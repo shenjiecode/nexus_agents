@@ -141,8 +141,13 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 			roles.GET("/:id/export", handler.ExportRole)    // GET /api/roles/:id/export
 
 			// OSS storage routes (protected - require auth)
-			roles.POST("/:id/upload", handler.UploadRole)     // POST /api/roles/:id/upload - get presigned upload URL
-			roles.GET("/:id/download", handler.DownloadRole) // GET /api/roles/:id/download - get presigned download URL
+			roles.POST("/:id/upload", handler.UploadRole)     // POST /api/roles/:id/upload
+			roles.GET("/:id/download", handler.DownloadRole) // GET /api/roles/:id/download
+
+			// Role file operations (protected - require auth)
+			roles.GET("/:id/files", handler.ListRoleFiles)           // GET /api/roles/:id/files
+			roles.GET("/:id/files/*path", handler.GetRoleFileContent) // GET /api/roles/:id/files/:path
+			roles.PUT("/:id/files/*path", handler.SaveRoleFileContent) // PUT /api/roles/:id/files/:path
 
 			// Debug routes (protected - require auth)
 			debug := roles.Group("/:id/debug")
