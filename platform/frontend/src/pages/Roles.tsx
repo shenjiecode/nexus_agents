@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CyberCard } from '../components/CyberCard';
 import { CyberButton } from '../components/CyberButton';
@@ -56,6 +56,22 @@ function OrganizationIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function UploadIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" />
+    </svg>
+  );
+}
+
+function DownloadIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+  );
+}
+
 
 
 
@@ -73,6 +89,10 @@ export function Roles() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [uploadingRoleId, setUploadingRoleId] = useState<string | null>(null);
+  const [downloadingRoleId, setDownloadingRoleId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
 
   // Get user from localStorage
   useEffect(() => {
@@ -128,6 +148,80 @@ export function Roles() {
       setSubmitError(err instanceof Error ? err.message : '创建失败');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+  // Handle upload button click - triggers file input
+  const handleUploadClick = (roleId: string) => {
+    setSelectedRoleId(roleId);
+    fileInputRef.current?.click();
+  };
+
+  // Handle file selection for upload
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedRoleId) return;
+
+    // Only allow .zip files
+    if (!file.name.endsWith('.zip')) {
+      console.error('Only .zip files are allowed');
+      e.target.value = '';
+      return;
+    }
+
+    setUploadingRoleId(selectedRoleId);
+    try {
+      // Get presigned upload URL
+      const response = await apiRequest<{ uploadUrl: string }>(`/api/roles/${selectedRoleId}/upload`, {
+        method: 'POST',
+      });
+
+      if (response.success && response.data.uploadUrl) {
+        // Upload file directly to OSS using presigned URL
+        const uploadResponse = await fetch(response.data.uploadUrl, {
+          method: 'PUT',
+          body: file,
+          headers: {
+            'Content-Type': 'application/zip',
+          },
+        });
+
+        if (uploadResponse.ok) {
+          console.log('Upload successful');
+        } else {
+          console.error('Upload failed:', uploadResponse.statusText);
+        }
+      } else {
+        console.error('Failed to get upload URL');
+      }
+    } catch (err) {
+      console.error('Upload failed:', err);
+    } finally {
+      setUploadingRoleId(null);
+      setSelectedRoleId(null);
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Handle download for user's own roles
+  const handleDownloadRole = async (role: Role) => {
+    setDownloadingRoleId(role.id);
+    try {
+      const response = await apiRequest<{ downloadUrl: string }>(`/api/roles/${role.id}/download`, {
+        method: 'GET',
+      });
+
+      if (response.success && response.data.downloadUrl) {
+        window.open(response.data.downloadUrl, '_blank');
+      } else {
+        console.error('Failed to get download URL');
+      }
+    } catch (err) {
+      console.error('Download failed:', err);
+    } finally {
+      setDownloadingRoleId(null);
     }
   };
 
@@ -216,13 +310,33 @@ export function Roles() {
                   <div className="p-3 rounded-lg bg-cyber-cyan/10 text-cyber-cyan group-hover:bg-cyber-cyan/20 transition-colors">
                     <UserGroupIcon className="w-6 h-6" />
                   </div>
-                  <CyberButton
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => navigate(`/roles/${role.id}/debug`)}
-                  >
-                    调试
-                  </CyberButton>
+                  <div className="flex items-center gap-2">
+                    <CyberButton
+                      size="sm"
+                      variant="ghost"
+                      disabled={uploadingRoleId === role.id}
+                      onClick={() => handleUploadClick(role.id)}
+                      icon={<UploadIcon className="w-4 h-4" />}
+                    >
+                      {uploadingRoleId === role.id ? '上传中...' : '上传'}
+                    </CyberButton>
+                    <CyberButton
+                      size="sm"
+                      variant="ghost"
+                      disabled={downloadingRoleId === role.id}
+                      onClick={() => handleDownloadRole(role)}
+                      icon={<DownloadIcon className="w-4 h-4" />}
+                    >
+                      {downloadingRoleId === role.id ? '下载中...' : '下载'}
+                    </CyberButton>
+                    <CyberButton
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => navigate(`/roles/${role.id}/debug`)}
+                    >
+                      调试
+                    </CyberButton>
+                  </div>
                 </div>
 
                 <h3 className="text-lg font-display font-semibold text-cyber-white group-hover:text-cyber-cyan transition-colors mb-1">
@@ -366,6 +480,15 @@ export function Roles() {
           </div>
         </form>
       </CyberModal>
+
+      {/* Hidden file input for upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".zip"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
 
     </div>
   );

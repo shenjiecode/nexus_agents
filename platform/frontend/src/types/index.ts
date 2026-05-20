@@ -51,3 +51,16 @@ export interface RoleFile {
   content: string;
   language?: string;
 }
+
+// MarketplaceRole - matches backend marketplace_roles table
+export interface MarketplaceRole {
+  id: string;
+  name: string;
+  description?: string;
+  storageKey: string;
+  size: number;
+  createdAt: string;
+  updatedAt?: string;
+  author?: string;
+}
+
