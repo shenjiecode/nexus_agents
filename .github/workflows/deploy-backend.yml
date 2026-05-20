@@ -1,0 +1,78 @@
+name: Deploy Backend (Go)
+
+on:
+  push:
+    branches: [deploy]
+    paths:
+      - 'platform/backend-go/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: platform/backend-go/go.sum
+
+      - name: Build
+        run: |
+          cd platform/backend-go
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o nexus-backend cmd/server/main.go
+
+      - name: Upload binary
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          source: "platform/backend-go/nexus-backend"
+          target: "/opt/nexus/backend"
+          strip_components: 2
+
+      - name: Deploy and restart
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script_stop: true
+          command_timeout: 60s
+          script: |
+            chmod +x /opt/nexus/backend/nexus-backend
+
+            # Create systemd service if not exists
+            if [ ! -f /etc/systemd/system/nexus-backend.service ]; then
+              cat > /etc/systemd/system/nexus-backend.service << 'SERVICE'
+            [Unit]
+            Description=Nexus Backend (Go)
+            After=network.target docker.service
+            Requires=docker.service
+
+            [Service]
+            Type=simple
+            ExecStart=/opt/nexus/backend/nexus-backend
+            EnvironmentFile=/opt/nexus/backend/.env
+            Restart=always
+            RestartSec=5
+
+            [Install]
+            WantedBy=multi-user.target
+            SERVICE
+              systemctl daemon-reload
+              systemctl enable nexus-backend
+            fi
+
+            # Restart with new binary
+            systemctl restart nexus-backend
+
+            # Wait and verify
+            sleep 3
+            systemctl is-active nexus-backend
+
+      - name: Health check
+        run: |
+          sleep 2
+          curl -sf http://${{ secrets.SERVER_HOST }}:13207/api/skills || (echo 'Health check failed!' && exit 1)
