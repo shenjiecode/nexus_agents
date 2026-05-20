@@ -89,3 +89,4 @@ deploy/auth.json
 **/.security.yml
 picoclaw-deploy/base/data/
 picoclaw-deploy/full/data/
+platform/backend-go/server
