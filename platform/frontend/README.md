@@ -197,3 +197,37 @@ return <OrganizationList data={data} />;
 - API 错误显示 toast 提示
 - Loading 显示 skeleton
 - 空数据显示 placeholder
+
+## 常见问题与最佳实践
+
+### React Router Navigate 组件问题
+
+**问题**：React Router 的 `<Navigate>` 组件在某些浏览器上下文（如 Playwright、某些自动化测试环境）中不能立即触发导航，导致页面空白。
+
+**解决方案**：将 `<Navigate>` 组件替换为 `useNavigate` hook + `useEffect`，确保在组件挂载后立即执行导航。
+
+```tsx
+// ❌ 有问题的写法
+function ProtectedRoute({ children }) {
+  const user = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+// ✅ 正确写法
+function ProtectedRoute({ children }) {
+  const user = useAuth();
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    if (!user) {
+      navigate('/login', { replace: true });
+    }
+  }, [user, navigate]);
+  
+  if (!user) return null;
+  return <>{children}</>;
+}
+```
+
+**原理**：`useEffect` 确保导航在组件渲染周期中正确执行，避免了 `<Navigate>` 在某些上下文中的渲染时机问题。
