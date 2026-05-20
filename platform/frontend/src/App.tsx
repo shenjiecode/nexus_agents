@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './pages/Dashboard';
@@ -46,13 +46,27 @@ function Layout({ children }: { children: React.ReactNode }) {
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const user = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    if (!user) {
+      navigate('/login', { replace: true });
+    }
+  }, [user, navigate]);
+  
+  if (!user) return null;
   return <>{children}</>;
 }
 
 function LogoutWrapper() {
   localStorage.removeItem('nexus_user');
-  return <Navigate to="/login" replace />;
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    navigate('/login', { replace: true });
+  }, [navigate]);
+  
+  return null;
 }
 
 function App() {
