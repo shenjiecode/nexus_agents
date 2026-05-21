@@ -106,7 +106,7 @@ func (p *ContainerPool) AllocateContainer(ctx context.Context, roleID, roleDir, 
 	}
 
 	sshPort := port + 1000
-	imageName := fmt.Sprintf("localhost/picoclaw-%s:latest", variant)
+	imageName := "sipeed/picoclaw:latest"
 	containerName := fmt.Sprintf("%s-%s-%d", ContainerPrefix, roleID, port)
 
 	p.logger.Info("allocating container",
