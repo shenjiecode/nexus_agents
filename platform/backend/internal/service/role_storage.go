@@ -145,39 +145,9 @@ func CreateRoleDir(userID, roleID string) (string, error) {
   },
   "model_list": [
     {
-      "model_name": "glm-5-turbo",
-      "provider": "zhipu",
-      "model": "glm-5-turbo",
-      "api_base": "https://open.bigmodel.cn/api/coding/paas/v4"
-    },
-    {
-      "model_name": "deepseek-v4-flash",
-      "provider": "deepseek",
-      "model": "deepseek-v4-flash",
-      "api_base": "https://api.deepseek.com/v1"
-    },
-    {
-      "model_name": "deepseek-v4-pro",
-      "provider": "deepseek",
-      "model": "deepseek-v4-pro",
-      "api_base": "https://api.deepseek.com/v1"
-    },
-    {
       "model_name": "tx/glm-5",
       "provider": "openai",
       "model": "glm-5",
-      "api_base": "https://api.lkeap.cloud.tencent.com/coding/v3"
-    },
-    {
-      "model_name": "tx/kimi-k2.5",
-      "provider": "openai",
-      "model": "kimi-k2.5",
-      "api_base": "https://api.lkeap.cloud.tencent.com/coding/v3"
-    },
-    {
-      "model_name": "tx/minimax-m2.5",
-      "provider": "openai",
-      "model": "minimax-m2.5",
       "api_base": "https://api.lkeap.cloud.tencent.com/coding/v3"
     }
   ],
@@ -201,22 +171,7 @@ func CreateRoleDir(userID, roleID string) (string, error) {
 	securityPath := filepath.Join(rolePath, ".security.yml")
 	if !fileExists(securityPath) {
 		defaultSecurity := `model_list:
-  glm-5-turbo:0:
-    api_keys:
-      - CHANGE_ME
-  deepseek-v4-flash:0:
-    api_keys:
-      - CHANGE_ME
-  deepseek-v4-pro:0:
-    api_keys:
-      - CHANGE_ME
   tx/glm-5:0:
-    api_keys:
-      - CHANGE_ME
-  tx/kimi-k2.5:0:
-    api_keys:
-      - CHANGE_ME
-  tx/minimax-m2.5:0:
     api_keys:
       - CHANGE_ME
 `
