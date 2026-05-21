@@ -48,6 +48,8 @@ services:
       OSS_BUCKET: agent-resource
       OSS_ACCESS_KEY_ID: JDC_921912A9F93626C555461C545917
       OSS_ACCESS_KEY_SECRET: 2E86CE84E4C36884E3E563AE2AE8924A
+      FRONTEND_URL: http://8.217.143.228:13208
+      CORS_ORIGINS: http://8.217.143.228:13208
     volumes:
       - ./data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock

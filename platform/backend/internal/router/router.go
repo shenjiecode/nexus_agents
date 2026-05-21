@@ -2,8 +2,8 @@ package router
 
 import (
 	"fmt"
+	"strings"
 	"time"
-
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
@@ -74,6 +74,20 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 		log.Info("OSS service initialized")
 	}
 
+	// Build CORS allowed origins from config
+	corsConfig := DefaultCORSConfig()
+	if cfg.FrontendURL != "" {
+		corsConfig.AllowOrigins = append(corsConfig.AllowOrigins, cfg.FrontendURL)
+	}
+	if cfg.CORSOrigins != "" {
+		for _, origin := range strings.Split(cfg.CORSOrigins, ",") {
+			o := strings.TrimSpace(origin)
+			if o != "" {
+				corsConfig.AllowOrigins = append(corsConfig.AllowOrigins, o)
+			}
+		}
+	}
+
 	// Create engine
 	engine := gin.New()
 
@@ -99,7 +113,7 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 	engine.Use(gin.Recovery())
 
 	// CORS middleware
-	engine.Use(corsMiddleware(DefaultCORSConfig()))
+	engine.Use(corsMiddleware(corsConfig))
 
 	// Auth middleware (extracts user from headers)
 	engine.Use(middleware.Auth())

@@ -23,6 +23,7 @@ SMTPUser     string `mapstructure:"SMTP_USER"`
 SMTPPassword string `mapstructure:"SMTP_PASSWORD"`
 SMTPFrom     string `mapstructure:"SMTP_FROM"`
 	FrontendURL  string `mapstructure:"FRONTEND_URL"`
+	CORSOrigins  string `mapstructure:"CORS_ORIGINS"`
 	// OSS Configuration
 	OSSEndpoint        string `mapstructure:"OSS_ENDPOINT"`
 	OSSBucket          string `mapstructure:"OSS_BUCKET"`
@@ -53,6 +54,7 @@ func Load() (*Config, error) {
 	viper.BindEnv("SMTP_PASSWORD")
 	viper.BindEnv("SMTP_FROM")
 	viper.BindEnv("FRONTEND_URL")
+	viper.BindEnv("CORS_ORIGINS")
 	viper.BindEnv("OSS_ENDPOINT")
 	viper.BindEnv("OSS_BUCKET")
 	viper.BindEnv("OSS_ACCESS_KEY_ID")
