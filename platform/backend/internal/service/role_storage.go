@@ -1,10 +1,14 @@
 package service
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -170,11 +174,17 @@ func CreateRoleDir(userID, roleID string) (string, error) {
 	// Write default .security.yml if not exists (picoclaw model API keys format)
 	securityPath := filepath.Join(rolePath, ".security.yml")
 	if !fileExists(securityPath) {
-		defaultSecurity := `model_list:
-  tx/glm-5:0:
-    api_keys:
-      - CHANGE_ME
-`
+		// Generate random pico token
+		picoToken := generateRandomToken()
+		defaultSecurity := fmt.Sprintf(`channel_list:
+	  pico:
+	    settings:
+	      token: %s
+	model_list:
+	  tx/glm-5:0:
+	    api_keys:
+	      - CHANGE_ME
+`, picoToken)
 		if err := os.WriteFile(securityPath, []byte(defaultSecurity), 0644); err != nil {
 			return "", err
 		}
@@ -565,6 +575,17 @@ func sortRoleFiles(files []RoleFileEntry) {
 // GetFileInfo returns fs.FileInfo for a role file
 func GetFileInfo(path string) (fs.FileInfo, error) {
 	return os.Stat(path)
+}
+
+
+// generateRandomToken generates a random 32-character token for pico channel
+func generateRandomToken() string {
+	bytes := make([]byte, 16)
+	if _, err := rand.Read(bytes); err != nil {
+		// Fallback to timestamp-based token if random fails
+		return hex.EncodeToString([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
+	}
+	return hex.EncodeToString(bytes)
 }
 
 // DeleteRoleDir deletes the role directory and all its contents

@@ -790,7 +790,9 @@ export function RoleDebug() {
   // Sync container status from role
   useEffect(() => {
     if (role) {
-      setContainerStatus(role.status as ContainerStatus);
+      // Map backend status: 'debugging' means container should be running
+      const mapped: ContainerStatus = role.status === 'debugging' ? 'running' : (role.status as ContainerStatus);
+      setContainerStatus(mapped);
     }
   }, [role]);
 

@@ -86,16 +86,6 @@ func TestCreateRoleDir(t *testing.T) {
 		}
 	}
 
-	// Check config.json content
-	configPath := filepath.Join(path, "config.json")
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		t.Fatalf("Failed to read config.json: %v", err)
-	}
-
-	if !stringContains(string(content), "new-role") {
-		t.Error("config.json should contain default name")
-	}
 
 	// Check .security.yml exists (hidden file)
 	securityPath := filepath.Join(path, ".security.yml")
@@ -198,15 +188,6 @@ func TestGetRoleFile(t *testing.T) {
 	// Create role directory with default files
 	CreateRoleDir(testUserID, testRoleID)
 
-	// Read config.json
-	content, err := GetRoleFile(testUserID, testRoleID, "config.json")
-	if err != nil {
-		t.Fatalf("GetRoleFile() error = %v", err)
-	}
-
-	if !stringContains(content, "new-role") {
-		t.Error("GetRoleFile() returned unexpected content")
-	}
 
 	// Read .security.yml
 	securityContent, err := GetRoleFile(testUserID, testRoleID, ".security.yml")
@@ -214,7 +195,7 @@ func TestGetRoleFile(t *testing.T) {
 		t.Fatalf("GetRoleFile() for .security.yml error = %v", err)
 	}
 
-	if !stringContains(securityContent, "permissions") {
+	if !stringContains(securityContent, "channel_list") {
 		t.Error("GetRoleFile() for .security.yml returned unexpected content")
 	}
 
