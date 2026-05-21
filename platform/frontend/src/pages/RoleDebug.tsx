@@ -253,7 +253,7 @@ function ChatPanel({ roleId, containerStatus }: ChatPanelProps) {
 
     const stored = localStorage.getItem('nexus_user');
     const userId = stored ? JSON.parse(stored).id : '';
-    const wsUrl = `ws://localhost:13207/api/roles/${roleId}/debug/ws?userId=${userId}`;
+    const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/roles/${roleId}/debug/ws?userId=${userId}`;
 
     setConnectionStatus('connecting');
     const socket = new WebSocket(wsUrl);
