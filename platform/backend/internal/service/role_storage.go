@@ -177,13 +177,13 @@ func CreateRoleDir(userID, roleID string) (string, error) {
 		// Generate random pico token
 		picoToken := generateRandomToken()
 		defaultSecurity := fmt.Sprintf(`channel_list:
-	  pico:
-	    settings:
-	      token: %s
-	model_list:
-	  tx/glm-5:0:
-	    api_keys:
-	      - CHANGE_ME
+  pico:
+    settings:
+      token: %s
+model_list:
+  tx/glm-5:0:
+    api_keys:
+      - CHANGE_ME
 `, picoToken)
 		if err := os.WriteFile(securityPath, []byte(defaultSecurity), 0644); err != nil {
 			return "", err
