@@ -34,7 +34,7 @@ func InitDB(cfg *config.Config) (*gorm.DB, error) {
 	}
 
 	// Run AutoMigrate
-	if err := db.AutoMigrate(&User{}, &Role{}, &PasswordResetToken{}); err != nil {
+		if err := db.AutoMigrate(&User{}, &Role{}, &PasswordResetToken{}, &Container{}); err != nil {
 		return nil, fmt.Errorf("failed to run auto migrate: %w", err)
 	}
 
