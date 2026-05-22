@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { CyberCard } from '../components/CyberCard';
 import { CyberButton } from '../components/CyberButton';
 import { StatusDot } from '../components/StatusDot';
+import { ConfigPanel } from '../components/ConfigPanel';
 import { useApi, apiRequest } from '../hooks/useApi';
 import type { Role, RoleFile } from '../types';
 
@@ -766,6 +767,7 @@ export function RoleDebug() {
   // Container state
   const [containerStatus, setContainerStatus] = useState<ContainerStatus>('stopped');
   const [operationLoading, setOperationLoading] = useState(false);
+  const [leftPanelView, setLeftPanelView] = useState<'files' | 'config'>('files');
 
   // File tree
   const [fileTree, setFileTree] = useState<FileTreeItem[]>([]);
@@ -963,9 +965,28 @@ export function RoleDebug() {
 
       {/* Main Content: File Editor (left) + Chat Panel (right) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Left: File Editor */}
+        {/* Left: File Editor or Config Panel */}
         <CyberCard cornerAccent className="h-[600px]">
-          <FileEditor roleId={id!} fileTree={fileTree} isOwner={isOwner} />
+          {/* Toggle buttons */}
+          <div className="flex gap-2 px-4 py-2 border-b border-cyber-cyan/20">
+            <CyberButton
+              variant={leftPanelView === 'files' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setLeftPanelView('files')}
+            >
+              文件树
+            </CyberButton>
+            <CyberButton
+              variant={leftPanelView === 'config' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setLeftPanelView('config')}
+            >
+              配置
+            </CyberButton>
+          </div>
+          {/* Content */}
+          {leftPanelView === 'files' && <FileEditor roleId={id!} fileTree={fileTree} isOwner={isOwner} />}
+          {leftPanelView === 'config' && <ConfigPanel roleId={id!} isOwner={isOwner} />}
         </CyberCard>
 
         {/* Right: Chat Panel */}

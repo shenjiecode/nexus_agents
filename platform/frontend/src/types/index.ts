@@ -64,3 +64,56 @@ export interface MarketplaceRole {
   author?: string;
 }
 
+// Picoclaw config.json types
+export interface PicoclawConfig {
+  version: number;
+  agents: {
+    defaults: PicoclawAgentDefaults;
+  };
+  model_list: PicoclawModelConfig[];
+  channel_list: Record<string, PicoclawChannelConfig>;
+  gateway?: PicoclawGatewayConfig;
+  tools?: Record<string, unknown>;
+  heartbeat?: Record<string, unknown>;
+  hooks?: Record<string, unknown>;
+  session?: Record<string, unknown>;
+  isolation?: Record<string, unknown>;
+}
+
+export interface PicoclawAgentDefaults {
+  model_name: string;
+  max_tokens: number;
+  temperature?: number;
+  max_tool_iterations?: number;
+  workspace?: string;
+  restrict_to_workspace?: boolean;
+  summarize_message_threshold?: number;
+  summarize_token_percent?: number;
+  steering_mode?: string;
+}
+
+export interface PicoclawModelConfig {
+  model_name: string;
+  provider: string;
+  model: string;
+  api_base?: string;
+  api_keys?: string[];
+}
+
+export interface PicoclawChannelConfig {
+  enabled: boolean;
+  type: string;
+  settings?: Record<string, unknown>;
+}
+
+export interface PicoclawGatewayConfig {
+  host: string;
+  port: number;
+}
+
+// Picoclaw .security.yml types
+export interface PicoclawSecurity {
+  channel_list?: Record<string, { settings?: { token?: string; [key: string]: unknown } }>;
+  model_list?: Record<string, { api_keys?: string[] }>;
+}
+
