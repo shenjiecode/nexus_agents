@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 	containertypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
@@ -161,13 +160,13 @@ func (p *ContainerPool) AllocateContainer(ctx context.Context, roleID, roleDir, 
 	// Host config (matches Node.js picoclaw-pool.ts)
 	hostConfig := &containertypes.HostConfig{
 		PortBindings: portBindings,
+		Binds: []string{
+			fmt.Sprintf("%s:%s:rw", roleDir, ContainerMountPath),
+		},
 		RestartPolicy: containertypes.RestartPolicy{
 			Name: "unless-stopped",
 		},
 		AutoRemove: false,
-	}
-	if roleDir != "" {
-		hostConfig.Binds = []string{fmt.Sprintf("%s:%s:rw", roleDir, ContainerMountPath)}
 	}
 
 	// Create container
@@ -379,218 +378,4 @@ func (p *ContainerPool) CleanupAll(ctx context.Context) {
 		_ = p.StopContainer(ctx, id)
 		_ = p.RemoveContainer(ctx, id)
 	}
-}
-
-// StartContainer starts an existing stopped container by its ID.
-func (p *ContainerPool) StartContainer(ctx context.Context, containerID string) error {
-	p.mu.Lock()
-	info, exists := p.containers[containerID]
-	if exists {
-		info.Status = StatusStarting
-	}
-	p.mu.Unlock()
-
-	if err := p.client.ContainerStart(ctx, containerID, containertypes.StartOptions{}); err != nil {
-		if exists {
-			p.mu.Lock()
-			info.Status = StatusError
-			p.mu.Unlock()
-		}
-		p.logger.Error("failed to start container",
-			zap.String("containerID", containerID),
-			zap.Error(err),
-		)
-		return fmt.Errorf("failed to start container: %w", err)
-	}
-
-	if exists {
-		p.mu.Lock()
-		info.Status = StatusRunning
-		p.mu.Unlock()
-	} else {
-		// Register new container in pool
-		inspect, err := p.client.ContainerInspect(ctx, containerID)
-		if err == nil {
-			newInfo := &ContainerInfo{
-				ContainerID: containerID,
-				Name:        inspect.Name,
-				Image:       inspect.Config.Image,
-				Status:      StatusRunning,
-			}
-			p.mu.Lock()
-			p.containers[containerID] = newInfo
-			p.mu.Unlock()
-		}
-	}
-
-	p.logger.Info("container started", zap.String("containerID", containerID))
-	return nil
-}
-
-// ListManagedContainers lists all containers with the nexus.managed=true label.
-func (p *ContainerPool) ListManagedContainers(ctx context.Context) ([]*ContainerInfo, error) {
-	f := filters.NewArgs()
-	f.Add("label", "nexus.managed=true")
-
-	containers, err := p.client.ContainerList(ctx, containertypes.ListOptions{
-		All:     true,
-		Filters: f,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list containers: %w", err)
-	}
-
-	result := make([]*ContainerInfo, 0, len(containers))
-	for _, c := range containers {
-		info := &ContainerInfo{
-			ContainerID: c.ID,
-			Name:        c.Names[0],
-			Image:       c.Image,
-			Status:      StatusStopped,
-		}
-		if c.State == "running" {
-			info.Status = StatusRunning
-		}
-		// Extract port info if available
-		for _, port := range c.Ports {
-			if port.PublicPort != 0 {
-				if port.PrivatePort == 8080 {
-					info.Port = int(port.PublicPort)
-					info.URL = fmt.Sprintf("http://localhost:%d", port.PublicPort)
-				}
-				if port.PrivatePort == 22 {
-					info.SSHPort = int(port.PublicPort)
-				}
-			}
-		}
-		result = append(result, info)
-	}
-
-	return result, nil
-}
-
-// AllocateUserContainer creates and starts a container with user-specific labels.
-// containerName is the name for the container.
-// roleDir is the host path to mount into the container.
-// variant selects the image variant (base, full, heavy).
-func (p *ContainerPool) AllocateUserContainer(ctx context.Context, userID, containerName, roleDir, variant string) (*ContainerInfo, error) {
-	// Check container limit
-	p.mu.RLock()
-	running := p.countRunning()
-	p.mu.RUnlock()
-
-	if running >= MaxContainers {
-		return nil, fmt.Errorf("maximum number of containers (%d) reached", MaxContainers)
-	}
-
-	// Find available port
-	port, err := p.FindAvailablePort(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find available port: %w", err)
-	}
-
-	sshPort := port + 1000
-	imageName := fmt.Sprintf("sipeed/picoclaw:%s", variant)
-
-	p.logger.Info("allocating user container",
-		zap.String("userID", userID),
-		zap.String("containerName", containerName),
-		zap.String("variant", variant),
-		zap.Int("port", port),
-		zap.String("image", imageName),
-	)
-
-	info := &ContainerInfo{
-		Name:    containerName,
-		Image:   imageName,
-		RoleID:  userID,
-		Port:    port,
-		SSHPort: sshPort,
-		URL:     fmt.Sprintf("http://localhost:%d", port),
-		Status:  StatusStarting,
-	}
-
-	// Build port bindings
-	portBindings := nat.PortMap{
-		"22/tcp": []nat.PortBinding{
-			{HostIP: "0.0.0.0", HostPort: strconv.Itoa(sshPort)},
-		},
-		"8080/tcp": []nat.PortBinding{
-			{HostIP: "0.0.0.0", HostPort: strconv.Itoa(port)},
-		},
-	}
-
-	// Container config with user-specific labels
-	containerConfig := &containertypes.Config{
-		Image: imageName,
-		ExposedPorts: nat.PortSet{
-			"22/tcp":   struct{}{},
-			"8080/tcp": struct{}{},
-		},
-		Env: []string{
-			fmt.Sprintf("PIKOCLAW_MODE=%s", variant),
-			fmt.Sprintf("WORKSPACE_ID=%s", userID),
-			fmt.Sprintf("USER_ID=%s", userID),
-		},
-		Labels: map[string]string{
-			"nexus.picoclaw":        "true",
-			"nexus.managed":         "true",
-			"nexus.container-type":  "user",
-			"nexus.picoclaw.user":   userID,
-			"nexus.picoclaw.variant": variant,
-		},
-	}
-
-	// Host config
-	hostConfig := &containertypes.HostConfig{
-		PortBindings: portBindings,
-		RestartPolicy: containertypes.RestartPolicy{
-			Name: "unless-stopped",
-		},
-		AutoRemove: false,
-	}
-	if roleDir != "" {
-		hostConfig.Binds = []string{fmt.Sprintf("%s:%s:rw", roleDir, ContainerMountPath)}
-	}
-
-	// Create container
-	resp, err := p.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, containerName)
-	if err != nil {
-		info.Status = StatusError
-		p.logger.Error("failed to create user container",
-			zap.String("userID", userID),
-			zap.String("containerName", containerName),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("failed to create container: %w", err)
-	}
-
-	info.ContainerID = resp.ID
-
-	// Start container
-	if err := p.client.ContainerStart(ctx, resp.ID, containertypes.StartOptions{}); err != nil {
-		info.Status = StatusError
-		// Attempt cleanup
-		_ = p.client.ContainerRemove(ctx, resp.ID, containertypes.RemoveOptions{Force: true})
-		p.logger.Error("failed to start user container",
-			zap.String("containerID", resp.ID),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("failed to start container: %w", err)
-	}
-
-	info.Status = StatusRunning
-
-	// Register in pool
-	p.mu.Lock()
-	p.containers[resp.ID] = info
-	p.mu.Unlock()
-
-	p.logger.Info("user container allocated",
-		zap.String("containerID", resp.ID),
-		zap.String("userID", userID),
-		zap.Int("port", port),
-	)
-
-	return info, nil
 }

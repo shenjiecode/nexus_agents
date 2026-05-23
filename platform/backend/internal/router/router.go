@@ -180,6 +180,15 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 		// Marketplace roles routes (public - no auth required)
 		api.GET("/marketplace/roles", handler.ListMarketplaceRoles)                      // GET /api/marketplace/roles
 		api.GET("/marketplace/roles/:id/download", handler.GetMarketplaceRoleDownload) // GET /api/marketplace/roles/:id/download
+		// Container routes (protected - require auth)
+		containers := api.Group("/containers")
+		{
+			containers.GET("", handler.ListContainers)            // GET /api/containers
+			containers.POST("", handler.CreateContainer)         // POST /api/containers
+			containers.POST("/:id/start", handler.StartContainer)  // POST /api/containers/:id/start
+			containers.POST("/:id/stop", handler.StopContainer)    // POST /api/containers/:id/stop
+			containers.DELETE("/:id", handler.DeleteContainer)    // DELETE /api/containers/:id
+	}
 	}
 
 	// 404 handler

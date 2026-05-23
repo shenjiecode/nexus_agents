@@ -7,6 +7,7 @@ const navItems = [
   { path: '/skills', label: '技能', icon: TagIcon },
   { path: '/mcps', label: '服务', icon: ServerIcon },
   { path: '/roles', label: '角色', icon: UserGroupIcon },
+  { path: '/containers', label: '容器', icon: ContainerIcon },
 ];
 
 function HomeIcon() {
@@ -40,6 +41,15 @@ function UserGroupIcon() {
   );
 }
 
+
+
+function ContainerIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+    </svg>
+  );
+}
 
 export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
