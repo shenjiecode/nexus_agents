@@ -1,0 +1,43 @@
+# Task 1: 项目初始化 + 依赖安装 - QA Evidence
+
+## Status: SUCCESS
+
+## Completed Items
+
+### Files Created
+- ✅ package.json (with name: nexus-role-container)
+- ✅ tsconfig.json (TypeScript configuration)
+- ✅ .env.example (ANTHROPIC_API_KEY template)
+- ✅ .gitignore (already existed, no changes needed)
+
+### npm install
+- ✅ npm install succeeds without errors
+- ✅ 145 packages installed
+- ⚠️ 9 vulnerabilities (8 moderate, 1 high) - can be addressed later
+
+### Scripts Configured
+- ✅ npm run dev: "tsx watch src/index.ts"
+- ✅ npm run build: "tsc"
+- ✅ npm run typecheck: "tsc --noEmit"
+- ✅ npm run test: "vitest run"
+
+### Dependencies Installed
+- hono: ^4.0.0
+- sql.js: ^1.11.0 (replaced better-sqlite3 due to native compilation requirements)
+- drizzle-orm: ^0.36.0
+- dockerode: ^4.0.0
+- zod: ^3.24.0
+- pino: ^9.0.0
+- drizzle-kit: ^0.28.0
+- typescript: ^5.6.0
+- vitest: ^2.0.0
+- @types/sql.js: ^1.4.9
+- @types/node: ^22.0.0
+- tsx: ^4.19.0
+
+### Note
+- No src/ directory created (as per task requirement - future tasks only)
+- Typecheck expects src/ to exist - this is expected behavior for MVP initialization
+
+## Verification Date
+2026-05-13

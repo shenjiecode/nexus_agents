@@ -1,0 +1,92 @@
+# Task 09: Role API Implementation - QA Evidence
+
+## Files Created
+
+1. **src/services/role-service.ts** - Role service with CRUD operations
+2. **src/api/routes/roles.ts** - Role API routes
+
+## Implementation Details
+
+### Role Service (src/services/role-service.ts)
+
+Provides the following functions:
+- `createRole(input, autoStart)` - Creates a role with config files, saves to DB, optionally starts container
+- `getAllRoles()` - Lists all roles with container counts
+- `getRoleById(roleId)` - Gets role by ID with full details including containers
+- `updateRole(roleId, input)` - Updates role config files and database
+- `deleteRole(roleId)` - Deletes role, stops/removes containers, deletes config files
+- `startRoleContainer(roleId)` - Starts a container for a role
+
+### Role Routes (src/api/routes/roles.ts)
+
+Implements:
+- **POST /api/roles** - Create role with Zod validation
+  - Validates name (required), description, prompts, skills
+  - Returns 201 on success with role details
+  - Validates input: name required, max 100 chars, description max 1000 chars
+
+- **GET /api/roles** - List all roles
+  - Returns array of roles with container counts
+
+- **GET /api/roles/:id** - Get role details
+  - Returns full role info including containers
+  - Returns 404 if not found
+
+- **PUT /api/roles/:id** - Update role
+  - Updates config files and database
+  - Returns 404 if not found
+
+- **DELETE /api/roles/:id** - Delete role
+  - Stops and removes all containers
+  - Deletes config files
+  - Returns 404 if not found
+
+- **POST /api/roles/:id/containers** - Start container for role
+  - Creates and starts Docker container
+  - Returns container details
+
+## Zod Validation
+
+All inputs validated with Zod schemas:
+- CreateRoleSchema - validates name (required), description, prompts, skills
+- UpdateRoleSchema - partial of CreateRoleSchema for updates
+
+## HTTP Status Codes
+
+- 200 - Success (GET, PUT)
+- 201 - Created (POST, container start)
+- 400 - Validation error
+- 404 - Not found
+- 500 - Server error
+
+## Verification
+
+- LSP diagnostics: Clean (no errors)
+- All imports properly configured
+- Error handling with proper HTTP status codes
+
+## Test Commands
+
+```bash
+# Create role
+curl -X POST http://localhost:3000/api/roles \
+  -H "Content-Type: application/json" \
+  -d '{"name": "test-role", "description": "Test role"}'
+
+# List roles
+curl http://localhost:3000/api/roles
+
+# Get role by ID
+curl http://localhost:3000/api/roles/{roleId}
+
+# Update role
+curl -X PUT http://localhost:3000/api/roles/{roleId} \
+  -H "Content-Type: application/json" \
+  -d '{"name": "updated-name"}'
+
+# Delete role
+curl -X DELETE http://localhost:3000/api/roles/{roleId}
+
+# Start container
+curl -X POST http://localhost:3000/api/roles/{roleId}/containers
+```

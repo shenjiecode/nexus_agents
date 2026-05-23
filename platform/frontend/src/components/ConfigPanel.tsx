@@ -8,6 +8,8 @@ import type {
   PicoclawChannelConfig,
   PicoclawAgentDefaults,
   RoleFile,
+  Skill,
+  Mcp,
 } from '../types';
 
 // Model presets for quick-add
@@ -164,6 +166,36 @@ function SaveIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+  );
+}
+
+function WrenchIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+      />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  );
+}
+
+function ServerIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+    </svg>
+  );
+}
+
 interface ConfigPanelProps {
   roleId: string;
   isOwner: boolean;
@@ -171,7 +203,7 @@ interface ConfigPanelProps {
 
 export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
   // Tab state
-  const [activeTab, setActiveTab] = useState<'agent' | 'channel'>('agent');
+  const [activeTab, setActiveTab] = useState<'agent' | 'channel' | 'skills' | 'mcp'>('agent');
 
   // Config state
   const [config, setConfig] = useState<PicoclawConfig | null>(null);
@@ -204,6 +236,14 @@ export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
     token: string;
     settings: Record<string, unknown>;
   }>({ name: '', type: '', enabled: true, token: '', settings: {} });
+
+  // Skills state
+  const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
+  const [skillsLoading, setSkillsLoading] = useState(false);
+
+  // MCPs state
+  const [availableMcps, setAvailableMcps] = useState<Mcp[]>([]);
+  const [mcpsLoading, setMcpsLoading] = useState(false);
 
   // Load config files
   const loadConfigs = useCallback(async () => {
@@ -249,6 +289,44 @@ export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
   useEffect(() => {
     loadConfigs();
   }, [loadConfigs]);
+
+  // Load available skills
+  const loadSkills = useCallback(async () => {
+    setSkillsLoading(true);
+    try {
+      const response = await apiRequest<Skill[]>('/api/skills');
+      if (response.success && response.data) {
+        setAvailableSkills(response.data);
+      }
+    } catch (err) {
+      console.error('Failed to load skills:', err);
+    } finally {
+      setSkillsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSkills();
+  }, [loadSkills]);
+
+  // Load available MCPs
+  const loadMcps = useCallback(async () => {
+    setMcpsLoading(true);
+    try {
+      const response = await apiRequest<Mcp[]>('/api/mcps');
+      if (response.success && response.data) {
+        setAvailableMcps(response.data);
+      }
+    } catch (err) {
+      console.error('Failed to load MCPs:', err);
+    } finally {
+      setMcpsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMcps();
+  }, [loadMcps]);
 
   // Simple YAML parser for security file
   function parseSecurityYaml(content: string): PicoclawSecurity {
@@ -618,6 +696,58 @@ export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
     setEditingChannelKey(null);
   };
 
+  // Handle add skill to role
+  const handleAddSkill = async (skillId: string) => {
+    if (!config || !isOwner) return;
+    try {
+      await apiRequest(`/api/roles/${roleId}/skills/${skillId}`, { method: 'POST' });
+      // Reload config to get updated state
+      loadConfigs();
+    } catch (err) {
+      console.error('Failed to add skill:', err);
+    }
+  };
+
+  // Handle remove skill from role
+  const handleRemoveSkill = async (skillId: string) => {
+    if (!config || !isOwner) return;
+    try {
+      await apiRequest(`/api/roles/${roleId}/skills/${skillId}`, { method: 'DELETE' });
+      // Reload config to get updated state
+      loadConfigs();
+    } catch (err) {
+      console.error('Failed to remove skill:', err);
+    }
+  };
+
+  // Handle add MCP to role
+  const handleAddMcp = async (mcpId: string) => {
+    if (!config || !isOwner) return;
+    try {
+      await apiRequest(`/api/roles/${roleId}/mcps/${mcpId}`, { method: 'POST' });
+      // Reload config to get updated state
+      loadConfigs();
+    } catch (err) {
+      console.error('Failed to add MCP:', err);
+    }
+  };
+
+  // Handle remove MCP from role
+  const handleRemoveMcp = async (mcpId: string) => {
+    if (!config || !isOwner) return;
+    try {
+      await apiRequest(`/api/roles/${roleId}/mcps/${mcpId}`, { method: 'DELETE' });
+      // Reload config to get updated state
+      loadConfigs();
+    } catch (err) {
+      console.error('Failed to remove MCP:', err);
+    }
+  };
+
+  // Get attached skills and MCPs
+  const attachedSkills = config?.agents?.defaults?.skills || [];
+  const attachedMcps = config?.agents?.defaults?.mcp_servers || [];
+
   if (loading) {
     return (
       <div className="h-[600px] flex items-center justify-center">
@@ -669,6 +799,22 @@ export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
             icon={<BroadcastIcon className="w-4 h-4" />}
           >
             Channel 配置
+          </CyberButton>
+          <CyberButton
+            variant={activeTab === 'skills' ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('skills')}
+            icon={<WrenchIcon className="w-4 h-4" />}
+          >
+            Skills 配置
+          </CyberButton>
+          <CyberButton
+            variant={activeTab === 'mcp' ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('mcp')}
+            icon={<ServerIcon className="w-4 h-4" />}
+          >
+            MCP 配置
           </CyberButton>
         </div>
 
@@ -940,6 +1086,216 @@ export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
                   </div>
                 )}
               </div>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'skills' && (
+          <>
+            {/* Attached Skills Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-display font-semibold text-cyber-cyan flex items-center gap-2">
+                  <WrenchIcon className="w-4 h-4" />
+                  已附加 Skills
+                </h3>
+                <span className="text-xs text-cyber-muted">{attachedSkills.length} 个技能</span>
+              </div>
+
+              <div className="space-y-2">
+                {attachedSkills.length > 0 ? (
+                  attachedSkills.map((skillId) => {
+                    const skill = availableSkills.find((s) => s.id === skillId);
+                    return (
+                      <div
+                        key={skillId}
+                        className="p-3 bg-cyber-dark-lighter/30 rounded-lg border border-cyber-cyan/10 hover:border-cyber-cyan/30 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <WrenchIcon className="w-4 h-4 text-cyber-cyan" />
+                            <div>
+                              <p className="font-medium text-cyber-white text-sm">
+                                {skill?.name || skillId}
+                              </p>
+                              {skill?.description && (
+                                <p className="text-xs text-cyber-muted line-clamp-1">
+                                  {skill.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <CyberButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveSkill(skillId)}
+                            disabled={!isOwner}
+                            icon={<TrashIcon className="w-3.5 h-3.5" />}
+                            className="text-cyber-error hover:text-cyber-error"
+                          >
+                            移除
+                          </CyberButton>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-8 text-cyber-muted text-sm">
+                    暂无附加技能
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Available Skills Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-display font-semibold text-cyber-cyan flex items-center gap-2">
+                  <WrenchIcon className="w-4 h-4" />
+                  可用 Skills
+                </h3>
+              </div>
+
+              {skillsLoading ? (
+                <div className="text-center py-8 text-cyber-muted">加载中...</div>
+              ) : availableSkills.length === 0 ? (
+                <div className="text-center py-8 text-cyber-muted text-sm">暂无可用技能</div>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {availableSkills
+                    .filter((skill) => !attachedSkills.includes(skill.id))
+                    .map((skill) => (
+                      <div
+                        key={skill.id}
+                        className="p-3 bg-cyber-dark-lighter/30 rounded-lg border border-cyber-cyan/10 hover:border-cyber-cyan/30 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <WrenchIcon className="w-4 h-4 text-cyber-cyan" />
+                            <div>
+                              <p className="font-medium text-cyber-white text-sm">{skill.name}</p>
+                              <p className="text-xs text-cyber-muted line-clamp-1">{skill.description}</p>
+                            </div>
+                          </div>
+                          <CyberButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddSkill(skill.id)}
+                            disabled={!isOwner}
+                            icon={<PlusIcon className="w-3.5 h-3.5" />}
+                          >
+                            添加
+                          </CyberButton>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {activeTab === 'mcp' && (
+          <>
+            {/* Attached MCPs Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-display font-semibold text-cyber-cyan flex items-center gap-2">
+                  <ServerIcon className="w-4 h-4" />
+                  已附加 MCPs
+                </h3>
+                <span className="text-xs text-cyber-muted">{attachedMcps.length} 个 MCP</span>
+              </div>
+
+              <div className="space-y-2">
+                {attachedMcps.length > 0 ? (
+                  attachedMcps.map((mcpId) => {
+                    const mcp = availableMcps.find((m) => m.id === mcpId);
+                    return (
+                      <div
+                        key={mcpId}
+                        className="p-3 bg-cyber-dark-lighter/30 rounded-lg border border-cyber-cyan/10 hover:border-cyber-cyan/30 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <ServerIcon className="w-4 h-4 text-cyber-cyan" />
+                            <div>
+                              <p className="font-medium text-cyber-white text-sm">
+                                {mcp?.name || mcpId}
+                              </p>
+                              {mcp?.description && (
+                                <p className="text-xs text-cyber-muted line-clamp-1">
+                                  {mcp.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <CyberButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveMcp(mcpId)}
+                            disabled={!isOwner}
+                            icon={<TrashIcon className="w-3.5 h-3.5" />}
+                            className="text-cyber-error hover:text-cyber-error"
+                          >
+                            移除
+                          </CyberButton>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-8 text-cyber-muted text-sm">
+                    暂无附加 MCPs
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Available MCPs Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-display font-semibold text-cyber-cyan flex items-center gap-2">
+                  <ServerIcon className="w-4 h-4" />
+                  可用 MCPs
+                </h3>
+              </div>
+
+              {mcpsLoading ? (
+                <div className="text-center py-8 text-cyber-muted">加载中...</div>
+              ) : availableMcps.length === 0 ? (
+                <div className="text-center py-8 text-cyber-muted text-sm">暂无可用 MCPs</div>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {availableMcps
+                    .filter((mcp) => !attachedMcps.includes(mcp.id))
+                    .map((mcp) => (
+                      <div
+                        key={mcp.id}
+                        className="p-3 bg-cyber-dark-lighter/30 rounded-lg border border-cyber-cyan/10 hover:border-cyber-cyan/30 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <ServerIcon className="w-4 h-4 text-cyber-cyan" />
+                            <div>
+                              <p className="font-medium text-cyber-white text-sm">{mcp.name}</p>
+                              <p className="text-xs text-cyber-muted line-clamp-1">{mcp.description}</p>
+                            </div>
+                          </div>
+                          <CyberButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddMcp(mcp.id)}
+                            disabled={!isOwner}
+                            icon={<PlusIcon className="w-3.5 h-3.5" />}
+                          >
+                            添加
+                          </CyberButton>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           </>
         )}

@@ -70,7 +70,7 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 		log.Warn("Failed to initialize OSS service", zap.Error(err))
 	}
 	if ossSvc != nil {
-		handler.SetOSSService(ossSvc)
+		handler.SetOSSMCPService(ossSvc)
 		log.Info("OSS service initialized")
 	}
 
@@ -171,11 +171,43 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 				debug.GET("/status", handler.DebugStatus)  // GET /api/roles/:id/debug/status
 				debug.GET("/ws", handler.DebugWebSocket)   // GET /api/roles/:id/debug/ws (WebSocket)
 			}
+
+			// Role skill/MCP routes (protected - require auth)
+			roles.POST("/:id/skills/:skillId", handler.AddSkillToRole)       // POST /api/roles/:id/skills/:skillId
+			roles.DELETE("/:id/skills/:skillId", handler.RemoveSkillFromRole) // DELETE /api/roles/:id/skills/:skillId
+			roles.POST("/:id/mcps/:mcpId", handler.AddMCPToRole)           // POST /api/roles/:id/mcps/:mcpId
+			roles.DELETE("/:id/mcps/:mcpId", handler.RemoveMCPFromRole)     // DELETE /api/roles/:id/mcps/:mcpId
 		}
 
 		// Marketplace routes (public - no auth required)
-		api.GET("/skills", handler.GetSkills)               // GET /api/skills
-		api.GET("/mcps", handler.GetMCPs)                  // GET /api/mcps
+		api.GET("/skills", handler.ListSkills)               // GET /api/skills
+		api.GET("/mcps", handler.ListMCPs)
+
+		// Skills routes (protected - require auth)
+		skills := api.Group("/skills")
+		{
+			skills.GET("/mine", handler.GetMySkills)
+			skills.POST("", handler.CreateSkill)
+			skills.GET("/:id", handler.GetSkill)
+			skills.PUT("/:id", handler.UpdateSkill)
+			skills.DELETE("/:id", handler.DeleteSkill)
+		skills.POST("/:id/upload", handler.UploadSkill)
+		skills.GET("/:id/download", handler.DownloadSkill)
+		skills.GET("/:id/files", handler.GetSkillFiles)
+			skills.GET("/:id/download", handler.DownloadSkill)
+		}
+
+		// MCPs routes (protected - require auth)
+		mcps := api.Group("/mcps")
+		{
+			mcps.GET("/mine", handler.GetMyMCPs)
+			mcps.POST("", handler.CreateMCP)
+			mcps.GET("/:id", handler.GetMCP)
+			mcps.PUT("/:id", handler.UpdateMCP)
+			mcps.DELETE("/:id", handler.DeleteMCP)
+			mcps.POST("/:id/upload", handler.UploadMCP)
+			mcps.GET("/:id/download", handler.DownloadMCP)
+		}
 
 		// Marketplace roles routes (public - no auth required)
 		api.GET("/marketplace/roles", handler.ListMarketplaceRoles)                      // GET /api/marketplace/roles

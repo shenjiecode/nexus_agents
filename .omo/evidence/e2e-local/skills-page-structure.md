@@ -1,0 +1,7 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]
+    - navigation [ref=e13]
+    - generic [ref=e39]
+  - main [ref=e47]:
+    - generic [ref=e49]

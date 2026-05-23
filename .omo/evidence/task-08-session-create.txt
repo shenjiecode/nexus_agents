@@ -1,0 +1,30 @@
+# Task 8: QA Session Service - Evidence
+
+## Created File
+- src/services/qa-service.ts
+
+## Functions Implemented
+1. createQASession(roleId) - Creates OpenCode session, stores mapping in DB
+2. sendMessage(roleId, sessionId, content) - Sends message via SDK
+3. getHistory(roleId, sessionId) - Returns message history
+4. closeSession(roleId, sessionId) - Closes and cleans up
+
+## Additional Functions
+- getActiveSessions(roleId) - Gets all active sessions for a role
+- cleanupExpiredSessions() - Cleans up expired sessions
+
+## Features
+- Session timeout handling: 300 seconds (SESSION_TIMEOUT_MS = 300 * 1000)
+- Maps sessions to containers
+- In-memory session storage with Map
+- Auto-timeout on session inactivity
+- Database persistence for sessions
+
+## Verification
+- LSP diagnostics: Clean (no errors)
+- File created successfully at src/services/qa-service.ts
+
+## Notes
+- Uses in-memory storage for active sessions (not persisted to filesystem)
+- Placeholder SDK response function (simulateSDKResponse) for future OpenCode SDK integration
+- Does NOT implement WebSocket streaming

@@ -1,0 +1,26 @@
+Task 7: OpenCode SDK Wrapper
+============================
+
+Created: src/integrations/opencode.ts
+
+Functions Implemented:
+- createClient(baseUrl: string): OpencodeClient
+- createSession(client, title?): Promise<string>
+- sendMessage(client, sessionId, content): Promise<MessageResult>
+- getMessages(client, sessionId): Promise<Message[]>
+- deleteSession(client, sessionId): Promise<void>
+- getSession(client, sessionId): Promise<SessionInfo>
+- listSessions(client): Promise<SessionInfo[]>
+
+Types Exported:
+- Message
+- MessageResult
+- SessionInfo
+- OpencodeClient
+- CreateSessionOptions
+- SendMessageOptions
+- OpencodeError (class)
+
+Verification:
+- TypeScript type check: PASS
+- LSP diagnostics: No errors

@@ -1,0 +1,36 @@
+Task 6: Container Manager Service - Completed
+
+File Created: src/services/container-manager.ts
+
+Functions Implemented:
+1. createContainer(roleId, configPath, port?) - Creates Docker container with:
+   - Volume mounts: opencode.json, prompts/, .opencode/, auth.json (optional)
+   - --restart unless-stopped policy
+   - Port mapping from host to container port 4096
+   - Environment variables for OpenCode server
+   - Container labels for tracking
+
+2. startContainer(containerId) - Starts a stopped container
+
+3. stopContainer(containerId, timeout=30) - Stops a running container with configurable timeout
+
+4. restartContainer(containerId) - Restarts a container (stop + start)
+
+5. removeContainer(containerId, force?) - Removes a container (stops first if running)
+
+6. healthCheck(containerUrl) - Returns boolean health status via HTTP /health endpoint
+
+7. waitForHealthy(containerUrl, timeout=30000) - Polls for health with timeout
+
+8. updateHealthStatus(containerId) - Updates health status for a container
+
+9. findAvailablePort(start=4096) - Finds available port, tries next if in use
+
+Additional Features:
+- Container limit enforcement (max 10 containers)
+- Container registry tracking (in-memory Map)
+- Container query functions (getContainer, getAllContainers, getContainersByRole)
+- Type exports (ContainerInstance interface)
+
+Validation: TypeScript diagnostics clean (no errors)
+Dependencies: @types/dockerode installed

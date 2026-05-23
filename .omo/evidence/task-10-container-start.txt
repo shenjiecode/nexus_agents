@@ -1,0 +1,31 @@
+# Task 10: Container API Implementation - QA Evidence
+
+## Implementation Complete
+
+### File Created
+- src/api/routes/containers.ts
+
+### Routes Implemented
+1. POST /api/roles/:id/containers - Start container with health check
+2. GET /api/roles/:id/containers - List containers for a role  
+3. POST /api/containers/:id/restart - Restart container (stop + start with health check)
+4. POST /api/containers/:id/stop - Stop container (30s timeout)
+5. DELETE /api/containers/:id - Force stop and remove
+
+### Verification
+- Build passes: ✅
+- LSP diagnostics clean: ✅
+- All routes implemented following task requirements
+
+### Excluded (as per requirements)
+- Log query API - NOT implemented
+- Resource monitoring - NOT implemented
+
+### Dependencies
+- Container service (src/services/container-manager.ts) - Ready and used
+- Config manager (src/services/config-manager.ts) - Functions used inline
+
+### Notes
+- Health check timeout set to 30 seconds (30000ms)
+- Stop timeout set to 30 seconds
+- Role configuration path derived from ROLES_BASE_DIR

@@ -1,0 +1,33 @@
+# Task 05: Config Manager Service - QA Evidence
+
+## Task Completed: ✅
+
+### Created File
+- `src/services/config-manager.ts`
+
+### Functions Implemented
+1. **generateRoleConfig(roleId, roleConfig)** - Creates directory structure:
+   - `roles/{roleId}/opencode.json`
+   - `roles/{roleId}/prompts/{agent-name}.txt`
+   - `roles/{roleId}/.opencode/skills/{skill}/SKILL.md`
+   - `roles/{roleId}/auth.json` (from ANTHROPIC_API_KEY env)
+
+2. **updateRoleConfig(roleId, updates)** - Updates existing config, merges with existing
+
+3. **deleteRoleConfig(roleId)** - Deletes all role config files and directories
+
+### Validation
+- Zod schemas implemented:
+  - `PromptConfigSchema` - validates prompt name and content
+  - `SkillConfigSchema` - validates skill name and description
+  - `RoleConfigSchema` - validates full role config
+  - `AuthConfigSchema` - validates auth config
+
+### Verification
+- LSP diagnostics: ✅ Clean (no errors/warnings/hints)
+- TypeScript: ✅ Compiles successfully
+
+### Notes
+- MVP simplified: MCP config not generated (as per requirements)
+- No hot reload logic implemented (as per requirements)
+- Uses synchronous fs operations for simplicity

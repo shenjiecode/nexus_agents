@@ -76,6 +76,11 @@ export function Mcps() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedMcp, setSelectedMcp] = useState<Mcp | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [configContent, setConfigContent] = useState('');
+  const [isLoadingConfig, setIsLoadingConfig] = useState(false);
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   // Upload form state
   const [formData, setFormData] = useState({
@@ -94,7 +99,7 @@ export function Mcps() {
 
   // Get user from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('nexus_org');
+    const stored = localStorage.getItem('nexus_user');
     if (stored) {
       try {
         setUser(JSON.parse(stored));
@@ -206,6 +211,58 @@ export function Mcps() {
       setDeleteError(err instanceof Error ? err.message : '删除失败');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // Fetch MCP config from OSS
+  const fetchMcpConfig = async (mcp: Mcp) => {
+    setIsLoadingConfig(true);
+    setConfigError(null);
+    try {
+      // Get presigned download URL
+      const response = await apiRequest<{ downloadUrl: string }>(`/api/mcps/${mcp.id}/download`);
+      // Fetch config content from the presigned URL
+      const contentResponse = await fetch(response.data.downloadUrl);
+      if (!contentResponse.ok) {
+        throw new Error('Failed to fetch config content');
+      }
+      const content = await contentResponse.text();
+      setConfigContent(content);
+      setIsEditModalOpen(true);
+    } catch (err) {
+      setConfigError(err instanceof Error ? err.message : '加载配置失败');
+    } finally {
+      setIsLoadingConfig(false);
+    }
+  };
+
+  // Save MCP config to OSS
+  const handleSaveConfig = async () => {
+    if (!selectedMcp) return;
+    setIsSavingConfig(true);
+    setConfigError(null);
+    try {
+      // Get presigned upload URL
+      const response = await apiRequest<{ uploadUrl: string }>(`/api/mcps/${selectedMcp.id}/upload`, {
+        method: 'POST',
+      });
+      // Upload config content to the presigned URL
+      const uploadResponse = await fetch(response.data.uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: configContent,
+      });
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to save config');
+      }
+      setIsEditModalOpen(false);
+      setConfigContent('');
+    } catch (err) {
+      setConfigError(err instanceof Error ? err.message : '保存配置失败');
+    } finally {
+      setIsSavingConfig(false);
     }
   };
 
@@ -472,6 +529,16 @@ export function Mcps() {
               </CyberButton>
               {canManageMcp(selectedMcp) && (
                 <CyberButton
+                  variant="secondary"
+                  disabled={isLoadingConfig}
+                  icon={<JsonIcon className="w-4 h-4" />}
+                  onClick={() => fetchMcpConfig(selectedMcp)}
+                >
+                  {isLoadingConfig ? '加载中...' : '编辑配置'}
+                </CyberButton>
+              )}
+              {canManageMcp(selectedMcp) && (
+                <CyberButton
                   variant="danger"
                   disabled={isDeleting}
                   icon={<TrashIcon className="w-4 h-4" />}
@@ -516,6 +583,61 @@ export function Mcps() {
               <code className="block mt-1 px-2 py-1 rounded bg-cyber-dark text-cyber-muted font-mono text-xs break-all">
                 {selectedMcp.id}
               </code>
+            </div>
+          </div>
+        </CyberModal>
+      )}
+
+      {/* Edit Config Modal */}
+      {selectedMcp && (
+        <CyberModal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setConfigContent('');
+            setConfigError(null);
+          }}
+          title={`编辑配置 - ${selectedMcp.name}`}
+          size="lg"
+          footer={
+            <>
+              <CyberButton
+                variant="ghost"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setConfigContent('');
+                  setConfigError(null);
+                }}
+              >
+                取消
+              </CyberButton>
+              <CyberButton
+                onClick={handleSaveConfig}
+                disabled={isSavingConfig}
+              >
+                {isSavingConfig ? '保存中...' : '保存'}
+              </CyberButton>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            {configError && (
+              <div className="p-3 rounded-lg bg-cyber-error/10 border border-cyber-error/30 text-cyber-error text-sm">
+                {configError}
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-cyber-muted mb-2">
+                JSON 配置
+              </label>
+              <textarea
+                value={configContent}
+                onChange={e => setConfigContent(e.target.value)}
+                rows={20}
+                className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white font-mono text-sm focus:border-cyber-cyan focus:outline-none resize-none"
+                placeholder="在此处编辑 MCP JSON 配置..."
+                spellCheck={false}
+              />
             </div>
           </div>
         </CyberModal>

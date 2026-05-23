@@ -41,8 +41,6 @@ services:
       MATRIX_REGISTRATION_SECRET: nexus_matrix_secret_xK9mP2vL7qR4wY6j
       DOCKER_HOST: /var/run/docker.sock
       NEXUS_HOST_DATA_PATH: /opt/nexus/data
-      OPENCODE_PROVIDER_NAME: tencent-coding-plan
-      OPENCODE_API_KEY: sk-sp-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
       ADMIN_PASSWORD: admin123
       OSS_ENDPOINT: https://s3.cn-east-1.jdcloud-oss.com
       OSS_BUCKET: agent-resource

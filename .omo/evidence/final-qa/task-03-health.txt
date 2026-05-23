@@ -1,0 +1,4 @@
+Task 3: Hono 服务骨架 + 基础路由
+PASS:
+- GET /health returns {"status":"ok"} ✓
+- GET /api/roles returns 501 (not implemented placeholder) ✓

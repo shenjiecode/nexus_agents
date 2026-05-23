@@ -193,6 +193,5 @@ docker compose up -d --build backend
 ## 注意事项
 
 1. **数据库密码**：生产环境请修改 `POSTGRES_PASSWORD`
-2. **API Key**：上传前替换 `OPENCODE_API_KEY` 为真实值
-3. **Docker Socket**：Backend 需要 Docker socket 权限来创建 Agent 容器
-4. **备份**：定期备份 `data/postgres` 目录
+2. **Docker Socket**：Backend 需要 Docker socket 权限来创建 Agent 容器
+3. **备份**：定期备份 `data/postgres` 目录

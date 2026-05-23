@@ -1,0 +1,50 @@
+# Task 4: Dockerfile + 基础镜像 - QA Evidence
+
+## Scenario: 镜像构建成功
+
+### Steps
+1. podman build -t nexus-role-test images/role
+2. podman run --rm nexus-role-test opencode --version
+3. podman run --rm nexus-role-test --help
+
+### Results
+
+#### Build Success
+```
+STEP 1/11: FROM ubuntu:24.04
+...
+STEP 11/11: ENTRYPOINT ["/entrypoint.sh"]
+COMMIT nexus-role-test
+--> 016e16210f50
+Successfully tagged localhost/nexus-role-test:latest
+```
+
+#### Version Check
+```
+$ podman run --rm nexus-role-test opencode --version
+Starting OpenCode serve on 0.0.0.0:4096...
+1.14.48
+```
+
+#### Help Check
+```
+$ podman run --rm nexus-role-test --help
+Starting OpenCode serve on 0.0.0.0:4096...
+opencode serve
+
+starts a headless opencode server
+
+Options:
+  -h, --help         show help                                                             [boolean]
+  -v, --version      show version number                                                   [boolean]
+  ...
+```
+
+## Verification
+- [x] docker build succeeds
+- [x] docker run outputs help or runs serve
+- [x] opencode --version outputs version number
+
+## Files Created
+- images/role/Dockerfile
+- images/role/entrypoint.sh

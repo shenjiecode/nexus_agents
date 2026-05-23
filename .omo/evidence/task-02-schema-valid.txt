@@ -1,0 +1,46 @@
+# Task 2: SQLite Database Schema - Validation Evidence
+
+## Files Created
+- src/db/schema.ts (40 lines)
+- src/db/index.ts (59 lines)
+
+## Schema Tables
+
+### roles
+- id (TEXT PRIMARY KEY)
+- name (TEXT NOT NULL)
+- description (TEXT)
+- config (TEXT - JSON string)
+- created_at (INTEGER NOT NULL)
+- updated_at (INTEGER NOT NULL)
+
+### containers
+- id (TEXT PRIMARY KEY)
+- role_id (TEXT NOT NULL, FK to roles.id)
+- container_id (TEXT NOT NULL)
+- port (INTEGER NOT NULL)
+- status (TEXT NOT NULL)
+- health_status (TEXT NOT NULL)
+- created_at (INTEGER NOT NULL)
+
+### sessions
+- id (TEXT PRIMARY KEY)
+- role_id (TEXT NOT NULL, FK to roles.id)
+- container_id (TEXT NOT NULL)
+- opencode_session_id (TEXT NOT NULL)
+- status (TEXT NOT NULL)
+- created_at (INTEGER NOT NULL)
+
+## TypeScript Types
+- Role, NewRole
+- Container, NewContainer  
+- Session, NewSession
+
+## Verification
+- TypeScript compilation: PASSED
+- Build: PASSED
+
+## Notes
+- Using drizzle-orm/sql-js for sql.js integration
+- Database initialized with initDatabase() async function
+- Tables created via raw SQL (not DDL migrations)

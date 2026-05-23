@@ -339,7 +339,7 @@ openssl rand -hex 16
 
 ### 角色创建逻辑已修复
 
-**2024-05-21 更新**: 后端代码已修改，创建新角色时会自动生成 pico channel token。
+**2026-05-21 更新**: 后端代码已修改，创建新角色时会自动生成 pico channel token。
 
 - 新建角色：后端自动生成完整的 `.security.yml`（包含 pico token）
 - 已有角色：如果缺少 channel_list，需要手动添加或重启后端后重新创建角色
@@ -390,3 +390,89 @@ model_list:
     api_keys:
       - sk-sp-xxxxxxxx  # 替换为有效的 API Key
 ```
+
+---
+
+## 生产环境部署
+
+### GitHub Workflow 自动部署
+
+项目配置了 GitHub Actions 自动部署流程：
+
+1. **触发条件**: 推送到 `deploy` 分支
+   - Frontend: 监听 `platform/frontend/**` 变更
+   - Backend: 监听 `platform/backend/**` 变更
+
+2. **部署流程**:
+   ```
+   GitHub Push (deploy branch)
+           ↓
+       ┌─────────────┬─────────────┐
+       ↓             ↓
+   Frontend    Backend
+   Workflow    Workflow
+       ↓             ↓
+     Build      Build (Go)
+       ↓             ↓
+     SCP ──────→ SCP
+     to server  to server
+       ↓             ↓
+   nginx reload   systemd restart
+                       ↓
+                health check
+   ```
+
+3. **服务器信息**:
+   - IP: `8.217.143.228`
+   - Backend 目录: `/opt/nexus/backend/`
+   - Frontend 目录: `/opt/nexus/frontend/`
+   - 数据目录: `/data/roles/`
+
+4. **手动触发**: GitHub Actions 页面点击 `workflow_dispatch`
+
+### 部署后验证
+
+```bash
+# SSH 到服务器
+ssh root@8.217.143.228
+
+# 检查后端服务状态
+systemctl status nexus-backend
+
+# 检查容器运行状态
+docker ps --filter name=picoclaw
+
+# 查看后端日志
+journalctl -u nexus-backend -f
+```
+
+---
+
+## 测试经验总结
+
+### 已验证的功能流程
+
+| 功能 | 状态 | 备注 |
+|------|------|------|
+| 用户登录 | ✅ | 邮箱密码登录正常 |
+| 创建角色 | ✅ | 自动生成 pico token |
+| 配置 API Key | ✅ | 通过 .security.yml 配置 |
+| 启动容器 | ✅ | 使用 sipeed/picoclaw:latest 镜像 |
+| WebSocket 连接 | ✅ | 状态显示"已连接" |
+| Agent 对话 | ✅ | 正常返回回复 |
+| GitHub 自动部署 | ✅ | 推送后自动部署 |
+
+### 常见问题
+
+1. **WebSocket 500 错误**: `.security.yml` 缺少 `channel_list.pico.settings.token`
+2. **容器日志 "No channels enabled"**: 同上，需要添加 pico channel 配置
+3. **YAML 格式错误**: 确保使用 2 空格缩进，不要用 tab
+
+### 本地 vs 生产环境差异
+
+| 项目 | 本地 | 生产 |
+|------|------|------|
+| 后端启动 | `go run cmd/server/main.go` | systemd 服务 |
+| 前端构建 | `pnpm dev` | Nginx 静态服务 |
+| 数据目录 | `platform/backend/data/roles/` | `/data/roles/` |
+| WebSocket 代理 | Vite proxy (`ws: true`) | Nginx proxy |

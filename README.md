@@ -47,8 +47,8 @@
                               ▼               ▼      │
                      ┌─────────────┐ ┌─────────────┐ │
                      │ Agent 容器1 │ │ Agent 容器2 │ │
-                     │ opencode    │ │ opencode    │ │
-                     │ :4096       │ │ :4096       │ │
+                     │ picoclaw    │ │ picoclaw    │ │
+                     │ :4100+      │ │ :4100+      │ │
                      └──────┬──────┘ └──────┬──────┘ │
                             │               │        │
                             └───────────────┴────────┘
@@ -72,14 +72,10 @@ OSS路径规则：
 ### 消息流程
 
 ```
-用户雇佣角色
-    → Backend 注册 Matrix 账户
-    → 写入 employees 表
-    → 创建 Docker 容器（注入 MATRIX_* 环境变量）
-    → 容器启动：opencode serve + agent.ts
+    → 创建 Docker 容器（挂载角色配置目录）
+    → 容器启动：picoclaw AI Agent
     → 用户邀请 agent 进入 Matrix 房间 → agent 自动接受
-    → 用户发消息 → agent 转发到 opencode → 回复到 Matrix 房间
-```
+    → 用户发消息 → agent 处理并回复到 Matrix 房间
 
 ---
 
@@ -207,37 +203,30 @@ platform/backend/internal/
 
 | 项目 | 说明 |
 |------|------|
-| 路径 | `agent/` |
-| 端口 | `4096`（容器内） |
-| 技术栈 | Node.js 24 + opencode-ai + 原生 fetch |
+| 镜像 | `sipeed/picoclaw:latest` |
+| 端口 | `4100+`（动态分配） |
+| 技术栈 | PicoClaw (Go) + LLM API |
 
 **架构**：
 ```
 ┌─────────────────────────────────────────────┐
 │                  Container                   │
 │                                              │
-│  opencode serve (常驻运行, port 4096)         │
-│        ↕ HTTP API                            │
-│  agent.ts (Matrix client, 原生 fetch)        │
-│        ↕ Matrix sync                         │
-│  Matrix Homeserver (外部)                    │
+│  picoclaw (Go AI Agent, port dynamic)       │
+│        ↕ HTTP API + WebSocket               │
+│  配置文件: config.json + .security.yml        │
 └─────────────────────────────────────────────┘
 ```
 
-**核心文件**：
-```
-agent/src/
-├── agent.ts         # Matrix 客户端 (原生 fetch)
-├── serve-client.ts  # OpenCode API 客户端
-├── config.ts        # 配置加载
-├── types.ts         # 类型定义
-└── logger.ts        # 日志模块
-```
+**核心配置**：
+- `config.json` - PicoClaw 标准配置（version 3 格式）
+- `.security.yml` - API Key + pico channel token
+- `workspace/` - 工作目录，包含 AGENT.md, SOUL.md 等
 
-**设计决策**：使用原生 fetch 而非 Matrix SDK
-- SDK 的核心价值是 E2EE，但本项目不需要
-- 仅使用 4 个 Matrix API：`sync`, `join`, `send`, `typing`
-- 依赖数量：SDK 235 packages → 原生 fetch 39 packages
+**设计决策**：使用官方 PicoClaw 镜像
+- 开箱即用的 AI Agent 运行时
+- 支持多种 LLM Provider（腾讯混元、OpenAI 兼容等）
+- WebSocket API 支持实时对话
 
 ---
 
@@ -260,21 +249,6 @@ agent/src/
 
 ---
 
-### 3.5 Images（容器镜像）
-
-| 路径 | 说明 |
-|------|------|
-| `images/base/` | 基础镜像：Ubuntu 24.04 + Node.js 24 + opencode-ai |
-| `images/role/` | 角色镜像模板 |
-
-**基础镜像内容**：
-- Ubuntu 24.04
-- Node.js 24 (nodesource)
-- 全局工具：opencode-ai, tsx
-- 工作目录：/workspace
-- 入口脚本：entrypoint.sh
-
----
 
 ## 四、关键技术
 
@@ -376,11 +350,8 @@ docker-compose up -d
 | `FRONTEND_URL` | Backend | 前端URL（密码重置链接） | - |
 | `MATRIX_HOMESERVER_URL` | Backend/Agent | Matrix 服务器 | `http://localhost:8008` |
 | `MATRIX_REGISTRATION_SECRET` | Backend | Matrix 注册密钥 | `dev-secret-change-in-production` |
-| `OPENCODE_PROVIDER_NAME` | Backend | AI Provider | `tencent-coding-plan` |
-| `OPENCODE_API_KEY` | Backend | AI API Key | - |
 | `MATRIX_ACCESS_TOKEN` | Agent | Matrix 访问令牌 | - |
 | `MATRIX_USER_ID` | Agent | Matrix 用户 ID | - |
-| `OPENCODE_BASE_URL` | Agent | OpenCode API 地址 | `http://localhost:4096` |
 
 ### 6.2 配置文件示例
 
@@ -404,9 +375,6 @@ SMTP_PASSWORD=your_password
 SMTP_FROM=noreply@example.com
 FRONTEND_URL=http://localhost:13208
 
-# OpenCode Provider
-OPENCODE_PROVIDER_NAME=tencent-coding-plan
-OPENCODE_API_KEY=sk-sp-xxxxxxxx
 
 # Matrix
 MATRIX_HOMESERVER_URL=http://localhost:8008
@@ -424,7 +392,7 @@ MATRIX_REGISTRATION_SECRET=dev-secret-change-in-production
 | Matrix PostgreSQL | 5432 | Matrix 数据库 |
 | Element Web | 8080 | Matrix 客户端 |
 | Ketesa Admin | 8081 | Synapse 管理 UI |
-| Agent 容器 | 4096 | opencode serve |
+| Agent 容器 | 4100+ | picoclaw (动态分配) |
 
 ---
 
@@ -453,23 +421,11 @@ nexus_agents/
 │       ├── go.mod                   # Go依赖 (Gin, GORM, AWS SDK v2)
 │       └── .env                     # 环境变量
 │
-├── agent/                           # 容器内 Agent 程序
-│   └── src/
-│       ├── agent.ts                 # Matrix 客户端 (原生 fetch)
-│       ├── serve-client.ts          # OpenCode API 客户端
-│       └── config.ts                # 配置
-│
 ├── matrix/                          # Matrix 消息服务
 │   ├── docker-compose.yml           # Synapse + PostgreSQL + Element Web + Ketesa
 │   └── config/                      # Synapse 配置
 │
-├── images/                          # Agent 容器镜像
-│   ├── base/                        # 基础镜像 (Ubuntu + Node.js + opencode-ai)
-│   └── role/                        # 角色镜像模板
-│
-├── roles/                           # 角色定义文件
-│   └── researcher/                  # 预置研究员角色
-│
+├── roles/                           # 角色定义文件（已弃用）
 ├── docs/                            # 文档
 │   └── rules/                       # 开发规范
 │

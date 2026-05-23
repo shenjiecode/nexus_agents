@@ -69,13 +69,60 @@ function OrganizationIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+// Additional Icons
+function FileIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  );
+}
+
+function FolderIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+    </svg>
+  );
+}
+
+function DownloadIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+  );
+}
+
+function EyeIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  );
+}
+
+// Types for skill files
+interface SkillFile {
+  path: string;
+  name: string;
+  size: number;
+  isDir: boolean;
+  content?: string;
+}
+
+interface SkillFilesResponse {
+  skill: Skill;
+  files: SkillFile[];
+  skillMdContent: string;
+}
 export function Skills() {
   const [user, setUser] = useState<StoredUser | null>(null);
   const [activeTab, setActiveTab] = useState<'public' | 'my'>('public');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
 
   // Upload form state
   const [formData, setFormData] = useState({
@@ -89,12 +136,18 @@ export function Skills() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Delete state
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // View skill files state
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewingSkill, setViewingSkill] = useState<Skill | null>(null);
+  const [skillFiles, setSkillFiles] = useState<SkillFile[]>([]);
+  const [skillMdContent, setSkillMdContent] = useState<string>('');
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [filesError, setFilesError] = useState<string | null>(null);
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   // Get user from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('nexus_org');
+    const stored = localStorage.getItem('nexus_user');
     if (stored) {
       try {
         setUser(JSON.parse(stored));
@@ -193,22 +246,52 @@ export function Skills() {
   const handleDelete = async (skill: Skill) => {
     if (!confirm(`确定要删除 Skill "${skill.name}" 吗？`)) return;
 
-    setIsDeleting(true);
-    setDeleteError(null);
-
     try {
       await apiRequest(`/api/skills/${skill.slug}`, {
         method: 'DELETE',
       });
-      setSelectedSkill(null);
       refetch();
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : '删除失败');
-    } finally {
-      setIsDeleting(false);
+      console.error('Delete failed:', err);
     }
   };
 
+  // Fetch skill files from OSS
+  const fetchSkillFiles = async (skill: Skill) => {
+    setIsLoadingFiles(true);
+    setFilesError(null);
+    setViewingSkill(skill);
+    setIsViewModalOpen(true);
+
+    try {
+      const response = await apiRequest<SkillFilesResponse>(`/api/skills/${skill.id}/files`);
+      setSkillFiles(response.data.files || []);
+      setSkillMdContent(response.data.skillMdContent || '');
+    } catch (err) {
+      setFilesError(err instanceof Error ? err.message : '加载文件失败');
+      setSkillFiles([]);
+      setSkillMdContent('');
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  };
+
+  // Handle download skill
+  const handleDownloadSkill = async (skill: Skill) => {
+    try {
+      const response = await apiRequest<{ downloadUrl: string; skillName: string }>(`/api/skills/${skill.id}/download`);
+      if (response.data.downloadUrl) {
+        const link = document.createElement('a');
+        link.href = response.data.downloadUrl;
+        link.download = `${skill.slug}.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (err) {
+      console.error('Download failed:', err);
+    }
+  };
   return (
     <div className="page-transition space-y-6">
       {/* Header */}
@@ -304,7 +387,7 @@ export function Skills() {
             <CyberCard
               key={skill.id}
               className="cursor-pointer hover:border-cyber-cyan/50 transition-colors group"
-              onClick={() => setSelectedSkill(skill)}
+              onClick={() => fetchSkillFiles(skill)}
             >
               <div className="p-6">
                 <div className="flex items-start justify-between mb-3">
@@ -455,67 +538,135 @@ export function Skills() {
         </form>
       </CyberModal>
 
-      {/* Skill Detail Modal */}
-      {selectedSkill && (
+      {/* Skill View Modal with File Tree */}
+      {isViewModalOpen && viewingSkill && (
         <CyberModal
-          isOpen={!!selectedSkill}
+          isOpen={isViewModalOpen}
           onClose={() => {
-            setSelectedSkill(null);
-            setDeleteError(null);
+            setIsViewModalOpen(false);
+            setViewingSkill(null);
+            setSkillFiles([]);
+            setSkillMdContent('');
+            setFilesError(null);
+            setSelectedFilePath(null);
           }}
-          title={selectedSkill.name}
-          size="md"
+          title={`查看 Skill: ${viewingSkill.name}`}
+          size="lg"
           footer={
-            <>
-              <CyberButton variant="ghost" onClick={() => setSelectedSkill(null)}>
+            <div className="flex items-center gap-3">
+              <CyberButton
+                variant="ghost"
+                onClick={() => {
+                  setIsViewModalOpen(false);
+                  setViewingSkill(null);
+                }}
+              >
                 关闭
               </CyberButton>
-              {canManageSkill(selectedSkill) && (
+              <CyberButton
+                onClick={() => handleDownloadSkill(viewingSkill)}
+                icon={<DownloadIcon className="w-4 h-4" />}
+              >
+                下载
+              </CyberButton>
+              {canManageSkill(viewingSkill) && (
                 <CyberButton
                   variant="danger"
-                  disabled={isDeleting}
+                  onClick={() => {
+                    setIsViewModalOpen(false);
+                    handleDelete(viewingSkill);
+                  }}
                   icon={<TrashIcon className="w-4 h-4" />}
-                  onClick={() => handleDelete(selectedSkill)}
                 >
-                  {isDeleting ? '删除中...' : '删除'}
+                  删除
                 </CyberButton>
               )}
-            </>
+            </div>
           }
         >
           <div className="space-y-4">
-            {deleteError && (
+            {filesError && (
               <div className="p-3 rounded-lg bg-cyber-error/10 border border-cyber-error/30 text-cyber-error text-sm">
-                {deleteError}
+                {filesError}
               </div>
             )}
 
-            <div>
-              <label className="text-xs font-mono text-cyber-muted uppercase">Slug</label>
-              <code className="block mt-1 px-2 py-1 rounded bg-cyber-dark text-cyber-cyan font-mono text-sm">
-                {selectedSkill.slug}
-              </code>
-            </div>
+            {isLoadingFiles ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyber-cyan"></div>
+                <span className="ml-3 text-cyber-muted">加载文件...</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* File Tree Sidebar */}
+                <div className="md:col-span-1">
+                  <div className="bg-cyber-dark rounded-lg border border-cyber-cyan/20 p-3">
+                    <h4 className="text-sm font-medium text-cyber-cyan mb-3 flex items-center gap-2">
+                      <FolderIcon className="w-4 h-4" />
+                      文件列表
+                    </h4>
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {skillFiles.length === 0 ? (
+                        <p className="text-cyber-muted text-sm">暂无文件</p>
+                      ) : (
+                        skillFiles.map((file) => (
+                          <button
+                            key={file.path}
+                            onClick={() => setSelectedFilePath(file.path)}
+                            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left transition-colors ${
+                              selectedFilePath === file.path
+                                ? 'bg-cyber-cyan/20 text-cyber-cyan'
+                                : 'hover:bg-cyber-dark-card text-cyber-muted hover:text-cyber-white'
+                            }`}
+                          >
+                            <FileIcon className="w-4 h-4 flex-shrink-0" />
+                            <span className="truncate">{file.name}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
 
-            <div>
-              <label className="text-xs font-mono text-cyber-muted uppercase">描述</label>
-              <p className="mt-1 text-cyber-white">{selectedSkill.description}</p>
-            </div>
-
-            {selectedSkill.category && (
-              <div>
-                <label className="text-xs font-mono text-cyber-muted uppercase">分类</label>
-                <span className="mt-1 inline-block px-2 py-0.5 text-sm rounded-full bg-cyber-purple/20 text-cyber-purple">
-                  {selectedSkill.category}
-                </span>
+                {/* Content Preview */}
+                <div className="md:col-span-2">
+                  <div className="bg-cyber-dark rounded-lg border border-cyber-cyan/20 p-4 min-h-64">
+                    {skillMdContent ? (
+                      <div>
+                        <h4 className="text-sm font-medium text-cyber-cyan mb-3">SKILL.md</h4>
+                        <div className="prose prose-invert prose-sm max-w-none">
+                          <pre className="bg-cyber-dark-card p-4 rounded-lg overflow-x-auto text-cyber-white whitespace-pre-wrap font-mono text-sm">
+                            {skillMdContent}
+                          </pre>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-12 text-cyber-muted">
+                        <EyeIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p>选择文件查看内容</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
-            <div>
-              <label className="text-xs font-mono text-cyber-muted uppercase">ID</label>
-              <code className="block mt-1 px-2 py-1 rounded bg-cyber-dark text-cyber-muted font-mono text-xs break-all">
-                {selectedSkill.id}
-              </code>
+            {/* Skill Info */}
+            <div className="mt-4 pt-4 border-t border-cyber-cyan/20">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-cyber-muted">Slug:</span>{' '}
+                  <code className="text-cyber-cyan font-mono">{viewingSkill.slug}</code>
+                </div>
+                <div>
+                  <span className="text-cyber-muted">分类:</span>{' '}
+                  <span className="text-cyber-white">{viewingSkill.category || '无'}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-cyber-muted">描述:</span>{' '}
+                  <span className="text-cyber-white">{viewingSkill.description || '无'}</span>
+                </div>
+              </div>
             </div>
           </div>
         </CyberModal>

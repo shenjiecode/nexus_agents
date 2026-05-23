@@ -678,3 +678,175 @@ func SaveRoleFileContent(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"path": filePath, "size": size}})
 }
+
+// AddSkillToRole handles POST /api/roles/:id/skills/:skillId - Add a skill to role's config.json
+func AddSkillToRole(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+
+	roleID := c.Param("id")
+	if roleID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Role ID is required"})
+		return
+	}
+
+	skillID := c.Param("skillId")
+	if skillID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Skill ID is required"})
+		return
+	}
+
+	// Validate role ownership
+	db := model.GetDB()
+	var role model.Role
+	result := db.First(&role, "id = ?", roleID)
+	if result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Role not found"})
+		return
+	}
+
+	if role.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden: you can only modify your own roles"})
+		return
+	}
+
+	// Update config.json
+	if err := service.UpdateRoleConfigSkills(user.ID, roleID, skillID, "add"); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "Skill added to role"}})
+}
+
+// RemoveSkillFromRole handles DELETE /api/roles/:id/skills/:skillId - Remove a skill from role's config.json
+func RemoveSkillFromRole(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+
+	roleID := c.Param("id")
+	if roleID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Role ID is required"})
+		return
+	}
+
+	skillID := c.Param("skillId")
+	if skillID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Skill ID is required"})
+		return
+	}
+
+	// Validate role ownership
+	db := model.GetDB()
+	var role model.Role
+	result := db.First(&role, "id = ?", roleID)
+	if result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Role not found"})
+		return
+	}
+
+	if role.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden: you can only modify your own roles"})
+		return
+	}
+
+	// Update config.json
+	if err := service.UpdateRoleConfigSkills(user.ID, roleID, skillID, "remove"); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "Skill removed from role"}})
+}
+
+// AddMCPToRole handles POST /api/roles/:id/mcps/:mcpId - Add an MCP to role's config.json
+func AddMCPToRole(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+
+	roleID := c.Param("id")
+	if roleID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Role ID is required"})
+		return
+	}
+
+	mcpID := c.Param("mcpId")
+	if mcpID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "MCP ID is required"})
+		return
+	}
+
+	// Validate role ownership
+	db := model.GetDB()
+	var role model.Role
+	result := db.First(&role, "id = ?", roleID)
+	if result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Role not found"})
+		return
+	}
+
+	if role.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden: you can only modify your own roles"})
+		return
+	}
+
+	// Update config.json
+	if err := service.UpdateRoleConfigMCPs(user.ID, roleID, mcpID, "add"); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "MCP added to role"}})
+}
+
+// RemoveMCPFromRole handles DELETE /api/roles/:id/mcps/:mcpId - Remove an MCP from role's config.json
+func RemoveMCPFromRole(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+
+	roleID := c.Param("id")
+	if roleID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Role ID is required"})
+		return
+	}
+
+	mcpID := c.Param("mcpId")
+	if mcpID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "MCP ID is required"})
+		return
+	}
+
+	// Validate role ownership
+	db := model.GetDB()
+	var role model.Role
+	result := db.First(&role, "id = ?", roleID)
+	if result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Role not found"})
+		return
+	}
+
+	if role.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden: you can only modify your own roles"})
+		return
+	}
+
+	// Update config.json
+	if err := service.UpdateRoleConfigMCPs(user.ID, roleID, mcpID, "remove"); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "MCP removed from role"}})
+}

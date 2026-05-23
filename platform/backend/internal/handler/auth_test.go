@@ -31,8 +31,8 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// hashPassword creates a bcrypt hash of the password.
-func hashPassword(t *testing.T, password string) string {
+// hashPasswordForTest creates a bcrypt hash of the password for testing.
+func hashPasswordForTest(t *testing.T, password string) string {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		t.Fatalf("failed to hash password: %v", err)
@@ -49,7 +49,7 @@ func TestLogin_Success(t *testing.T) {
 	model.SetTestDB(db)
 
 	// Create test user
-	hashedPassword := hashPassword(t, "testpass")
+	hashedPassword := hashPasswordForTest(t, "testpass")
 	user := model.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -112,7 +112,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 	model.SetTestDB(db)
 
 	// Create test user
-	hashedPassword := hashPassword(t, "testpass")
+	hashedPassword := hashPasswordForTest(t, "testpass")
 	user := model.User{
 		Username: "testuser2",
 		Email:    "test2@example.com",

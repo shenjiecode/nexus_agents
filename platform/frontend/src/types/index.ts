@@ -12,6 +12,7 @@ export interface User {
   nickname?: string;
   token?: string;
 }
+
 // Skill - matches backend marketplace.go mock data
 export interface Skill {
   id: string;
@@ -19,6 +20,10 @@ export interface Skill {
   slug: string;
   description: string;
   category?: string;
+  userId?: string;
+  storageKey?: string;
+  size?: number;
+  isPublic?: string;
 }
 
 // Mcp - matches backend marketplace.go mock data
@@ -28,6 +33,10 @@ export interface Mcp {
   slug: string;
   description: string;
   category?: string;
+  userId?: string;
+  storageKey?: string;
+  size?: number;
+  isPublic?: string;
 }
 
 // Role - matches backend RoleResponse
@@ -90,6 +99,8 @@ export interface PicoclawAgentDefaults {
   summarize_message_threshold?: number;
   summarize_token_percent?: number;
   steering_mode?: string;
+  skills?: string[];
+  mcp_servers?: string[];
 }
 
 export interface PicoclawModelConfig {
@@ -116,4 +127,3 @@ export interface PicoclawSecurity {
   channel_list?: Record<string, { settings?: { token?: string; [key: string]: unknown } }>;
   model_list?: Record<string, { api_keys?: string[] }>;
 }
-

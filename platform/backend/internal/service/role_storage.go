@@ -3,6 +3,7 @@ package service
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -591,4 +592,171 @@ func generateRandomToken() string {
 // DeleteRoleDir deletes the role directory and all its contents
 func DeleteRoleDir(rolePath string) error {
 	return os.RemoveAll(rolePath)
+}
+
+// PicoConfig represents the picoclaw config.json structure
+// We only need the agents.defaults section for skill/MCP updates
+type PicoConfig struct {
+	Version  int                    `json:"version"`
+	Agents   PicoAgentsConfig       `json:"agents"`
+	ModelList []PicoModelConfig      `json:"model_list"`
+	ChannelList map[string]interface{} `json:"channel_list"`
+}
+
+type PicoAgentsConfig struct {
+	Defaults PicoAgentDefaults `json:"defaults"`
+}
+
+type PicoAgentDefaults struct {
+	Skills     []string `json:"skills,omitempty"`
+	MCPServers []string `json:"mcp_servers,omitempty"`
+	ModelName  string   `json:"model_name,omitempty"`
+	MaxTokens  int      `json:"max_tokens,omitempty"`
+}
+
+type PicoModelConfig struct {
+	ModelName string `json:"model_name"`
+	Provider  string `json:"provider"`
+	Model     string `json:"model"`
+	APIBase   string `json:"api_base,omitempty"`
+}
+
+// UpdateRoleConfigSkills adds or removes a skill ID from the role's config.json
+// action: "add" or "remove"
+func UpdateRoleConfigSkills(userID, roleID, skillID, action string) error {
+	rolePath := GetRoleDir(userID, roleID)
+	configPath := filepath.Join(rolePath, "config.json")
+
+	// Read existing config
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		return &RoleStorageError{
+			Message: "failed to read config.json: " + err.Error(),
+			Code:    ErrCodeFileNotFound,
+		}
+	}
+
+	// Parse config
+	var config PicoConfig
+	if err := json.Unmarshal(content, &config); err != nil {
+		return &RoleStorageError{
+			Message: "failed to parse config.json: " + err.Error(),
+			Code:    ErrCodeInvalidType,
+		}
+	}
+
+	// Update skills array
+	skills := config.Agents.Defaults.Skills
+	if skills == nil {
+		skills = []string{}
+	}
+
+	if action == "add" {
+		// Check if already exists
+		for _, s := range skills {
+			if s == skillID {
+				return nil // Already exists, no change needed
+			}
+		}
+		skills = append(skills, skillID)
+	} else if action == "remove" {
+		// Remove the skill
+		newSkills := []string{}
+		for _, s := range skills {
+			if s != skillID {
+				newSkills = append(newSkills, s)
+			}
+		}
+		skills = newSkills
+	}
+
+	config.Agents.Defaults.Skills = skills
+
+	// Write back to file
+	newContent, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return &RoleStorageError{
+			Message: "failed to marshal config.json: " + err.Error(),
+			Code:    ErrCodeInvalidType,
+		}
+	}
+
+	if err := os.WriteFile(configPath, newContent, 0644); err != nil {
+		return &RoleStorageError{
+			Message: "failed to write config.json: " + err.Error(),
+			Code:    ErrCodeAccessDenied,
+		}
+	}
+
+	return nil
+}
+
+// UpdateRoleConfigMCPs adds or removes an MCP ID from the role's config.json
+// action: "add" or "remove"
+func UpdateRoleConfigMCPs(userID, roleID, mcpID, action string) error {
+	rolePath := GetRoleDir(userID, roleID)
+	configPath := filepath.Join(rolePath, "config.json")
+
+	// Read existing config
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		return &RoleStorageError{
+			Message: "failed to read config.json: " + err.Error(),
+			Code:    ErrCodeFileNotFound,
+		}
+	}
+
+	// Parse config
+	var config PicoConfig
+	if err := json.Unmarshal(content, &config); err != nil {
+		return &RoleStorageError{
+			Message: "failed to parse config.json: " + err.Error(),
+			Code:    ErrCodeInvalidType,
+		}
+	}
+
+	// Update mcp_servers array
+	mcps := config.Agents.Defaults.MCPServers
+	if mcps == nil {
+		mcps = []string{}
+	}
+
+	if action == "add" {
+		// Check if already exists
+		for _, m := range mcps {
+			if m == mcpID {
+				return nil // Already exists, no change needed
+			}
+		}
+		mcps = append(mcps, mcpID)
+	} else if action == "remove" {
+		// Remove the MCP
+		newMcps := []string{}
+		for _, m := range mcps {
+			if m != mcpID {
+				newMcps = append(newMcps, m)
+			}
+		}
+		mcps = newMcps
+	}
+
+	config.Agents.Defaults.MCPServers = mcps
+
+	// Write back to file
+	newContent, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return &RoleStorageError{
+			Message: "failed to marshal config.json: " + err.Error(),
+			Code:    ErrCodeInvalidType,
+		}
+	}
+
+	if err := os.WriteFile(configPath, newContent, 0644); err != nil {
+		return &RoleStorageError{
+			Message: "failed to write config.json: " + err.Error(),
+			Code:    ErrCodeAccessDenied,
+		}
+	}
+
+	return nil
 }

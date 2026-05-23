@@ -17,16 +17,16 @@
   },
   "agents": {
     "sisyphus": {
-      "model": "zai-coding-plan/glm-5.1",
-      "fallback_models": ["tencent-coding-plan/glm-5", "tencent-coding-plan/minimax-m2.5"]
+      "model": "tencent-coding-plan/glm-5",
+      "fallback_models": ["tencent-coding-plan/minimax-m2.5"]
     },
     "oracle": {
-      "model": "zai-coding-plan/glm-5.1",
-      "fallback_models": ["tencent-coding-plan/glm-5", "tencent-coding-plan/minimax-m2.5"]
+      "model": "tencent-coding-plan/glm-5",
+      "fallback_models": ["tencent-coding-plan/minimax-m2.5"]
     },
     "prometheus": {
-      "model": "zai-coding-plan/glm-5.1",
-      "fallback_models": ["tencent-coding-plan/glm-5", "tencent-coding-plan/kimi-k2.5"]
+      "model": "tencent-coding-plan/glm-5",
+      "fallback_models": ["tencent-coding-plan/kimi-k2.5"]
     },
     "sisyphus-junior": {
       "model": "tencent-coding-plan/minimax-m2.5",
@@ -34,15 +34,15 @@
     },
     "atlas": {
       "model": "tencent-coding-plan/minimax-m2.5",
-      "fallback_models": ["tencent-coding-plan/kimi-k2.5", "zai-coding-plan/glm-4.7"]
+      "fallback_models": ["tencent-coding-plan/kimi-k2.5"]
     },
     "librarian": {
       "model": "tencent-coding-plan/minimax-m2.5",
-      "fallback_models": ["zai-coding-plan/glm-4.7"]
+      "fallback_models": ["tencent-coding-plan/kimi-k2.5"]
     },
     "metis": {
       "model": "tencent-coding-plan/minimax-m2.5",
-      "fallback_models": ["zai-coding-plan/glm-5-turbo", "zai-coding-plan/glm-4.7"]
+      "fallback_models": ["tencent-coding-plan/kimi-k2.5"]
     },
     "momus": {
       "model": "tencent-coding-plan/glm-5",
@@ -50,37 +50,37 @@
     },
     "explore": {
       "model": "tencent-coding-plan/minimax-m2.5",
-      "fallback_models": ["zai-coding-plan/glm-5-turbo", "zai-coding-plan/glm-4.7"]
+      "fallback_models": ["tencent-coding-plan/kimi-k2.5"]
     },
     "multimodal-looker": {
       "model": "tencent-coding-plan/kimi-k2.5",
-      "fallback_models": ["zai-coding-plan/glm-4.6v"]
+      "fallback_models": ["tencent-coding-plan/glm-5"]
     }
   },
   "categories": {
     "visual-engineering": {
       "model": "tencent-coding-plan/kimi-k2.5",
-      "fallback_models": ["tencent-coding-plan/minimax-m2.5", "zai-coding-plan/glm-4.6v"]
+      "fallback_models": ["tencent-coding-plan/minimax-m2.5"]
     },
     "artistry": {
-      "model": "zai-coding-plan/glm-5.1",
+      "model": "tencent-coding-plan/glm-5",
       "fallback_models": ["tencent-coding-plan/glm-5", "tencent-coding-plan/minimax-m2.5"]
     },
     "ultrabrain": {
-      "model": "zai-coding-plan/glm-5.1",
-      "fallback_models": ["tencent-coding-plan/glm-5", "zai-coding-plan/glm-5-turbo"]
+      "model": "tencent-coding-plan/glm-5",
+      "fallback_models": ["tencent-coding-plan/kimi-k2.5"]
     },
     "deep": {
-      "model": "zai-coding-plan/glm-5.1",
+      "model": "tencent-coding-plan/glm-5",
       "fallback_models": ["tencent-coding-plan/kimi-k2.5", "tencent-coding-plan/minimax-m2.5"]
     },
     "quick": {
       "model": "tencent-coding-plan/minimax-m2.5",
-      "fallback_models": ["zai-coding-plan/glm-5-turbo", "zai-coding-plan/glm-4.7"]
+      "fallback_models": ["tencent-coding-plan/kimi-k2.5"]
     },
     "unspecified-low": {
       "model": "tencent-coding-plan/minimax-m2.5",
-      "fallback_models": ["zai-coding-plan/glm-4.7"]
+      "fallback_models": ["tencent-coding-plan/kimi-k2.5"]
     },
     "unspecified-high": {
       "model": "tencent-coding-plan/minimax-m2.5",
