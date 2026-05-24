@@ -160,7 +160,7 @@ export function Sidebar() {
                 <span className="font-display font-bold text-cyber-dark text-sm">{userInitial}</span>
               </div>
               {/* Neon ring effect */}
-              <div className="absolute inset-0 rounded-full border-2 border-cyber-cyan/50 animate-pulse" />
+              <div className="absolute inset-0 rounded-full border-2 border-cyber-cyan/50 animate-pulse pointer-events-none" />
             </div>
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
