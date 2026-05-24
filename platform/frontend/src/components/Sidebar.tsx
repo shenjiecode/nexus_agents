@@ -3,8 +3,10 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 
 interface StoredUser {
   id: string;
-  name: string;
-  slug: string;
+  name?: string;
+  nickname?: string;
+  username?: string;
+  slug?: string;
   email?: string;
   role?: 'admin' | 'user';
 }
@@ -76,7 +78,9 @@ export function Sidebar() {
     }
   }, []);
 
-  const userInitial = user?.name?.charAt(0).toUpperCase() || 'U';
+  // Display name: nickname > name > username > email
+  const displayName = user?.nickname || user?.name || user?.username || user?.email?.split('@')[0] || '用户';
+  const userInitial = displayName.charAt(0).toUpperCase();
 
   return (
     <aside
@@ -160,13 +164,13 @@ export function Sidebar() {
             </div>
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-cyber-white truncate">{user.name}</p>
-                <p className="text-xs text-cyber-muted font-mono truncate">{user.slug}</p>
+                <p className="text-sm font-medium text-cyber-white truncate">{displayName}</p>
+                <p className="text-xs text-cyber-muted font-mono truncate">{user?.email || user?.username}</p>
               </div>
             )}
             {isCollapsed && (
               <div className="absolute left-full ml-2 px-2 py-1 bg-cyber-dark-card border border-cyber-cyan/30 rounded text-sm text-cyber-white opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50">
-                {user.name}
+                {displayName}
               </div>
             )}
           </div>
