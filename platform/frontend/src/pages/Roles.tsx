@@ -11,8 +11,7 @@ export interface StoredUser {
   id: string;
   name: string;
   slug: string;
-  role: 'admin' | 'org';
-  orgId?: string;
+  role: 'admin' | 'user';
 }
 
 function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -89,7 +88,7 @@ export function Roles() {
 
   // Keep localStorage reading logic for future use (StoredUser interface is used elsewhere)
   useEffect(() => {
-    const stored = localStorage.getItem('nexus_org');
+    const stored = localStorage.getItem('nexus_user');
     if (stored) {
       try {
         JSON.parse(stored);

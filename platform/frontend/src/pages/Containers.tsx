@@ -69,8 +69,7 @@ interface StoredUser {
   id: string;
   name: string;
   slug: string;
-  role: 'admin' | 'org';
-  orgId?: string;
+  role: 'admin' | 'user';
 }
 
 const statusOptions: { value: ContainerStatus | 'all'; label: string }[] = [
@@ -113,7 +112,7 @@ export function Containers() {
 
   // Get user from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('nexus_org');
+    const stored = localStorage.getItem('nexus_user');
     if (stored) {
       try {
         setUser(JSON.parse(stored));

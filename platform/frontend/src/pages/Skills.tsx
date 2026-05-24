@@ -9,8 +9,7 @@ interface StoredUser {
   id: string;
   name: string;
   slug: string;
-  role: 'admin' | 'org';
-  orgId?: string;
+  role: 'admin' | 'user';
 }
 
 function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
