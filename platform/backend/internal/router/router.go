@@ -191,10 +191,10 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 			skills.GET("/:id", handler.GetSkill)
 			skills.PUT("/:id", handler.UpdateSkill)
 			skills.DELETE("/:id", handler.DeleteSkill)
-		skills.POST("/:id/upload", handler.UploadSkill)
-		skills.GET("/:id/download", handler.DownloadSkill)
-		skills.GET("/:id/files", handler.GetSkillFiles)
+			skills.POST("/:id/upload", handler.UploadSkill)
 			skills.GET("/:id/download", handler.DownloadSkill)
+			skills.GET("/:id/files", handler.GetSkillFiles)
+
 		}
 
 		// MCPs routes (protected - require auth)
