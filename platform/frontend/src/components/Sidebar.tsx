@@ -11,6 +11,10 @@ interface StoredUser {
   role?: 'admin' | 'user';
 }
 
+interface SidebarProps {
+  isCollapsed: boolean;
+  onCollapse: (collapsed: boolean) => void;
+}
 
 const navItems = [
   { path: '/', label: '首页', icon: HomeIcon },
@@ -51,8 +55,6 @@ function UserGroupIcon() {
   );
 }
 
-
-
 function ContainerIcon() {
   return (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -61,8 +63,7 @@ function ContainerIcon() {
   );
 }
 
-export function Sidebar() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+export function Sidebar({ isCollapsed, onCollapse }: SidebarProps) {
   const [user, setUser] = useState<StoredUser | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -104,7 +105,7 @@ export function Sidebar() {
           </div>
         )}
         <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
+          onClick={() => onCollapse(!isCollapsed)}
           className="p-1.5 rounded-lg text-cyber-muted hover:text-cyber-cyan hover:bg-cyber-cyan/10 transition-colors"
         >
           <svg
@@ -149,52 +150,50 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Bottom section */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-cyber-cyan/20 space-y-3">
-        {/* User info */}
+      {/* Bottom section - User card */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-cyber-cyan/20">
         {user && (
-          <div className={`flex items-center gap-3 p-2 rounded-lg bg-cyber-cyan/5 border border-cyber-cyan/10 hover:border-cyber-cyan/30 transition-all ${isCollapsed ? 'justify-center' : ''}`}>
+          <div className={`flex items-center gap-2 p-2 rounded-lg bg-cyber-cyan/5 border border-cyber-cyan/10 hover:border-cyber-cyan/30 transition-all ${isCollapsed ? 'justify-center' : ''}`}>
             {/* Avatar with neon glow */}
-            <div className="relative">
+            <div className="relative flex-shrink-0">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyber-cyan/80 to-cyber-purple/80 flex items-center justify-center shadow-cyber-glow">
                 <span className="font-display font-bold text-cyber-dark text-sm">{userInitial}</span>
               </div>
               {/* Neon ring effect */}
               <div className="absolute inset-0 rounded-full border-2 border-cyber-cyan/50 animate-pulse pointer-events-none" />
             </div>
+            
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-cyber-white truncate">{displayName}</p>
                 <p className="text-xs text-cyber-muted font-mono truncate">{user?.email || user?.username}</p>
               </div>
             )}
+            
+            {/* Logout button */}
+            <button
+              onClick={() => navigate('/logout')}
+              className={`p-1.5 rounded-lg text-cyber-muted hover:text-cyber-error hover:bg-cyber-error/10 transition-colors flex-shrink-0 ${isCollapsed ? 'hidden' : ''}`}
+              title="退出登录"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
+            
             {isCollapsed && (
-              <div className="absolute left-full ml-2 px-2 py-1 bg-cyber-dark-card border border-cyber-cyan/30 rounded text-sm text-cyber-white opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50">
-                {displayName}
-              </div>
+              <button
+                onClick={() => navigate('/logout')}
+                className="p-1.5 rounded-lg text-cyber-muted hover:text-cyber-error hover:bg-cyber-error/10 transition-colors"
+                title="退出登录"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
             )}
           </div>
         )}
-
-        {/* System status */}
-        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-          <div className="w-2 h-2 rounded-full bg-cyber-success status-pulse" />
-          {!isCollapsed && (
-            <span className="text-xs text-cyber-muted font-mono">
-              系统在线
-            </span>
-          )}
-        </div>
-
-        <button
-          onClick={() => navigate('/logout')}
-          className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg text-cyber-muted hover:text-cyber-error hover:bg-cyber-error/5 transition-all ${isCollapsed ? 'justify-center' : ''}`}
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          {!isCollapsed && <span className="text-sm font-medium">退出登录</span>}
-        </button>
       </div>
     </aside>
   );

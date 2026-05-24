@@ -33,10 +33,12 @@ function useAuth() {
 }
 
 function Layout({ children }: { children: React.ReactNode }) {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  
   return (
     <div className="min-h-screen cyber-grid-bg bg-cyber-gradient">
-      <Sidebar />
-      <main className="lg:ml-64 min-h-screen transition-all duration-300">
+      <Sidebar isCollapsed={isSidebarCollapsed} onCollapse={setIsSidebarCollapsed} />
+      <main className={`min-h-screen transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         <div className="p-6 lg:p-8 max-w-7xl mx-auto">
           {children}
         </div>
