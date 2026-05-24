@@ -1,8 +1,8 @@
-import type { ReactNode, ButtonHTMLAttributes } from 'react';
+import type { ReactNode, MouseEventHandler } from 'react';
 
-interface CyberButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface CyberButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
-  onClick?: () => void;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
   type?: 'button' | 'submit' | 'reset';
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   size?: 'sm' | 'md' | 'lg';

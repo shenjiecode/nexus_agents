@@ -111,12 +111,12 @@ export function Mcps() {
 
   // Fetch MCPs based on context
   const endpoint = useMemo(() => {
-    // For org users, we can filter by org or get all public
-    if (activeTab === 'my' && user?.role === 'org' && user?.id) {
-      return `/api/mcps?org=${user.id}`;
+    if (activeTab === 'my' && user?.id) {
+      return '/api/mcps/mine';
     }
     return '/api/mcps';
   }, [activeTab, user]);
+
 
   const { data: mcps, loading, error, refetch } = useApi<Mcp[]>(endpoint);
 
@@ -144,15 +144,13 @@ export function Mcps() {
   }, [mcps, searchQuery, selectedCategory]);
 
   // Check if user can manage a MCP
-  const canManageMcp = (_mcp: Mcp): boolean => {
+  const canManageMcp = (mcp: Mcp): boolean => {
     if (!user) return false;
-    return user.role === 'admin';
+    return user.role === 'admin' || mcp.userId === user.id;
   };
 
-  // Check if user is logged in as org
-  const isOrg = user?.role === 'org';
-  const isAdmin = user?.role === 'admin';
-  const canUpload = isOrg || isAdmin;
+  // Check if user is logged in
+  const isLoggedIn = !!user;
 
   const generateSlug = (name: string) => {
     return name
@@ -276,18 +274,10 @@ export function Mcps() {
           </h1>
           <p className="text-cyber-muted mt-1">浏览和管理 MCP 配置</p>
         </div>
-        {canUpload && (
-          <CyberButton
-            onClick={() => setIsUploadModalOpen(true)}
-            icon={<PlusIcon className="w-5 h-5" />}
-          >
-            上传 MCP
-          </CyberButton>
-        )}
       </div>
 
       {/* Tabs */}
-      {isOrg && (
+      {isLoggedIn && (
         <div className="flex gap-2">
           <CyberButton
             variant={activeTab === 'public' ? 'primary' : 'ghost'}
@@ -307,6 +297,7 @@ export function Mcps() {
           </CyberButton>
         </div>
       )}
+
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -336,63 +327,137 @@ export function Mcps() {
         )}
       </div>
 
-      {/* MCPs Grid */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map(i => (
-            <CyberCard key={i} className="h-48">
-              <div className="p-6 skeleton h-full" />
+      {/* Public MCPs Tab */}
+      {activeTab === 'public' && (
+        <>
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <CyberCard key={i} className="h-48">
+                  <div className="p-6 skeleton h-full" />
+                </CyberCard>
+              ))}
+            </div>
+          ) : error ? (
+            <CyberCard>
+              <div className="p-8 text-center text-cyber-error">加载失败：{error}</div>
             </CyberCard>
-          ))}
-        </div>
-      ) : error ? (
-        <CyberCard>
-          <div className="p-8 text-center text-cyber-error">加载失败：{error}</div>
-        </CyberCard>
-      ) : filteredMcps.length === 0 ? (
-        <CyberCard>
-          <div className="p-8 text-center text-cyber-muted">
-            {searchQuery || selectedCategory ? '没有找到匹配的 MCPs' : '暂无 MCPs'}
-          </div>
-        </CyberCard>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredMcps.map(mcp => (
-            <CyberCard
-              key={mcp.id}
-              className="cursor-pointer hover:border-cyber-cyan/50 transition-colors group"
-              onClick={() => setSelectedMcp(mcp)}
-            >
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 rounded-lg bg-cyber-purple/10 text-cyber-purple group-hover:bg-cyber-purple/20 transition-colors">
-                    <ServerIcon className="w-6 h-6" />
-                  </div>
-                  {mcp.category && (
-                    <span className="px-2 py-0.5 text-xs rounded-full bg-cyber-cyan/20 text-cyber-cyan">
-                      {mcp.category}
-                    </span>
-                  )}
-                </div>
-
-                <h3 className="text-lg font-display font-semibold text-cyber-white group-hover:text-cyber-cyan transition-colors mb-1">
-                  {mcp.name}
-                </h3>
-                <code className="text-xs text-cyber-muted font-mono">{mcp.slug}</code>
-
-                <p className="mt-2 text-sm text-cyber-muted line-clamp-2">{mcp.description}</p>
-
-                <div className="mt-4 flex items-center justify-between">
-                  {mcp.category && (
-                    <span className="px-2 py-0.5 text-xs rounded-full bg-cyber-cyan/20 text-cyber-cyan">
-                      {mcp.category}
-                    </span>
-                  )}
-                </div>
+          ) : filteredMcps.length === 0 ? (
+            <CyberCard>
+              <div className="p-8 text-center text-cyber-muted">
+                {searchQuery || selectedCategory ? '没有找到匹配的 MCPs' : '暂无 MCPs'}
               </div>
             </CyberCard>
-          ))}
-        </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredMcps.map(mcp => (
+                <CyberCard
+                  key={mcp.id}
+                  className="cursor-pointer hover:border-cyber-cyan/50 transition-colors group"
+                  onClick={() => setSelectedMcp(mcp)}
+                >
+                  <div className="p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="p-3 rounded-lg bg-cyber-purple/10 text-cyber-purple group-hover:bg-cyber-purple/20 transition-colors">
+                        <ServerIcon className="w-6 h-6" />
+                      </div>
+                      {mcp.category && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-cyber-cyan/20 text-cyber-cyan">
+                          {mcp.category}
+                        </span>
+                      )}
+                    </div>
+
+                    <h3 className="text-lg font-display font-semibold text-cyber-white group-hover:text-cyber-cyan transition-colors mb-1">
+                      {mcp.name}
+                    </h3>
+                    <code className="text-xs text-cyber-muted font-mono">{mcp.slug}</code>
+
+                    <p className="mt-2 text-sm text-cyber-muted line-clamp-2">{mcp.description}</p>
+                  </div>
+                </CyberCard>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* My MCPs Tab */}
+      {activeTab === 'my' && isLoggedIn && (
+        <>
+          {/* Upload Button */}
+          <div className="flex gap-2">
+            <CyberButton
+              onClick={() => setIsUploadModalOpen(true)}
+              icon={<PlusIcon className="w-5 h-5" />}
+            >
+              上传 MCP
+            </CyberButton>
+          </div>
+
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <CyberCard key={i} className="h-48">
+                  <div className="p-6 skeleton h-full" />
+                </CyberCard>
+              ))}
+            </div>
+          ) : error ? (
+            <CyberCard>
+              <div className="p-8 text-center text-cyber-error">加载失败：{error}</div>
+            </CyberCard>
+          ) : filteredMcps.length === 0 ? (
+            <CyberCard>
+              <div className="p-8 text-center text-cyber-muted">
+                {searchQuery || selectedCategory ? '没有找到匹配的 MCPs' : '暂无 MCPs，点击上方按钮上传'}
+              </div>
+            </CyberCard>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredMcps.map(mcp => (
+                <CyberCard
+                  key={mcp.id}
+                  className="cursor-pointer hover:border-cyber-cyan/50 transition-colors group"
+                  onClick={() => setSelectedMcp(mcp)}
+                >
+                  <div className="p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="p-3 rounded-lg bg-cyber-purple/10 text-cyber-purple group-hover:bg-cyber-purple/20 transition-colors">
+                        <ServerIcon className="w-6 h-6" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {mcp.category && (
+                          <span className="px-2 py-0.5 text-xs rounded-full bg-cyber-cyan/20 text-cyber-cyan">
+                            {mcp.category}
+                          </span>
+                        )}
+                        <CyberButton
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            handleDelete(mcp);
+                          }}
+                          icon={<TrashIcon className="w-4 h-4" />}
+                        >
+                          删除
+                        </CyberButton>
+                      </div>
+                    </div>
+
+                    <h3 className="text-lg font-display font-semibold text-cyber-white group-hover:text-cyber-cyan transition-colors mb-1">
+                      {mcp.name}
+                    </h3>
+                    <code className="text-xs text-cyber-muted font-mono">{mcp.slug}</code>
+
+                    <p className="mt-2 text-sm text-cyber-muted line-clamp-2">{mcp.description}</p>
+                  </div>
+                </CyberCard>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Upload Modal */}
