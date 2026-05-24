@@ -76,14 +76,10 @@ export function Dashboard() {
             </span>
           </div>
 
-          {/* Main title with CP2077 glitch effect and kanji decoration */}
+          {/* Main title with CP2077 glitch effect */}
           <h1 className="text-5xl md:text-7xl font-display font-bold text-cyber-white mb-6 tracking-tight relative">
             <span className="glitch-cp2077 neon-glow-cyan" data-text="Nexus Agents">
               Nexus Agents
-            </span>
-            {/* Kanji decoration */}
-            <span className="kanji-decoration absolute -top-4 -right-4 md:right-8 text-cyber-cyan/30 text-2xl font-bold">
-              ネオ東京
             </span>
           </h1>
 

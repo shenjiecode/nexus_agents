@@ -676,8 +676,7 @@ input::placeholder, textarea::placeholder {
 /* Glitch text enhanced (CP2077 style) */
 .glitch-cp2077 {
   position: relative;
-  animation: glitch-skew 1s infinite linear alternate-reverse;
-}
+  }
 .glitch-cp2077::before,
 .glitch-cp2077::after {
   content: attr(data-text);
@@ -686,19 +685,19 @@ input::placeholder, textarea::placeholder {
   width: 100%;
   height: 100%;
   left: 0;
-}
+  }
 .glitch-cp2077::before {
   left: 2px;
   text-shadow: -2px 0 #FF2A6D;
   clip: rect(44px, 450px, 56px, 0);
-  animation: glitch-anim 0.5s infinite linear alternate-reverse;
-}
+  animation: glitch-anim 3s infinite linear alternate-reverse;
+  }
 .glitch-cp2077::after {
   left: -2px;
   text-shadow: -2px 0 #00D9FF, 2px 2px #FCEE0A;
   clip: rect(44px, 450px, 56px, 0);
-  animation: glitch-anim2 0.5s infinite linear alternate-reverse;
-}
+  animation: glitch-anim2 2s infinite linear alternate-reverse;
+  }
 @keyframes glitch-skew {
   0% { transform: skew(0deg); }
   10% { transform: skew(-1deg); }
