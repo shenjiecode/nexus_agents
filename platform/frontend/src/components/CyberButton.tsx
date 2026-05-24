@@ -23,46 +23,67 @@ export function CyberButton({
   ...props
 }: CyberButtonProps) {
   const baseStyles = `
-    relative font-display font-medium rounded-lg
-    transition-all duration-300 btn-ripple
+    relative font-display font-medium
+    transition-all duration-150
     flex items-center justify-center gap-2
     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none
   `;
 
-  const variantStyles = {
-    primary: `
-      bg-gradient-to-r from-cyber-cyan/20 to-cyber-purple/20
-      border border-cyber-cyan/40
-      text-cyber-cyan
-      hover:border-cyber-cyan hover:shadow-cyber-glow-hover
-      hover:from-cyber-cyan/30 hover:to-cyber-purple/30
-    `,
-    secondary: `
-      bg-cyber-dark-lighter
-      border border-cyber-purple/40
-      text-cyber-purple
-      hover:border-cyber-purple hover:shadow-purple-glow
-      hover:bg-cyber-purple/10
-    `,
-    danger: `
-      bg-cyber-error/10
-      border border-cyber-error/40
-      text-cyber-error
-      hover:border-cyber-error hover:shadow-error-glow
-      hover:bg-cyber-error/20
-    `,
-    ghost: `
-      bg-transparent
-      border border-transparent
-      text-cyber-muted
-      hover:text-cyber-cyan hover:border-cyber-cyan/20
-    `,
+  const sizeStyles = {
+    sm: 'px-4 py-1.5 text-sm',
+    md: 'px-6 py-2.5 text-base',
+    lg: 'px-8 py-3.5 text-lg',
   };
 
-  const sizeStyles = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-base',
-    lg: 'px-6 py-3 text-lg',
+  // Industrial cyberpunk 2077 style variants
+  const getVariantStyles = () => {
+    switch (variant) {
+      case 'primary':
+        return `
+          btn-industrial
+          bg-cyber-dark-lighter
+          border-2 border-cyber-cyan/60
+          text-cyber-cyan
+          box-glow-cyan
+          hover:border-cyber-cyan hover:shadow-cyber-glow-intense
+          hover:text-white
+          active:scale-[0.98]
+        `;
+      case 'secondary':
+        return `
+          btn-industrial
+          bg-cyber-dark-lighter
+          border-2 border-cyber-purple/60
+          text-cyber-purple
+          box-glow-cyan
+          hover:border-cyber-purple hover:shadow-purple-glow
+          hover:text-white
+          active:scale-[0.98]
+        `;
+      case 'danger':
+        return `
+          btn-industrial
+          bg-cyber-dark-lighter
+          border-2 border-cyber-red/60
+          text-cyber-red
+          box-glow-red
+          hover:border-cyber-red hover:shadow-red-glow
+          hover:text-white
+          active:scale-[0.98]
+        `;
+      case 'ghost':
+        return `
+          btn-industrial
+          bg-transparent
+          border-2 border-transparent
+          text-cyber-muted
+          hover:border-cyber-cyan/40 hover:text-cyber-cyan
+          hover:shadow-cyber-glow
+          active:scale-[0.98]
+        `;
+      default:
+        return '';
+    }
   };
 
   return (
@@ -70,11 +91,11 @@ export function CyberButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+      className={`${baseStyles} ${sizeStyles[size]} ${getVariantStyles()} ${className}`}
       {...props}
     >
       {icon && <span className="flex-shrink-0">{icon}</span>}
-      {children}
+      <span className="relative z-10">{children}</span>
     </button>
   );
 }

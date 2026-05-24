@@ -22,6 +22,15 @@ export default {
           success: '#10B981',
           'success-glow': 'rgba(16, 185, 129, 0.3)',
           warning: '#F59E0B',
+          /* CP2077 aggressive palette */
+          yellow: '#FCEE0A',
+          'yellow-glow': 'rgba(252, 238, 10, 0.3)',
+          red: '#FF2A6D',
+          'red-glow': 'rgba(255, 2, 107, 0.3)',
+          magenta: '#FF00FF',
+          'magenta-glow': 'rgba(255, 0, 255, 0.3)',
+          'deep-blue': '#1A1A2E',
+          midnight: '#16213E',
         }
       },
       fontFamily: {
@@ -32,31 +41,25 @@ export default {
       boxShadow: {
         'cyber-glow': '0 0 20px rgba(0, 217, 255, 0.3)',
         'cyber-glow-hover': '0 0 30px rgba(0, 217, 255, 0.5)',
+        'cyber-glow-intense': '0 0 5px rgba(0, 217, 255, 0.3), 0 0 10px rgba(0, 217, 255, 0.3), 0 0 20px rgba(0, 217, 255, 0.2), 0 0 40px rgba(0, 217, 255, 0.1)',
         'purple-glow': '0 0 20px rgba(139, 92, 246, 0.3)',
         'error-glow': '0 0 20px rgba(239, 68, 68, 0.3)',
+        'yellow-glow': '0 0 5px rgba(252, 238, 10, 0.3), 0 0 10px rgba(252, 238, 10, 0.3), 0 0 20px rgba(252, 238, 10, 0.2)',
+        'red-glow': '0 0 5px rgba(255, 2, 107, 0.3), 0 0 10px rgba(255, 2, 107, 0.3), 0 0 20px rgba(255, 2, 107, 0.2)',
+        'magenta-glow': '0 0 5px rgba(255, 0, 255, 0.3), 0 0 10px rgba(255, 0, 255, 0.3), 0 0 20px rgba(255, 0, 255, 0.2)',
       },
       animation: {
         'shimmer': 'shimmer 2s linear infinite',
         'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
         'scanline': 'scanline 8s linear infinite',
-      },
-      keyframes: {
-        shimmer: {
-          '0%': { backgroundPosition: '-200% 0' },
-          '100%': { backgroundPosition: '200% 0' },
-        },
-        'pulse-glow': {
-          '0%, 100%': { boxShadow: '0 0 10px rgba(0, 217, 255, 0.3)' },
-          '50%': { boxShadow: '0 0 25px rgba(0, 217, 255, 0.6)' },
-        },
-        scanline: {
-          '0%': { transform: 'translateY(-100%)' },
-          '100%': { transform: 'translateY(100%)' },
-        }
+        'glitch-skew': 'glitch-skew 1s infinite linear alternate-reverse',
+        'crt-flicker': 'crt-flicker 0.15s infinite',
+        'skyline-pulse': 'skyline-pulse 4s ease-in-out infinite',
       },
       backgroundImage: {
         'cyber-gradient': 'linear-gradient(135deg, #0A0A0F 0%, #1E1E2E 100%)',
         'card-gradient': 'linear-gradient(180deg, rgba(0, 217, 255, 0.05) 0%, transparent 100%)',
+        'warning-stripe': 'repeating-linear-gradient(45deg, #FCEE0A 0, #FCEE0A 10px, #0A0A0F 10px, #0A0A0F 20px)',
       }
     },
   },

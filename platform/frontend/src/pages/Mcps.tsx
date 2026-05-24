@@ -268,7 +268,7 @@ export function Mcps() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="MCPs">
+          <h1 className="text-3xl font-display font-bold text-cyber-white glitch-cp2077 neon-glow-cyan" data-text="MCPs">
             MCPs
           </h1>
           <p className="text-cyber-muted mt-1">浏览和管理 MCP 配置</p>

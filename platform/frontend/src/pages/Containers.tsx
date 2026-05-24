@@ -263,7 +263,7 @@ export function Containers() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="Containers">
+          <h1 className="text-3xl font-display font-bold text-cyber-white glitch-cp2077 neon-glow-cyan" data-text="Containers">
             Containers
           </h1>
           <p className="text-cyber-muted mt-1">管理和监控您的容器</p>

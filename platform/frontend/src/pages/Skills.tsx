@@ -294,7 +294,7 @@ export function Skills() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-cyber-white glitch" data-text="Skills">
+          <h1 className="text-3xl font-display font-bold text-cyber-white glitch-cp2077 neon-glow-cyan" data-text="Skills">
             Skills
           </h1>
           <p className="text-cyber-muted mt-1">浏览和管理 AI Skills</p>

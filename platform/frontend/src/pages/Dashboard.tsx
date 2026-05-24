@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { CyberCard } from '../components/CyberCard';
 
 function PuzzleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -57,54 +56,78 @@ const sections = [
 
 export function Dashboard() {
   return (
-    <div className="page-transition flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">
-      <div className="w-full max-w-4xl mx-auto px-4">
+    <div className="page-transition flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] relative">
+      {/* Noise overlay for CRT effect */}
+      <div className="noise-overlay" />
+      
+      {/* City skyline silhouette at bottom */}
+      <div className="cyber-skyline" />
+      
+      <div className="w-full max-w-4xl mx-auto px-4 relative z-10">
         <div className="text-center mb-16">
-          <div className="inline-block mb-6 px-4 py-1.5 rounded-full border border-cyber-cyan/30 bg-cyber-cyan/5">
-            <span className="text-cyber-cyan text-xs font-mono tracking-wider uppercase">
+          {/* Enhanced platform badge with industrial style */}
+          <div className="inline-block mb-8 px-5 py-2 border border-cyber-cyan/40 bg-cyber-cyan/5 relative">
+            <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-cyber-cyan" />
+            <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-cyber-cyan" />
+            <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-cyber-cyan" />
+            <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-cyber-cyan" />
+            <span className="text-cyber-cyan text-xs font-mono tracking-widest uppercase">
               Nexus Agents Platform
             </span>
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-display font-bold text-cyber-white mb-4 tracking-tight">
-            <span className="glitch" data-text="Nexus Agents">
+          {/* Main title with CP2077 glitch effect and kanji decoration */}
+          <h1 className="text-5xl md:text-7xl font-display font-bold text-cyber-white mb-6 tracking-tight relative">
+            <span className="glitch-cp2077 neon-glow-cyan" data-text="Nexus Agents">
               Nexus Agents
+            </span>
+            {/* Kanji decoration */}
+            <span className="kanji-decoration absolute -top-4 -right-4 md:right-8 text-cyber-cyan/30 text-2xl font-bold">
+              ネオ東京
             </span>
           </h1>
 
-          <p className="text-lg md:text-xl text-cyber-muted font-light max-w-lg mx-auto leading-relaxed">
+          <p className="text-lg md:text-xl text-cyber-muted font-light max-w-lg mx-auto leading-relaxed mb-6">
             容器即人 — AI Agent 管理平台
           </p>
 
-          <div className="mt-6 w-24 h-px bg-gradient-to-r from-transparent via-cyber-cyan/50 to-transparent mx-auto" />
+          {/* Enhanced neon divider with multiple glow layers */}
+          <div className="relative">
+            <div className="w-32 h-[2px] bg-gradient-to-r from-transparent via-cyber-cyan to-transparent mx-auto" />
+            <div className="absolute inset-0 w-32 h-[2px] bg-gradient-to-r from-transparent via-cyber-cyan/50 to-transparent mx-auto blur-sm" />
+            <div className="absolute inset-0 w-48 h-[1px] bg-gradient-to-r from-transparent via-cyber-cyan/30 to-transparent mx-auto top-[2px]" />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* Cards grid with industrial card style */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {sections.map((section) => (
-            <Link key={section.to} to={section.to} className="group">
-              <CyberCard className={`h-full ${section.glow}`} hoverEffect>
-                <div className="p-6 flex flex-col items-center text-center">
-                  <div className={`p-3 rounded-xl bg-${section.color}/10 text-${section.color} mb-4 group-hover:bg-${section.color}/20 transition-colors`}>
-                    <section.icon className="w-7 h-7" />
+            <Link key={section.to} to={section.to} className="group block">
+              <div className={`card-industrial h-full transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(0,217,255,0.2)] ${section.glow}`}>
+                <div className="p-7 flex flex-col items-center text-center relative z-10">
+                  {/* Enhanced icon container with industrial corner accents */}
+                  <div className={`p-4 rounded-lg bg-${section.color}/10 text-${section.color} mb-5 group-hover:bg-${section.color}/20 transition-all duration-300 relative industrial-corners`}>
+                    <section.icon className="w-8 h-8 group-hover:scale-110 transition-transform duration-300" />
                   </div>
 
-                  <h3 className="font-display font-semibold text-lg text-cyber-white group-hover:text-cyber-cyan transition-colors mb-1">
+                  <h3 className="font-display font-semibold text-xl text-cyber-white group-hover:text-cyber-cyan transition-colors mb-2">
                     {section.title}
                   </h3>
 
-                  <p className="text-cyber-cyan/70 text-xs font-mono mb-3 tracking-wide">
+                  <p className="text-cyber-cyan/70 text-xs font-mono mb-3 tracking-wider uppercase">
                     {section.subtitle}
                   </p>
 
-                  <p className="text-cyber-muted text-sm leading-relaxed">
+                  <p className="text-cyber-muted text-sm leading-relaxed mb-4">
                     {section.description}
                   </p>
 
-                  <div className="mt-4 text-cyber-cyan/40 group-hover:text-cyber-cyan text-xs font-mono transition-colors">
-                    进入 →
+                  <div className="mt-auto text-cyber-cyan/40 group-hover:text-cyber-cyan text-xs font-mono tracking-wider transition-colors flex items-center gap-1">
+                    进入 
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
                   </div>
                 </div>
-              </CyberCard>
+              </div>
             </Link>
           ))}
         </div>
