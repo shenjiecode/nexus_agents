@@ -87,26 +87,26 @@ export function Sidebar({ isCollapsed, onCollapse }: SidebarProps) {
     <aside
       className={`
         fixed left-0 top-0 h-screen
-        bg-cyber-dark-card border-r border-cyber-cyan/20 box-glow-cyan
+        bg-cyber-dark-card border-r border-cyber-cyan/30
         transition-all duration-300 z-40
         ${isCollapsed ? 'w-16' : 'w-64'}
       `}
     >
-      {/* Logo */}
-      <div className="flex items-center justify-between h-16 px-4 border-b border-cyber-cyan/20">
+      {/* Logo Area */}
+      <div className="flex items-center justify-between h-16 px-4 border-b border-cyber-cyan/30">
         {!isCollapsed && (
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-gradient-to-br from-cyber-cyan to-cyber-purple flex items-center justify-center shadow-cyber-glow">
-              <span className="font-display font-bold text-cyber-dark text-lg">N</span>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyber-cyan to-cyber-purple flex items-center justify-center shadow-lg">
+              <span className="font-display font-bold text-cyber-dark text-xl">N</span>
             </div>
-            <span className="font-display font-bold text-cyber-cyan text-lg neon-text">
+            <span className="font-display font-bold text-cyber-cyan text-xl neon-text tracking-wide">
               Nexus
             </span>
           </div>
         )}
         <button
           onClick={() => onCollapse(!isCollapsed)}
-          className="p-1.5 rounded-lg text-cyber-muted hover:text-cyber-cyan hover:bg-cyber-cyan/10 transition-colors"
+          className={`p-2 rounded-lg text-cyber-muted hover:text-cyber-cyan hover:bg-cyber-cyan/10 transition-colors ${isCollapsed ? 'mx-auto' : ''}`}
         >
           <svg
             className={`w-5 h-5 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`}
@@ -120,29 +120,29 @@ export function Sidebar({ isCollapsed, onCollapse }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="p-2 space-y-1">
+      <nav className="p-3 space-y-1.5">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             className={({ isActive }) => `
               flex items-center gap-3 px-3 py-2.5 rounded-lg
-              transition-all duration-300 group relative
+              transition-all duration-200 group relative
               ${isActive
-                ? 'bg-cyber-cyan/10 text-cyber-cyan border-l-2 border-cyber-cyan shadow-cyber-glow'
-                : 'text-cyber-muted hover:text-cyber-white hover:bg-cyber-cyan/5'
+                ? 'bg-cyber-cyan/15 text-cyber-cyan border-l-[3px] border-cyber-cyan'
+                : 'text-cyber-muted/80 hover:text-cyber-white hover:bg-cyber-cyan/5'
               }
-              ${isCollapsed ? 'justify-center' : ''}
+              ${isCollapsed ? 'justify-center px-2' : ''}
             `}
           >
-            <span className={`transition-colors ${location.pathname === item.path ? 'text-cyber-cyan' : 'group-hover:text-cyber-cyan'}`}>
+            <span className={`${location.pathname === item.path ? 'text-cyber-cyan' : 'group-hover:text-cyber-cyan'}`}>
               <item.icon />
             </span>
             {!isCollapsed && (
-              <span className="font-medium text-sm">{item.label}</span>
+              <span className="font-medium text-sm tracking-wide">{item.label}</span>
             )}
             {isCollapsed && (
-              <div className="absolute left-full ml-2 px-2 py-1 bg-cyber-dark-card border border-cyber-cyan/30 rounded text-sm text-cyber-white opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50">
+              <div className="absolute left-full ml-3 px-3 py-2 bg-cyber-dark-card border border-cyber-cyan/40 rounded-lg text-sm text-cyber-white opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-lg">
                 {item.label}
               </div>
             )}
@@ -150,29 +150,28 @@ export function Sidebar({ isCollapsed, onCollapse }: SidebarProps) {
         ))}
       </nav>
 
-      {/* Bottom section - User card */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-cyber-cyan/20">
+      {/* User Card */}
+      <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-cyber-cyan/30 bg-cyber-dark-card/50">
         {user && (
-          <div className={`group relative flex items-center gap-2 ${isCollapsed ? 'justify-center' : ''}`}>
-            {/* Avatar with neon glow */}
+          <div className={`group relative flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
+            {/* Avatar */}
             <div className="relative flex-shrink-0 cursor-pointer">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyber-cyan/80 to-cyber-purple/80 flex items-center justify-center shadow-cyber-glow">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyber-cyan to-cyber-purple flex items-center justify-center shadow-lg">
                 <span className="font-display font-bold text-cyber-dark text-sm">{userInitial}</span>
               </div>
-              {/* Neon ring effect */}
-              <div className="absolute inset-0 rounded-full border-2 border-cyber-cyan/50 animate-pulse pointer-events-none" />
+              <div className="absolute inset-0 rounded-full border-2 border-cyber-cyan/40 group-hover:border-cyber-cyan/70 transition-colors pointer-events-none" />
             </div>
             
-            {/* Expanded state: user info + logout button */}
+            {/* User Info */}
             {!isCollapsed && (
               <>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-cyber-white truncate">{displayName}</p>
-                  <p className="text-xs text-cyber-muted font-mono truncate">{user?.email || user?.username}</p>
+                  <p className="text-xs text-cyber-muted font-mono truncate mt-0.5">{user?.email || user?.username}</p>
                 </div>
                 <button
                   onClick={() => navigate('/logout')}
-                  className="p-1.5 rounded-lg text-cyber-muted hover:text-cyber-red hover:bg-cyber-red/10 transition-colors flex-shrink-0"
+                  className="p-2 rounded-lg text-cyber-muted/70 hover:text-cyber-red hover:bg-cyber-red/10 transition-colors flex-shrink-0"
                   title="退出登录"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -182,9 +181,9 @@ export function Sidebar({ isCollapsed, onCollapse }: SidebarProps) {
               </>
             )}
             
-            {/* Collapsed state: hover tooltip with logout */}
+            {/* Collapsed Tooltip */}
             {isCollapsed && (
-              <div className="absolute left-full ml-2 bottom-0 px-3 py-2 bg-cyber-dark-card border border-cyber-cyan/30 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 flex items-center gap-2">
+              <div className="absolute left-full ml-3 bottom-0 px-3 py-2 bg-cyber-dark-card border border-cyber-cyan/40 rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 flex items-center gap-2 shadow-lg">
                 <span className="text-sm text-cyber-white">{displayName}</span>
                 <button
                   onClick={(e) => {
