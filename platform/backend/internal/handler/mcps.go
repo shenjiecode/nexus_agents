@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -461,27 +462,62 @@ func UploadMCP(c *gin.Context) {
 		return
 	}
 
-	// Generate OSS path for MCP config
-	// Format: mcps/{userID}/{mcpID}/config.json
-	ossPath := fmt.Sprintf("mcps/%s/%s/config.json", user.ID, mcpID)
-
-	// Generate presigned upload URL (expires in 1 hour)
-	presignedURL, err := ossMCPService.GeneratePresignedUploadURL(ossPath, time.Hour)
+	// Receive multipart file
+	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":  "Failed to generate upload URL",
+			"error":  "File is required",
+		})
+		return
+	}
+	defer file.Close()
+
+	// Validate file size (max 10MB for JSON config)
+	const maxSize = 10 * 1024 * 1024
+	if header.Size > maxSize {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":  "File size exceeds 10MB limit",
 		})
 		return
 	}
 
+	// Read file content
+	data, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":  "Failed to read file",
+		})
+		return
+	}
+
+	// Generate OSS path for MCP config
+	ossPath := fmt.Sprintf("mcps/%s/%s/config.json", user.ID, mcpID)
+
+	// Upload directly to OSS
+	_, err = ossMCPService.UploadFile(ossPath, data)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":  "Failed to upload file to storage",
+		})
+		return
+	}
+
+	// Update MCP record with storage info
+	db.Model(&mcp).Updates(map[string]interface{}{
+		"storage_key": ossPath,
+		"size":        header.Size,
+	})
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"uploadUrl": presignedURL,
 			"ossPath":   ossPath,
-			"expiresIn": 3600,
-			"mcpId":    mcpID,
+			"size":      header.Size,
+			"mcpId":     mcpID,
 		},
 	})
 }
@@ -559,12 +595,12 @@ func DownloadMCP(c *gin.Context) {
 		return
 	}
 
-	// Generate presigned download URL (expires in 1 hour)
-	presignedURL, err := ossMCPService.GeneratePresignedDownloadURL(ossPath, time.Hour)
+	// Download file content directly from OSS
+	content, err := ossMCPService.DownloadFile(ossPath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"error":  "Failed to generate download URL",
+			"error":   "Failed to download config",
 		})
 		return
 	}
@@ -572,11 +608,88 @@ func DownloadMCP(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"downloadUrl": presignedURL,
-			"ossPath":     ossPath,
-			"expiresIn":   3600,
-			"mcpId":      mcpID,
-			"mcpName":    mcp.Name,
+			"content": string(content),
+			"ossPath": ossPath,
+			"mcpId":   mcpID,
+			"mcpName": mcp.Name,
+		},
+	})
+}
+
+// SaveMCPConfig handles PUT /api/mcps/:id/config - Save MCP config content directly
+func SaveMCPConfig(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":  "Unauthorized",
+		})
+		return
+	}
+
+	if ossMCPService == nil || !ossMCPService.IsConfigured() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"success": false,
+			"error":  "OSS storage is not configured",
+		})
+		return
+	}
+
+	mcpID := c.Param("id")
+	if mcpID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":  "MCP ID is required",
+		})
+		return
+	}
+
+	db := model.GetDB()
+	var mcp model.MCP
+	result := db.First(&mcp, "id = ?", mcpID)
+	if result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":  "MCP not found",
+		})
+		return
+	}
+
+	if mcp.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":  "Forbidden: you can only save your own MCPs",
+		})
+		return
+	}
+
+	var req struct {
+		Content string `json:"content"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":  "Invalid request body",
+		})
+		return
+	}
+
+	ossPath := fmt.Sprintf("mcps/%s/%s/config.json", mcp.UserID, mcpID)
+
+	_, err := ossMCPService.UploadFile(ossPath, []byte(req.Content))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":  "Failed to save config to storage",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"ossPath": ossPath,
+			"mcpId":   mcpID,
 		},
 	})
 }

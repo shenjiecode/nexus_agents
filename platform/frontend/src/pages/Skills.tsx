@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { CyberCard } from '../components/CyberCard';
 import { CyberButton } from '../components/CyberButton';
 import { CyberModal } from '../components/CyberModal';
+import { useConfirm } from '../components/ConfirmDialog';
+import { useToast } from '../components/Toast';
 import { useApi, apiRequest } from '../hooks/useApi';
 import type { Skill } from '../types';
 
@@ -135,7 +137,8 @@ export function Skills() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Delete state
-
+  const { openConfirm, ConfirmDialog } = useConfirm();
+  const toast = useToast();
   // View skill files state
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingSkill, setViewingSkill] = useState<Skill | null>(null);
@@ -217,17 +220,36 @@ export function Skills() {
     setSubmitError(null);
 
     try {
-      const form = new FormData();
-      form.append('name', formData.name);
-      form.append('slug', formData.slug);
-      form.append('description', formData.description);
-      form.append('category', formData.category || '');
-      form.append('file', selectedFile);
-
-      await apiRequest<Skill>('/api/skills', {
+      // Step 1: Create skill metadata (JSON)
+      const createResponse = await apiRequest<Skill>('/api/skills', {
         method: 'POST',
-        body: form,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          slug: formData.slug,
+          description: formData.description,
+          category: formData.category || '',
+        }),
       });
+
+      if (!createResponse.success || !createResponse.data?.id) {
+        throw new Error('Failed to create skill');
+      }
+
+      const skillId = createResponse.data.id;
+
+      // Step 2: Upload file to backend (which uploads to OSS)
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', selectedFile);
+
+      const uploadResponse = await apiRequest<{ ossPath: string; size: number }>(`/api/skills/${skillId}/upload`, {
+        method: 'POST',
+        body: uploadFormData,
+      });
+
+      if (!uploadResponse.success) {
+        throw new Error('Failed to upload file');
+      }
 
       setIsUploadModalOpen(false);
       setFormData({ name: '', slug: '', description: '', category: '' });
@@ -241,16 +263,24 @@ export function Skills() {
   };
 
   const handleDelete = async (skill: Skill) => {
-    if (!confirm(`确定要删除 Skill "${skill.name}" 吗？`)) return;
-
-    try {
-      await apiRequest(`/api/skills/${skill.slug}`, {
-        method: 'DELETE',
-      });
-      refetch();
-    } catch (err) {
-      console.error('Delete failed:', err);
-    }
+    openConfirm({
+      type: 'danger',
+      title: '删除 Skill',
+      message: `确定要删除 Skill "${skill.name}" 吗？此操作不可撤销。`,
+      confirmText: '删除',
+      cancelText: '取消',
+      onConfirm: async () => {
+        try {
+          await apiRequest(`/api/skills/${skill.id}`, {
+            method: 'DELETE',
+          });
+          refetch();
+          toast.success('Skill 删除成功');
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : '删除失败');
+        }
+      },
+    });
   };
 
   // Fetch skill files from OSS
@@ -736,6 +766,7 @@ export function Skills() {
           </div>
         </CyberModal>
       )}
+      {ConfirmDialog}
     </div>
   );
 }

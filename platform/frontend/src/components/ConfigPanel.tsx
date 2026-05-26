@@ -197,11 +197,12 @@ function ServerIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 interface ConfigPanelProps {
-  roleId: string;
+  entityId: string;
+  isContainerMode: boolean;
   isOwner: boolean;
 }
 
-export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
+export function ConfigPanel({ entityId, isContainerMode, isOwner }: ConfigPanelProps) {
   // Tab state
   const [activeTab, setActiveTab] = useState<'agent' | 'channel' | 'skills' | 'mcp'>('agent');
 
@@ -251,9 +252,14 @@ export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
     setError(null);
 
     try {
+      // Determine base endpoint based on mode
+      const baseEndpoint = isContainerMode
+        ? `/api/containers/${entityId}/files`
+        : `/api/roles/${entityId}/files`;
+
       // Load config.json
       const configResponse = await apiRequest<RoleFile>(
-        `/api/roles/${roleId}/files/${encodeURIComponent('config.json')}`
+        `${baseEndpoint}/${encodeURIComponent('config.json')}`
       );
 
       if (configResponse.success && configResponse.data) {
@@ -268,7 +274,7 @@ export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
 
       // Load .security.yml
       const securityResponse = await apiRequest<RoleFile>(
-        `/api/roles/${roleId}/files/${encodeURIComponent('.security.yml')}`
+        `${baseEndpoint}/${encodeURIComponent('.security.yml')}`
       );
 
       if (securityResponse.success && securityResponse.data) {
@@ -284,7 +290,7 @@ export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
     } finally {
       setLoading(false);
     }
-  }, [roleId]);
+  }, [entityId]);
 
   useEffect(() => {
     loadConfigs();
@@ -442,10 +448,15 @@ export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
 
     setSaveStatus('saving');
 
+    // Determine base endpoint based on mode
+    const baseEndpoint = isContainerMode
+      ? `/api/containers/${entityId}/files`
+      : `/api/roles/${entityId}/files`;
+
     try {
       // Save config.json
       const configResponse = await apiRequest(
-        `/api/roles/${roleId}/files/${encodeURIComponent('config.json')}`,
+        `${baseEndpoint}/${encodeURIComponent('config.json')}`,
         {
           method: 'PUT',
           body: JSON.stringify({ content: JSON.stringify(config, null, 2) }),
@@ -459,7 +470,7 @@ export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
       // Save .security.yml
       const securityYaml = serializeSecurityYaml(security || {});
       const securityResponse = await apiRequest(
-        `/api/roles/${roleId}/files/${encodeURIComponent('.security.yml')}`,
+        `${baseEndpoint}/${encodeURIComponent('.security.yml')}`,
         {
           method: 'PUT',
           body: JSON.stringify({ content: securityYaml }),
@@ -700,7 +711,7 @@ export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
   const handleAddSkill = async (skillId: string) => {
     if (!config || !isOwner) return;
     try {
-      await apiRequest(`/api/roles/${roleId}/skills/${skillId}`, { method: 'POST' });
+      await apiRequest(`/api/roles/${entityId}/skills/${skillId}`, { method: 'POST' });
       // Reload config to get updated state
       loadConfigs();
     } catch (err) {
@@ -712,7 +723,7 @@ export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
   const handleRemoveSkill = async (skillId: string) => {
     if (!config || !isOwner) return;
     try {
-      await apiRequest(`/api/roles/${roleId}/skills/${skillId}`, { method: 'DELETE' });
+      await apiRequest(`/api/roles/${entityId}/skills/${skillId}`, { method: 'DELETE' });
       // Reload config to get updated state
       loadConfigs();
     } catch (err) {
@@ -724,7 +735,7 @@ export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
   const handleAddMcp = async (mcpId: string) => {
     if (!config || !isOwner) return;
     try {
-      await apiRequest(`/api/roles/${roleId}/mcps/${mcpId}`, { method: 'POST' });
+      await apiRequest(`/api/roles/${entityId}/mcps/${mcpId}`, { method: 'POST' });
       // Reload config to get updated state
       loadConfigs();
     } catch (err) {
@@ -736,7 +747,7 @@ export function ConfigPanel({ roleId, isOwner }: ConfigPanelProps) {
   const handleRemoveMcp = async (mcpId: string) => {
     if (!config || !isOwner) return;
     try {
-      await apiRequest(`/api/roles/${roleId}/mcps/${mcpId}`, { method: 'DELETE' });
+      await apiRequest(`/api/roles/${entityId}/mcps/${mcpId}`, { method: 'DELETE' });
       // Reload config to get updated state
       loadConfigs();
     } catch (err) {

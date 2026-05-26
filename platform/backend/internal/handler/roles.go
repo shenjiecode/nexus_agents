@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -445,8 +446,7 @@ func deleteRoleDirRecursive(path string) error {
 	return service.DeleteRoleDir(path)
 }
 
-// UploadRole handles POST /api/roles/:id/upload - Generate presigned URL for uploading role package to OSS
-// Frontend can use the returned URL to upload the zip file directly to OSS
+// UploadRole handles POST /api/roles/:id/upload - Upload role package directly to OSS via backend
 func UploadRole(c *gin.Context) {
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -495,16 +495,46 @@ func UploadRole(c *gin.Context) {
 		return
 	}
 
-	// Generate OSS path for role package
-	// Format: roles/{userID}/{roleID}/package.zip
-	ossPath := fmt.Sprintf("roles/%s/%s/package.zip", user.ID, roleID)
+	// Receive multipart file
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":  "File is required",
+		})
+		return
+	}
+	defer file.Close()
 
-	// Generate presigned upload URL (expires in 1 hour)
-	presignedURL, err := ossService.GeneratePresignedUploadURL(ossPath, time.Hour)
+	// Validate file size (max 50MB)
+	const maxSize = 50 * 1024 * 1024
+	if header.Size > maxSize {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":  "File size exceeds 50MB limit",
+		})
+		return
+	}
+
+	// Read file content
+	data, err := io.ReadAll(file)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"error":  "Failed to generate upload URL",
+			"error":  "Failed to read file",
+		})
+		return
+	}
+
+	// Generate OSS path for role package
+	ossPath := fmt.Sprintf("roles/%s/%s/package.zip", user.ID, roleID)
+
+	// Upload directly to OSS
+	_, err = ossService.UploadFile(ossPath, data)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":  "Failed to upload file to storage",
 		})
 		return
 	}
@@ -512,9 +542,8 @@ func UploadRole(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"uploadUrl": presignedURL,
 			"ossPath":   ossPath,
-			"expiresIn": 3600,
+			"size":      header.Size,
 			"roleId":    roleID,
 		},
 	})

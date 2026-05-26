@@ -10,7 +10,7 @@
 # 1. 启动 Backend (需要先确保 PostgreSQL 运行)
 cd platform/backend
 # 首次需要启动 PostgreSQL (如果没运行)
-docker-compose up -d  # 或 podman-compose up -d
+docker-compose up -d
 # 启动 Backend 服务
 go run cmd/server/main.go
 
@@ -147,7 +147,7 @@ model_list:
 **检查**:
 ```bash
 # 确认容器运行
-podman ps --filter name=picoclaw
+docker ps --filter name=picoclaw
 
 # 确认 Backend 运行
 curl http://localhost:13207/health
@@ -176,10 +176,10 @@ model_list:
 **检查**:
 ```bash
 # 确认 picoclaw 镜像存在
-podman images | grep picoclaw
+docker images | grep picoclaw
 
 # 如果没有，拉取镜像
-podman pull sipeed/picoclaw:latest
+docker pull sipeed/picoclaw:latest
 ```
 
 ### 4. config.json 格式错误
@@ -264,7 +264,7 @@ curl -s http://localhost:13208 > /dev/null && echo " ✓"
 
 # 3. 检查容器状态
 echo "=== 检查调试容器 ==="
-podman ps --filter name=picoclaw
+docker ps --filter name=picoclaw
 
 # 4. 测试 WebSocket (需要 Node.js + ws 包)
 echo "=== 测试 WebSocket ==="
@@ -354,15 +354,15 @@ openssl rand -hex 16
 
 ```bash
 # 1. 检查容器状态
-podman ps --filter name=picoclaw
+docker ps --filter name=picoclaw
 
 # 2. 检查容器日志
-podman logs <container-name> | grep -i channel
+docker logs <container-name> | grep -i channel
 
 # 如果显示 "No channels enabled"，说明 .security.yml 缺少 pico 配置
 
 # 3. 检查容器内的 .security.yml
-podman exec <container-name> cat /root/.picoclaw/.security.yml
+docker exec <container-name> cat /root/.picoclaw/.security.yml
 
 # 确认包含 channel_list.pico.settings.token
 ```
@@ -372,10 +372,10 @@ podman exec <container-name> cat /root/.picoclaw/.security.yml
 **检查**: 镜像是否存在
 
 ```bash
-podman images | grep picoclaw
+docker images | grep picoclaw
 
 # 如果没有，拉取镜像
-podman pull sipeed/picoclaw:latest
+docker pull sipeed/picoclaw:latest
 ```
 
 ### 问题: API Key 无效

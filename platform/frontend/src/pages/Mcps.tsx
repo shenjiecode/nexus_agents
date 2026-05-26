@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { CyberCard } from '../components/CyberCard';
 import { CyberButton } from '../components/CyberButton';
 import { CyberModal } from '../components/CyberModal';
+import { useConfirm } from '../components/ConfirmDialog';
+import { useToast } from '../components/Toast';
 import { useApi, apiRequest } from '../hooks/useApi';
 import type { Mcp } from '../types';
 
@@ -93,8 +95,8 @@ export function Mcps() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Delete state
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const { openConfirm, ConfirmDialog } = useConfirm();
+  const toast = useToast();
 
   // Get user from localStorage
   useEffect(() => {
@@ -169,17 +171,37 @@ export function Mcps() {
     setSubmitError(null);
 
     try {
-      const form = new FormData();
-      form.append('name', formData.name);
-      form.append('slug', formData.slug);
-      form.append('description', formData.description);
-      form.append('category', formData.category || '');
-      form.append('file', selectedFile);
-
-      await apiRequest<Mcp>('/api/mcps', {
+      // Step 1: Create MCP metadata (JSON)
+      const createResponse = await apiRequest<Mcp>('/api/mcps', {
         method: 'POST',
-        body: form,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          slug: formData.slug,
+          description: formData.description,
+          category: formData.category || '',
+        }),
       });
+
+      if (!createResponse.success || !createResponse.data?.id) {
+        throw new Error('Failed to create MCP');
+      }
+
+      const mcpId = createResponse.data.id;
+
+      // Step 2: Upload file to backend (which uploads to OSS)
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', selectedFile);
+
+      const uploadResponse = await apiRequest<{ ossPath: string; size: number }>(`/api/mcps/${mcpId}/upload`, {
+        method: 'POST',
+        body: uploadFormData,
+      });
+
+      if (!uploadResponse.success) {
+        throw new Error('Failed to upload file');
+      }
+
 
       setIsUploadModalOpen(false);
       setFormData({ name: '', slug: '', description: '', category: '' });
@@ -193,38 +215,34 @@ export function Mcps() {
   };
 
   const handleDelete = async (mcp: Mcp) => {
-    if (!confirm(`确定要删除 MCP "${mcp.name}" 吗？`)) return;
-
-    setIsDeleting(true);
-    setDeleteError(null);
-
-    try {
-      await apiRequest(`/api/mcps/${mcp.slug}`, {
-        method: 'DELETE',
-      });
-      setSelectedMcp(null);
-      refetch();
-    } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : '删除失败');
-    } finally {
-      setIsDeleting(false);
-    }
+    openConfirm({
+      type: 'danger',
+      title: '删除 MCP',
+      message: `确定要删除 MCP "${mcp.name}" 吗？此操作不可撤销。`,
+      confirmText: '删除',
+      cancelText: '取消',
+      onConfirm: async () => {
+        try {
+          await apiRequest(`/api/mcps/${mcp.id}`, {
+            method: 'DELETE',
+          });
+          setSelectedMcp(null);
+          refetch();
+          toast.success('MCP 删除成功');
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : '删除失败');
+        }
+      },
+    });
   };
 
-  // Fetch MCP config from OSS
+  // Fetch MCP config via backend proxy
   const fetchMcpConfig = async (mcp: Mcp) => {
     setIsLoadingConfig(true);
     setConfigError(null);
     try {
-      // Get presigned download URL
-      const response = await apiRequest<{ downloadUrl: string }>(`/api/mcps/${mcp.id}/download`);
-      // Fetch config content from the presigned URL
-      const contentResponse = await fetch(response.data.downloadUrl);
-      if (!contentResponse.ok) {
-        throw new Error('Failed to fetch config content');
-      }
-      const content = await contentResponse.text();
-      setConfigContent(content);
+      const response = await apiRequest<{ content: string }>(`/api/mcps/${mcp.id}/download`);
+      setConfigContent(response.data.content);
       setIsEditModalOpen(true);
     } catch (err) {
       setConfigError(err instanceof Error ? err.message : '加载配置失败');
@@ -233,27 +251,17 @@ export function Mcps() {
     }
   };
 
-  // Save MCP config to OSS
+  // Save MCP config via backend proxy
   const handleSaveConfig = async () => {
     if (!selectedMcp) return;
     setIsSavingConfig(true);
     setConfigError(null);
     try {
-      // Get presigned upload URL
-      const response = await apiRequest<{ uploadUrl: string }>(`/api/mcps/${selectedMcp.id}/upload`, {
-        method: 'POST',
-      });
-      // Upload config content to the presigned URL
-      const uploadResponse = await fetch(response.data.uploadUrl, {
+      await apiRequest(`/api/mcps/${selectedMcp.id}/config`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: configContent,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: configContent }),
       });
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to save config');
-      }
       setIsEditModalOpen(false);
       setConfigContent('');
     } catch (err) {
@@ -582,7 +590,6 @@ export function Mcps() {
           isOpen={!!selectedMcp}
           onClose={() => {
             setSelectedMcp(null);
-            setDeleteError(null);
           }}
           title={selectedMcp.name}
           size="md"
@@ -604,23 +611,16 @@ export function Mcps() {
               {canManageMcp(selectedMcp) && (
                 <CyberButton
                   variant="danger"
-                  disabled={isDeleting}
                   icon={<TrashIcon className="w-4 h-4" />}
                   onClick={() => handleDelete(selectedMcp)}
                 >
-                  {isDeleting ? '删除中...' : '删除'}
+                  删除
                 </CyberButton>
               )}
             </>
           }
         >
           <div className="space-y-4">
-            {deleteError && (
-              <div className="p-3 rounded-lg bg-cyber-error/10 border border-cyber-error/30 text-cyber-error text-sm">
-                {deleteError}
-              </div>
-            )}
-
             <div>
               <label className="text-xs font-mono text-cyber-muted uppercase">Slug</label>
               <code className="block mt-1 px-2 py-1 rounded bg-cyber-dark text-cyber-cyan font-mono text-sm">
@@ -706,6 +706,7 @@ export function Mcps() {
           </div>
         </CyberModal>
       )}
+      {ConfirmDialog}
     </div>
   );
 }

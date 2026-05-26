@@ -39,7 +39,7 @@
                      ┌────────┴────────┐              │
                      ▼                 ▼              │
               ┌───────────┐    ┌─────────────┐        │
-              │PostgreSQL │    │Docker/Podman│        │
+              │PostgreSQL │    │   Docker    │        │
               │   :5433   │    │  Socket     │        │
               └───────────┘    └──────┬──────┘        │
                                       │               │
@@ -273,7 +273,7 @@ platform/backend/internal/
 | 对象存储 | AWS SDK v2 (S3兼容) | 京东云OSS S3兼容，Presigned URL模式 |
 | 认证 | X-User-Id头 | 轻量级认证，前端传递用户ID |
 | 日志 | Zap | 结构化日志、高性能 |
-| 容器管理 | Docker/Podman | 标准容器运行时 |
+| 容器管理 | Docker | 标准容器运行时 |
 
 ### 4.3 OSS 存储
 

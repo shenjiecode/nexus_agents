@@ -168,8 +168,8 @@ func TestAllocateContainer(t *testing.T) {
 	if info.SSHPort != info.Port+1000 {
 		t.Errorf("expected SSH port = %d, got %d", info.Port+1000, info.SSHPort)
 	}
-	if info.Image != "sipeed/picoclaw:full" {
-		t.Errorf("expected image 'sipeed/picoclaw:full', got %s", info.Image)
+	if info.Image != "sipeed/picoclaw:latest" {
+		t.Errorf("expected image 'sipeed/picoclaw:latest', got %s", info.Image)
 	}
 	if info.URL != fmt.Sprintf("http://localhost:%d", info.Port) {
 		t.Errorf("unexpected URL: %s", info.URL)
@@ -194,7 +194,7 @@ func TestAllocateContainer(t *testing.T) {
 	}
 
 	// Verify container config
-	if mc.config.Image != "sipeed/picoclaw:full" {
+	if mc.config.Image != "sipeed/picoclaw:latest" {
 		t.Errorf("unexpected image: %s", mc.config.Image)
 	}
 	if mc.config.Labels["nexus.picoclaw"] != "true" {
@@ -249,9 +249,8 @@ func TestAllocateContainerVariants(t *testing.T) {
 				t.Fatalf("AllocateContainer(%s) error = %v", variant, err)
 			}
 
-			expectedImage := fmt.Sprintf("sipeed/picoclaw:%s", variant)
-			if info.Image != expectedImage {
-				t.Errorf("expected image %s, got %s", expectedImage, info.Image)
+			if info.Image != "sipeed/picoclaw:latest" {
+				t.Errorf("expected image sipeed/picoclaw:latest, got %s", info.Image)
 			}
 		})
 	}
@@ -576,11 +575,11 @@ func TestContainerPortBindings(t *testing.T) {
 	mc := mock.containers[info.ContainerID]
 
 	// Verify exposed ports in container config
-	if _, ok := mc.config.ExposedPorts["22/tcp"]; !ok {
+	if _, ok := mc.config.ExposedPorts["18800/tcp"]; !ok {
 		t.Error("expected 22/tcp in exposed ports")
 	}
-	if _, ok := mc.config.ExposedPorts["8080/tcp"]; !ok {
-		t.Error("expected 8080/tcp in exposed ports")
+	if _, ok := mc.config.ExposedPorts["18790/tcp"]; !ok {
+		t.Error("expected 18790/tcp in exposed ports")
 	}
 
 	// Verify port bindings in host config
@@ -588,7 +587,7 @@ func TestContainerPortBindings(t *testing.T) {
 		t.Fatal("expected port bindings")
 	}
 
-	sshBindings, ok := mc.host.PortBindings[nat.Port("22/tcp")]
+	sshBindings, ok := mc.host.PortBindings[nat.Port("18800/tcp")]
 	if !ok || len(sshBindings) == 0 {
 		t.Fatal("expected SSH port binding")
 	}
@@ -596,7 +595,7 @@ func TestContainerPortBindings(t *testing.T) {
 		t.Errorf("expected SSH port %d, got %s", info.Port+1000, sshBindings[0].HostPort)
 	}
 
-	httpBindings, ok := mc.host.PortBindings[nat.Port("8080/tcp")]
+	httpBindings, ok := mc.host.PortBindings[nat.Port("18790/tcp")]
 	if !ok || len(httpBindings) == 0 {
 		t.Fatal("expected HTTP port binding")
 	}

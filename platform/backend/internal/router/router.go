@@ -64,14 +64,16 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 	// Set container pool and logger for debug handlers
 	handler.SetContainerPool(pool)
 	handler.SetDebugLogger(log)
-	// Initialize OSS service (optional - may be nil if not configured)
+	// Initialize OSS service for both Skills and MCPs
 	ossSvc, err := service.NewOSSService(cfg)
 	if err != nil {
 		log.Warn("Failed to initialize OSS service", zap.Error(err))
 	}
 	if ossSvc != nil {
 		handler.SetOSSMCPService(ossSvc)
-		log.Info("OSS service initialized")
+		handler.SetOSSSkillService(ossSvc)
+		handler.SetOSSService(ossSvc)
+		log.Info("OSS service initialized for Skills, MCPs and Roles")
 	}
 
 	// Build CORS allowed origins from config
@@ -207,6 +209,7 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 			mcps.DELETE("/:id", handler.DeleteMCP)
 			mcps.POST("/:id/upload", handler.UploadMCP)
 			mcps.GET("/:id/download", handler.DownloadMCP)
+			mcps.PUT("/:id/config", handler.SaveMCPConfig)
 		}
 
 		// Marketplace roles routes (public - no auth required)
@@ -217,9 +220,16 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 		{
 			containers.GET("", handler.ListContainers)            // GET /api/containers
 			containers.POST("", handler.CreateContainer)         // POST /api/containers
+			containers.GET("/:id", handler.GetContainer)         // GET /api/containers/:id
+			containers.GET("/:id/files", handler.GetContainerFiles)  // GET /api/containers/:id/files
+			containers.GET("/:id/files/*path", handler.GetContainerFileContent) // GET /api/containers/:id/files/:path
+			containers.PUT("/:id/files/*path", handler.SaveContainerFileContent) // PUT /api/containers/:id/files/:path
 			containers.POST("/:id/start", handler.StartContainer)  // POST /api/containers/:id/start
 			containers.POST("/:id/stop", handler.StopContainer)    // POST /api/containers/:id/stop
 			containers.DELETE("/:id", handler.DeleteContainer)    // DELETE /api/containers/:id
+			debug := containers.Group("/:id/debug")
+				debug.GET("/status", handler.GetContainerDebugStatus) // GET /api/containers/:id/debug/status
+				debug.GET("/ws", handler.ContainerDebugWebSocket)   // GET /api/containers/:id/debug/ws (WebSocket)
 	}
 	}
 

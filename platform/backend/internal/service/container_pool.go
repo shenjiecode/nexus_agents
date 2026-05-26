@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	containertypes "github.com/docker/docker/api/types/container"
@@ -89,7 +88,7 @@ func NewDockerClient() (DockerClient, error) {
 
 // AllocateContainer creates and starts a new container for debugging a role.
 // roleID identifies the role, roleDir is the host path to mount into the container.
-// variant selects the image variant (base, full, heavy).
+// variant is kept for labeling but does not affect image selection.
 func (p *ContainerPool) AllocateContainer(ctx context.Context, roleID, roleDir, variant string) (*ContainerInfo, error) {
 	// Check container limit
 	p.mu.RLock()
@@ -107,7 +106,7 @@ func (p *ContainerPool) AllocateContainer(ctx context.Context, roleID, roleDir, 
 	}
 
 	sshPort := port + 1000
-	imageName := fmt.Sprintf("sipeed/picoclaw:%s", variant)
+	imageName := "sipeed/picoclaw:latest"
 	containerName := fmt.Sprintf("%s-%s-%d", ContainerPrefix, roleID, port)
 
 	p.logger.Info("allocating container",
@@ -129,20 +128,21 @@ func (p *ContainerPool) AllocateContainer(ctx context.Context, roleID, roleDir, 
 
 	// Build port bindings
 	portBindings := nat.PortMap{
-		"22/tcp": []nat.PortBinding{
+		"18800/tcp": []nat.PortBinding{
 			{HostIP: "0.0.0.0", HostPort: strconv.Itoa(sshPort)},
 		},
-		"8080/tcp": []nat.PortBinding{
+		"18790/tcp": []nat.PortBinding{
 			{HostIP: "0.0.0.0", HostPort: strconv.Itoa(port)},
 		},
 	}
 
-	// Container config (matches Node.js picoclaw-pool.ts)
+	// Container config
 	containerConfig := &containertypes.Config{
-		Image: imageName,
+		Image:   imageName,
+		Cmd:     []string{"--allow-empty", "--host", "0.0.0.0"},
 		ExposedPorts: nat.PortSet{
-			"22/tcp":   struct{}{},
-			"8080/tcp": struct{}{},
+			"18800/tcp":   struct{}{},
+			"18790/tcp": struct{}{},
 		},
 		Env: []string{
 			fmt.Sprintf("PIKOCLAW_MODE=%s", variant),
@@ -158,7 +158,7 @@ func (p *ContainerPool) AllocateContainer(ctx context.Context, roleID, roleDir, 
 		},
 	}
 
-	// Host config (matches Node.js picoclaw-pool.ts)
+	// Host config
 	hostConfig := &containertypes.HostConfig{
 		PortBindings: portBindings,
 		RestartPolicy: containertypes.RestartPolicy{
@@ -187,7 +187,6 @@ func (p *ContainerPool) AllocateContainer(ctx context.Context, roleID, roleDir, 
 	// Start container
 	if err := p.client.ContainerStart(ctx, resp.ID, containertypes.StartOptions{}); err != nil {
 		info.Status = StatusError
-		// Attempt cleanup
 		_ = p.client.ContainerRemove(ctx, resp.ID, containertypes.RemoveOptions{Force: true})
 		p.logger.Error("failed to start container",
 			zap.String("containerID", resp.ID),
@@ -454,11 +453,11 @@ func (p *ContainerPool) ListManagedContainers(ctx context.Context) ([]*Container
 		// Extract port info if available
 		for _, port := range c.Ports {
 			if port.PublicPort != 0 {
-				if port.PrivatePort == 8080 {
+				if port.PrivatePort == 18790 {
 					info.Port = int(port.PublicPort)
 					info.URL = fmt.Sprintf("http://localhost:%d", port.PublicPort)
 				}
-				if port.PrivatePort == 22 {
+				if port.PrivatePort == 18800 {
 					info.SSHPort = int(port.PublicPort)
 				}
 			}
@@ -472,7 +471,7 @@ func (p *ContainerPool) ListManagedContainers(ctx context.Context) ([]*Container
 // AllocateUserContainer creates and starts a container with user-specific labels.
 // containerName is the name for the container.
 // roleDir is the host path to mount into the container.
-// variant selects the image variant (base, full, heavy).
+// variant is kept for labeling but does not affect image selection.
 func (p *ContainerPool) AllocateUserContainer(ctx context.Context, userID, containerName, roleDir, variant string) (*ContainerInfo, error) {
 	// Check container limit
 	p.mu.RLock()
@@ -490,7 +489,7 @@ func (p *ContainerPool) AllocateUserContainer(ctx context.Context, userID, conta
 	}
 
 	sshPort := port + 1000
-	imageName := fmt.Sprintf("sipeed/picoclaw:%s", variant)
+	imageName := "sipeed/picoclaw:latest"
 
 	p.logger.Info("allocating user container",
 		zap.String("userID", userID),
@@ -512,20 +511,21 @@ func (p *ContainerPool) AllocateUserContainer(ctx context.Context, userID, conta
 
 	// Build port bindings
 	portBindings := nat.PortMap{
-		"22/tcp": []nat.PortBinding{
+		"18800/tcp": []nat.PortBinding{
 			{HostIP: "0.0.0.0", HostPort: strconv.Itoa(sshPort)},
 		},
-		"8080/tcp": []nat.PortBinding{
+		"18790/tcp": []nat.PortBinding{
 			{HostIP: "0.0.0.0", HostPort: strconv.Itoa(port)},
 		},
 	}
 
 	// Container config with user-specific labels
 	containerConfig := &containertypes.Config{
-		Image: imageName,
+		Image:   imageName,
+		Cmd:     []string{"--allow-empty", "--host", "0.0.0.0"},
 		ExposedPorts: nat.PortSet{
-			"22/tcp":   struct{}{},
-			"8080/tcp": struct{}{},
+			"18800/tcp":   struct{}{},
+			"18790/tcp": struct{}{},
 		},
 		Env: []string{
 			fmt.Sprintf("PIKOCLAW_MODE=%s", variant),

@@ -60,6 +60,7 @@ func Load() (*Config, error) {
 	viper.BindEnv("OSS_ACCESS_KEY_ID")
 	viper.BindEnv("OSS_ACCESS_KEY_SECRET")
 	viper.BindEnv("OSS_REGION")
+
 	viper.SetDefault("PORT", DefaultPort)
 	viper.SetDefault("LOG_LEVEL", DefaultLogLevel)
 	viper.SetDefault("ENVIRONMENT", DefaultEnvironment)

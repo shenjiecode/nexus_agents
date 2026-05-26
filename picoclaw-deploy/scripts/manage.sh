@@ -42,8 +42,7 @@ case "$CMD" in
         ;;
     status)
         if [[ -z "$SERVER" ]]; then
-            docker ps --filter name=picoclaw --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || \
-            podman ps --filter name=picoclaw --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null
+            docker ps --filter name=picoclaw --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null
         else
             ssh "$SERVER" "docker ps --filter name=picoclaw --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
         fi
@@ -59,7 +58,7 @@ case "$CMD" in
         ;;
     shell)
         if [[ -z "$SERVER" ]]; then
-            docker exec -it picoclaw sh 2>/dev/null || podman exec -it picoclaw sh
+            docker exec -it picoclaw sh
         else
             ssh "$SERVER" "docker exec -it picoclaw sh"
         fi
@@ -67,8 +66,7 @@ case "$CMD" in
     test)
         echo "Testing LLM connection..."
         if [[ -z "$SERVER" ]]; then
-            docker exec picoclaw picoclaw agent -m 'Say hello in one word' 2>/dev/null || \
-            podman exec picoclaw picoclaw agent -m 'Say hello in one word'
+            docker exec picoclaw picoclaw agent -m 'Say hello in one word'
         else
             ssh "$SERVER" "docker exec picoclaw picoclaw agent -m 'Say hello in one word'"
         fi

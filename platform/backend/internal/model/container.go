@@ -14,7 +14,7 @@ type Container struct {
 	User       User      `gorm:"foreignKey:UserID" json:"-"`
 	Name       string    `json:"name"`
 	Description string  `json:"description"`
-	Variant    string    `json:"variant"` // base, full, heavy
+	Variant    string    `json:"variant"` // kept for record, image is always sipeed/picoclaw:latest
 	RoleID     *string   `json:"roleId"` // optional, references role
 	ContainerID string   `json:"containerId"` // Docker container ID
 	Port       int       `json:"port"`

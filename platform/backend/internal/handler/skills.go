@@ -419,8 +419,7 @@ func DeleteSkill(c *gin.Context) {
 	})
 }
 
-// UploadSkill handles POST /api/skills/:id/upload - Generate presigned URL for uploading skill package to OSS
-// Frontend can use the returned URL to upload the zip file directly to OSS
+// UploadSkill handles POST /api/skills/:id/upload - Upload skill package directly to OSS via backend
 func UploadSkill(c *gin.Context) {
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -469,26 +468,61 @@ func UploadSkill(c *gin.Context) {
 		return
 	}
 
-	// Generate OSS path for skill package
-	// Format: skills/{userID}/{skillID}/package.zip
-	ossPath := fmt.Sprintf("skills/%s/%s/package.zip", user.ID, skillID)
-
-	// Generate presigned upload URL (expires in 1 hour)
-	presignedURL, err := ossSkillService.GeneratePresignedUploadURL(ossPath, time.Hour)
+	// Receive multipart file
+	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":  "Failed to generate upload URL",
+			"error":  "File is required",
+		})
+		return
+	}
+	defer file.Close()
+
+	// Validate file size (max 50MB)
+	const maxSize = 50 * 1024 * 1024
+	if header.Size > maxSize {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":  "File size exceeds 50MB limit",
 		})
 		return
 	}
 
+	// Read file content
+	data, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":  "Failed to read file",
+		})
+		return
+	}
+
+	// Generate OSS path for skill package
+	ossPath := fmt.Sprintf("skills/%s/%s/package.zip", user.ID, skillID)
+
+	// Upload directly to OSS
+	_, err = ossSkillService.UploadFile(ossPath, data)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":  "Failed to upload file to storage",
+		})
+		return
+	}
+
+	// Update skill record with storage info
+	db.Model(&skill).Updates(map[string]interface{}{
+		"storage_key": ossPath,
+		"size":        header.Size,
+	})
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"uploadUrl": presignedURL,
 			"ossPath":   ossPath,
-			"expiresIn": 3600,
+			"size":      header.Size,
 			"skillId":   skillID,
 		},
 	})

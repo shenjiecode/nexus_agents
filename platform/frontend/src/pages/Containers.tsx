@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CyberCard } from '../components/CyberCard';
 import { CyberButton } from '../components/CyberButton';
 import { CyberModal } from '../components/CyberModal';
@@ -80,13 +81,10 @@ const statusOptions: { value: ContainerStatus | 'all'; label: string }[] = [
   { value: 'creating', label: '创建中' },
 ];
 
-const variantOptions = [
-  { value: 'base', label: '基础版 (base)' },
-  { value: 'full', label: '完整版 (full)' },
-  { value: 'heavy', label: '重型版 (heavy)' },
-];
+// variantOptions removed - all containers use sipeed/picoclaw:latest
 
 export function Containers() {
+  const navigate = useNavigate();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [, setUser] = useState<StoredUser | null>(null);
@@ -354,15 +352,25 @@ export function Containers() {
                     )}
                     {/* Stop Button - only when running */}
                     {container.status === 'running' && (
-                      <CyberButton
-                        size="sm"
-                        variant="ghost"
-                        disabled={actionLoading?.containerId === container.id && actionLoading.action === 'stop'}
-                        onClick={() => handleStop(container)}
-                        icon={<StopIcon className="w-4 h-4" />}
-                      >
-                        {actionLoading?.containerId === container.id && actionLoading.action === 'stop' ? '停止中...' : '停止'}
-                      </CyberButton>
+                      <>
+                        <CyberButton
+                          size="sm"
+                          variant="ghost"
+                          disabled={actionLoading?.containerId === container.id && actionLoading.action === 'stop'}
+                          onClick={() => handleStop(container)}
+                          icon={<StopIcon className="w-4 h-4" />}
+                        >
+                          {actionLoading?.containerId === container.id && actionLoading.action === 'stop' ? '停止中...' : '停止'}
+                        </CyberButton>
+                        {/* Debug Button */}
+                        <CyberButton
+                          size="sm"
+                          variant="primary"
+                          onClick={() => navigate(`/containers/${container.id}/debug`)}
+                        >
+                          调试
+                        </CyberButton>
+                      </>
                     )}
                     {/* Delete Button - always visible */}
                     <CyberButton
@@ -487,23 +495,15 @@ export function Containers() {
             />
           </div>
 
-          {/* Variant */}
+          {/* Variant: fixed to standard */}
           <div>
-            <label className="block text-sm font-medium text-cyber-muted mb-1">变体</label>
-            <div className="relative">
-              <select
-                value={formData.variant}
-                onChange={e => setFormData(prev => ({ ...prev, variant: e.target.value }))}
-                className="appearance-none w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white focus:border-cyber-cyan focus:outline-none cursor-pointer"
-              >
-                {variantOptions.map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-cyber-muted pointer-events-none" />
-            </div>
+            <label className="block text-sm font-medium text-cyber-muted mb-1">镜像</label>
+            <input
+              type="text"
+              value="sipeed/picoclaw:latest"
+              disabled
+              className="w-full px-3 py-2 rounded-lg bg-cyber-dark/50 border border-cyber-cyan/20 text-cyber-muted cursor-not-allowed"
+            />
           </div>
 
           {/* Role Dropdown */}

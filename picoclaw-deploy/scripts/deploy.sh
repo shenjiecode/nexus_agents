@@ -48,7 +48,7 @@ resolve_image() {
 echo "=== PicoClaw Deploy (${FLAVOR}) ==="
 echo "Image: ${IMAGE}"
 
-# --- Local deploy (podman/docker) ---
+# --- Local deploy (docker) ---
 deploy_local() {
     local arch
     arch=$(detect_arch "local")
@@ -60,22 +60,13 @@ deploy_local() {
     mkdir -p "${DEPLOY_ROOT}/${FLAVOR}/data"
 
     echo "[2/6] Pulling image..."
-    if command -v podman &>/dev/null; then
-        podman pull "${IMAGE}"
-    else
-        docker pull "${IMAGE}"
-    fi
+    docker pull "${IMAGE}"
 
     echo "[3/6] Checking for existing workspace..."
     if [[ ! -d "${DEPLOY_ROOT}/${FLAVOR}/data/workspace" ]]; then
         echo "  No workspace found. Running onboard to generate defaults..."
-        if command -v podman &>/dev/null; then
-            podman run --rm -v "${DEPLOY_ROOT}/${FLAVOR}/data:/root/.picoclaw" \
-                --entrypoint "" "${IMAGE}" sh -c "echo 'n' | picoclaw onboard"
-        else
-            docker run --rm -v "${DEPLOY_ROOT}/${FLAVOR}/data:/root/.picoclaw" \
-                --entrypoint "" "${IMAGE}" sh -c "echo 'n' | picoclaw onboard"
-        fi
+        docker run --rm -v "${DEPLOY_ROOT}/${FLAVOR}/data:/root/.picoclaw" \
+            --entrypoint "" "${IMAGE}" sh -c "echo 'n' | picoclaw onboard"
         echo "  ✓ Workspace generated"
     else
         echo "  ✓ Workspace already exists"
@@ -98,11 +89,7 @@ deploy_local() {
 
     echo "[6/6] Starting container..."
     cd "${DEPLOY_ROOT}/${FLAVOR}"
-    if command -v podman &>/dev/null; then
-        podman compose up -d
-    else
-        docker compose up -d
-    fi
+    docker compose up -d
 
     echo ""
     echo "=== Deploy Complete ==="

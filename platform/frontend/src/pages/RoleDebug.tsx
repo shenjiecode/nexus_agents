@@ -6,6 +6,7 @@ import { StatusDot } from '../components/StatusDot';
 import { ConfigPanel } from '../components/ConfigPanel';
 import { useApi, apiRequest } from '../hooks/useApi';
 import type { Role, RoleFile } from '../types';
+import type { Container } from '../types/container';
 
 // Icons
 function PlayIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -225,11 +226,12 @@ function FileTreeNode({
 
 // ChatPanel component
 interface ChatPanelProps {
-  roleId: string;
+  entityId: string;
   containerStatus: ContainerStatus;
+  isContainerMode: boolean;
 }
 
-function ChatPanel({ roleId, containerStatus }: ChatPanelProps) {
+function ChatPanel({ entityId, containerStatus, isContainerMode }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
@@ -254,7 +256,10 @@ function ChatPanel({ roleId, containerStatus }: ChatPanelProps) {
 
     const stored = localStorage.getItem('nexus_user');
     const userId = stored ? JSON.parse(stored).id : '';
-    const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/roles/${roleId}/debug/ws?userId=${userId}`;
+    const wsEndpoint = isContainerMode
+      ? `/api/containers/${entityId}/debug/ws`
+      : `/api/roles/${entityId}/debug/ws`;
+    const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}${wsEndpoint}?userId=${userId}`;
 
     setConnectionStatus('connecting');
     const socket = new WebSocket(wsUrl);
@@ -314,7 +319,7 @@ function ChatPanel({ roleId, containerStatus }: ChatPanelProps) {
     };
 
     wsRef.current = socket;
-  }, [roleId, containerStatus]);
+  }, [entityId, isContainerMode, containerStatus]);
 
   // Connect when container becomes running (with delay for container warmup)
   useEffect(() => {
@@ -525,12 +530,13 @@ function ChatPanel({ roleId, containerStatus }: ChatPanelProps) {
 
 // FileEditor component
 interface FileEditorProps {
-  roleId: string;
+  entityId: string;
+  isContainerMode: boolean;
   fileTree: FileTreeItem[];
   isOwner: boolean;
 }
 
-function FileEditor({ roleId, fileTree, isOwner }: FileEditorProps) {
+function FileEditor({ entityId, isContainerMode, fileTree, isOwner }: FileEditorProps) {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [content, setContent] = useState<string>('');
@@ -559,7 +565,10 @@ function FileEditor({ roleId, fileTree, isOwner }: FileEditorProps) {
     setSaveSuccess(false);
 
     try {
-      const response = await apiRequest<RoleFile>(`/api/roles/${roleId}/files/${encodeURIComponent(path)}`);
+      const endpoint = isContainerMode
+        ? `/api/containers/${entityId}/files/${encodeURIComponent(path)}`
+        : `/api/roles/${entityId}/files/${encodeURIComponent(path)}`;
+      const response = await apiRequest<RoleFile>(endpoint);
 
       if (!response.success || !response.data) {
         throw new Error(response.message || 'Failed to load file');
@@ -606,7 +615,10 @@ function FileEditor({ roleId, fileTree, isOwner }: FileEditorProps) {
     setSaveSuccess(false);
 
     try {
-      const response = await apiRequest(`/api/roles/${roleId}/files/${encodeURIComponent(selectedPath)}`, {
+      const endpoint = isContainerMode
+        ? `/api/containers/${entityId}/files/${encodeURIComponent(selectedPath)}`
+        : `/api/roles/${entityId}/files/${encodeURIComponent(selectedPath)}`;
+      const response = await apiRequest(endpoint, {
         method: 'PUT',
         body: JSON.stringify({ content }),
       });
@@ -657,9 +669,19 @@ function FileEditor({ roleId, fileTree, isOwner }: FileEditorProps) {
               已保存
             </span>
           )}
+          {hasUnsavedChanges && isOwner && (
+            <CyberButton
+              variant="primary"
+              size="sm"
+              onClick={handleSave}
+              disabled={saving}
+              icon={<SaveIcon className="w-4 h-4" />}
+            >
+              {saving ? '保存中...' : '保存'}
+            </CyberButton>
+          )}
         </div>
       </div>
-
       <div className="flex-1 flex overflow-hidden">
         {/* File Tree */}
         <div className="w-48 border-r border-cyber-cyan/20 overflow-y-auto">
@@ -757,12 +779,24 @@ function FileEditor({ roleId, fileTree, isOwner }: FileEditorProps) {
   );
 }
 
-export function RoleDebug() {
+interface RoleDebugProps {
+  mode?: 'role' | 'container';
+}
+
+export function RoleDebug({ mode = 'role' }: RoleDebugProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  // Role data
-  const { data: role, loading: roleLoading } = useApi<Role>(`/api/roles/${id}`);
+  // Determine if we're in container mode
+  const isContainerMode = mode === 'container';
+
+  // Role or Container data
+  const { data: role } = useApi<Role>(isContainerMode ? '' : `/api/roles/${id}`);
+  const { data: container } = useApi<Container>(isContainerMode ? `/api/containers/${id}` : '');
+
+  // Use role or container data
+  const entityData = isContainerMode ? container : role;
+  const entityLoading = isContainerMode ? !container : !role;
 
   // Container state
   const [containerStatus, setContainerStatus] = useState<ContainerStatus>('stopped');
@@ -787,25 +821,38 @@ export function RoleDebug() {
     }
   }, []);
 
-  const isOwner = role && currentUserId && role.userId === currentUserId;
+  const isOwner = entityData && currentUserId && (isContainerMode
+    ? (entityData as Container).userId === currentUserId
+    : (entityData as Role).userId === currentUserId);
 
-  // Sync container status from role
+
+  // Sync container status from entity
   useEffect(() => {
-    if (role) {
-      // Map backend status: 'debugging' means container should be running
-      const mapped: ContainerStatus = role.status === 'debugging' ? 'running' : (role.status as ContainerStatus);
-      setContainerStatus(mapped);
+    if (entityData) {
+      if (isContainerMode) {
+        // Container mode: status is direct
+        setContainerStatus((entityData as Container).status as ContainerStatus);
+      } else {
+        // Role mode: 'debugging' means container should be running
+        const role = entityData as Role;
+        const mapped: ContainerStatus = role.status === 'debugging' ? 'running' : (role.status as ContainerStatus);
+        setContainerStatus(mapped);
+      }
     }
-  }, [role]);
+  }, [entityData, isContainerMode]);
 
-  // Load file list
+  // Load file list (when effectiveRoleId exists)
   useEffect(() => {
     if (!id) return;
 
     const loadFileList = async () => {
       try {
+        // Use container file API in container mode, role file API otherwise
+        const endpoint = isContainerMode
+          ? `/api/containers/${id}/files`
+          : `/api/roles/${id}/files`;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const response = await apiRequest<any>(`/api/roles/${id}/files`);
+        const response = await apiRequest<any>(endpoint);
         if (response.success && Array.isArray(response.data)) {
           setFileTree(mapApiToFileTree(response.data));
         }
@@ -815,14 +862,17 @@ export function RoleDebug() {
     };
 
     loadFileList();
-  }, [id]);
+  }, [id, isContainerMode]);
 
   const handleStartContainer = async () => {
     if (!id || !isOwner) return;
 
     setOperationLoading(true);
     try {
-      const response = await apiRequest(`/api/roles/${id}/debug/start`, {
+      const endpoint = isContainerMode
+        ? `/api/containers/${id}/start`
+        : `/api/roles/${id}/debug/start`;
+      const response = await apiRequest(endpoint, {
         method: 'POST',
       });
 
@@ -841,7 +891,10 @@ export function RoleDebug() {
 
     setOperationLoading(true);
     try {
-      const response = await apiRequest(`/api/roles/${id}/debug/stop`, {
+      const endpoint = isContainerMode
+        ? `/api/containers/${id}/stop`
+        : `/api/roles/${id}/debug/stop`;
+      const response = await apiRequest(endpoint, {
         method: 'POST',
       });
 
@@ -871,7 +924,7 @@ export function RoleDebug() {
   };
 
   // Loading state
-  if (roleLoading) {
+  if (entityLoading) {
     return (
       <div className="page-transition space-y-6">
         <div className="skeleton h-16 rounded-lg" />
@@ -896,10 +949,10 @@ export function RoleDebug() {
             <p className="text-cyber-muted mb-6">只有角色所有者可以进行调试</p>
             <CyberButton
               variant="ghost"
-              onClick={() => navigate('/roles')}
+              onClick={() => navigate(isContainerMode ? '/containers' : '/roles')}
               icon={<ArrowLeftIcon className="w-4 h-4" />}
             >
-              返回角色详情
+              返回{isContainerMode ? '容器' : '角色'}列表
             </CyberButton>
           </div>
         </CyberCard>
@@ -913,24 +966,21 @@ export function RoleDebug() {
       <CyberCard cornerAccent>
         <div className="p-4">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            {/* Left: Role Info */}
+            {/* Left: Entity Info */}
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/roles')}
+                onClick={() => navigate(isContainerMode ? '/containers' : '/roles')}
                 className="p-2 rounded-lg bg-cyber-dark-lighter text-cyber-muted hover:text-cyber-cyan hover:bg-cyber-cyan/10 transition-colors"
               >
                 <ArrowLeftIcon className="w-5 h-5" />
               </button>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-display font-bold text-cyber-white">{role?.name}</h1>
+                  <h1 className="text-2xl font-display font-bold text-cyber-white">{entityData?.name}</h1>
                   <StatusDot status={getStatusDotStatus(containerStatus)} showLabel />
                 </div>
                 <p className="text-cyber-muted text-sm mt-1">
-                  调试模式 · {role?.variant === 'base' && '基础版'}
-                  {role?.variant === 'full' && '完整版'}
-                  {role?.variant === 'heavy' && '重型版'}
-                  {role?.containerPort && ` · 端口 ${role.containerPort}`}
+                  {isContainerMode ? '容器调试' : '调试模式'}{(entityData as any)?.containerPort || (entityData as any)?.port ? ` · 端口 ${(entityData as any).containerPort || (entityData as any).port}` : ''}
                 </p>
               </div>
             </div>
@@ -985,12 +1035,12 @@ export function RoleDebug() {
             </CyberButton>
           </div>
           {/* Content */}
-          {leftPanelView === 'files' && <FileEditor roleId={id!} fileTree={fileTree} isOwner={isOwner} />}
-          {leftPanelView === 'config' && <ConfigPanel roleId={id!} isOwner={isOwner} />}
+          {leftPanelView === 'files' && <FileEditor entityId={id!} isContainerMode={isContainerMode} fileTree={fileTree} isOwner={isOwner} />}
+          {leftPanelView === 'config' && <ConfigPanel entityId={id!} isContainerMode={isContainerMode} isOwner={isOwner} />}
         </CyberCard>
 
         {/* Right: Chat Panel */}
-        <ChatPanel roleId={id!} containerStatus={containerStatus} />
+        <ChatPanel entityId={id!} containerStatus={containerStatus} isContainerMode={isContainerMode} />
       </div>
     </div>
   );

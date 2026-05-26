@@ -41,11 +41,17 @@ interface UseApiReturn<T> extends UseApiState<T> {
 export function useApi<T>(endpoint: string): UseApiReturn<T> {
   const [state, setState] = useState<UseApiState<T>>({
     data: null,
-    loading: true,
+    loading: endpoint !== '', // only loading if endpoint is provided
     error: null,
   });
 
   const fetchData = useCallback(async () => {
+    // Skip if endpoint is empty
+    if (!endpoint) {
+      setState({ data: null, loading: false, error: null });
+      return;
+    }
+
     setState(prev => ({ ...prev, loading: true, error: null }));
     
     try {

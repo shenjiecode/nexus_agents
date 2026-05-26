@@ -1,10 +1,18 @@
 package handler
 
 import (
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 
 	"github.com/nexus-agents/backend/internal/middleware"
@@ -100,8 +108,41 @@ func CreateContainer(c *gin.Context) {
 			return
 		}
 		_ = role
-		roleDir = service.GetRoleDir(user.ID, *req.RoleID)
+		// Copy role files to container directory (not shared)
+		// roleDir = service.GetRoleDir(user.ID, *req.RoleID)
 	}
+
+	// Generate container ID upfront
+	containerUUID := uuid.New().String()
+	dockerContainerName := fmt.Sprintf("nexus-%s", containerUUID[:8])
+
+	// Container has its own workspace directory
+	containerWorkspaceDir := service.ContainerSecurityDir(user.ID, containerUUID)
+
+	// If role is bound, copy role files to container directory
+	if req.RoleID != nil && *req.RoleID != "" {
+		srcDir := service.GetRoleDir(user.ID, *req.RoleID)
+		if err := copyDirectory(srcDir, containerWorkspaceDir); err != nil {
+			getContainerLogger().Warn("failed to copy role files to container",
+				zap.String("srcDir", srcDir),
+				zap.String("dstDir", containerWorkspaceDir),
+				zap.Error(err),
+			)
+			// Continue anyway - container will have empty workspace
+		}
+	}
+
+	// Generate security config for container
+	_, err := service.GenerateContainerSecurity(user.ID, containerUUID)
+	if err != nil {
+		getContainerLogger().Warn("failed to generate container security",
+			zap.String("userId", user.ID),
+			zap.Error(err),
+		)
+	}
+
+	roleDir = containerWorkspaceDir
+
 
 	// Allocate container via pool
 	if pool == nil {
@@ -112,12 +153,8 @@ func CreateContainer(c *gin.Context) {
 		return
 	}
 
-	containerName := req.Name
-	if containerName == "" {
-		containerName = "container-" + time.Now().Format("20060102150405")
-	}
-
-	info, err := pool.AllocateUserContainer(c.Request.Context(), user.ID, containerName, roleDir, variant)
+	// Use the dockerContainerName generated above
+	info, err := pool.AllocateUserContainer(c.Request.Context(), user.ID, dockerContainerName, roleDir, variant)
 	if err != nil {
 		getContainerLogger().Error("failed to allocate container",
 			zap.String("userId", user.ID),
@@ -133,6 +170,7 @@ func CreateContainer(c *gin.Context) {
 
 	// Create container record in database
 	container := &model.Container{
+		ID:          containerUUID, // Use the same UUID for directory
 		UserID:      user.ID,
 		Name:        req.Name,
 		Description: req.Description,
@@ -158,6 +196,15 @@ func CreateContainer(c *gin.Context) {
 			"error":   "Failed to create container record",
 		})
 		return
+	}
+
+	// Fix permissions on container directory (container runs as root)
+	containerDir := service.ContainerSecurityDir(user.ID, containerUUID)
+	if err := fixContainerPermissions(containerDir); err != nil {
+		getContainerLogger().Warn("failed to fix container permissions",
+			zap.String("dir", containerDir),
+			zap.Error(err),
+		)
 	}
 
 	getContainerLogger().Info("container created",
@@ -491,4 +538,497 @@ func DeleteContainer(c *gin.Context) {
 			"message": "Container deleted successfully",
 		},
 	})
+}
+
+// ContainerDebugWebSocket handles GET /api/containers/:id/debug/ws
+// It upgrades the HTTP connection to WebSocket and proxies messages
+// between the client and the container's pico channel.
+func ContainerDebugWebSocket(c *gin.Context) {
+	containerID := c.Param("id")
+	if containerID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Container ID is required",
+		})
+		return
+	}
+
+	// Get user from header or query param
+	userID := c.GetHeader("X-User-Id")
+	if userID == "" {
+		userID = c.Query("userId")
+	}
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Unauthorized",
+		})
+		return
+	}
+
+	// Find container and validate ownership
+	db := model.GetDB()
+	var container model.Container
+	if err := db.First(&container, "id = ?", containerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   "Container not found",
+		})
+		return
+	}
+
+	if container.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   "Only the container owner can debug it",
+		})
+		return
+	}
+
+	// Check container is running
+	if container.Status != "running" || container.Port == 0 {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"success": false,
+			"error":   "Container is not running",
+		})
+		return
+	}
+
+	// Upgrade to WebSocket
+	clientConn, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		getContainerLogger().Error("failed to upgrade WebSocket",
+			zap.String("containerId", containerID),
+			zap.Error(err),
+		)
+		return
+	}
+	defer clientConn.Close()
+
+	getContainerLogger().Info("container debug WebSocket client connected",
+		zap.String("containerId", containerID),
+		zap.String("userId", userID),
+		zap.Int("port", container.Port),
+	)
+
+	// Connect to container's pico channel
+	containerURL := fmt.Sprintf("ws://localhost:%d/pico/ws", container.Port)
+
+	// Get pico token from the container's mounted role directory
+	var picoToken string
+	if container.RoleID != nil && *container.RoleID != "" {
+		token, err := service.GetPicoToken(userID, *container.RoleID)
+		if err != nil {
+			getContainerLogger().Warn("failed to get pico token, trying without",
+				zap.String("containerId", containerID),
+				zap.String("roleId", *container.RoleID),
+				zap.Error(err),
+			)
+		}
+		picoToken = token
+	}
+
+	containerConn, err := dialContainerWebSocket(containerURL, picoToken)
+	if err != nil {
+		getContainerLogger().Error("failed to connect to container WebSocket",
+			zap.String("containerId", containerID),
+			zap.String("containerUrl", containerURL),
+			zap.Error(err),
+		)
+		writeWSCloseMsg(clientConn, websocket.CloseInternalServerErr, "Container connection error")
+		return
+	}
+	defer containerConn.Close()
+
+	getContainerLogger().Info("container debug WebSocket proxy: connected to container",
+		zap.String("containerId", containerID),
+		zap.String("containerUrl", containerURL),
+	)
+
+	// Bidirectional proxy
+	done := make(chan struct{}, 2)
+
+	// Client -> Container
+	go proxyWebSocketMessages("client->container", clientConn, containerConn, done)
+
+	// Container -> Client
+	go proxyWebSocketMessages("container->client", containerConn, clientConn, done)
+
+	// Wait for either direction to finish
+	<-done
+
+	getContainerLogger().Info("container debug WebSocket proxy: session ended",
+		zap.String("containerId", containerID),
+	)
+}
+
+// GetContainerDebugStatus handles GET /api/containers/:id/debug/status
+func GetContainerDebugStatus(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Unauthorized",
+		})
+		return
+	}
+
+	containerID := c.Param("id")
+	if containerID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Container ID is required",
+		})
+		return
+	}
+
+	// Find container and validate ownership
+	db := model.GetDB()
+	var container model.Container
+	if err := db.First(&container, "id = ?", containerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   "Container not found",
+		})
+		return
+	}
+
+	if container.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   "Only the container owner can view debug status",
+		})
+		return
+	}
+
+	// Get real-time container status from Docker
+	containerStatus := container.Status
+	if pool != nil && container.ContainerID != "" {
+		info, err := pool.GetContainerStatus(c.Request.Context(), container.ContainerID)
+		if err == nil && info != nil {
+			containerStatus = string(info.Status)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"id":              container.ID,
+			"name":            container.Name,
+			"containerId":     container.ContainerID,
+			"containerPort":   container.Port,
+			"containerStatus": containerStatus,
+			"debugActive":     containerStatus == "running",
+		},
+	})
+}
+
+// dialContainerWebSocket connects to the container's WebSocket with timeout.
+func dialContainerWebSocket(url, token string) (*websocket.Conn, error) {
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 10 * time.Second,
+	}
+	headers := http.Header{}
+	if token != "" {
+		headers.Set("Authorization", "Bearer "+token)
+	}
+	conn, _, err := dialer.Dial(url, headers)
+	if err != nil {
+		return nil, fmt.Errorf("dial container WebSocket: %w", err)
+	}
+	return conn, nil
+}
+
+// proxyWebSocketMessages reads from src and writes to dst.
+func proxyWebSocketMessages(direction string, src, dst *websocket.Conn, done chan<- struct{}) {
+	for {
+		messageType, msg, err := src.ReadMessage()
+		if err != nil {
+			if !websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+				getContainerLogger().Debug("WebSocket read error",
+					zap.String("direction", direction),
+					zap.Error(err),
+				)
+			}
+			select {
+			case done <- struct{}{}:
+			default:
+			}
+			return
+		}
+
+		if err := dst.WriteMessage(messageType, msg); err != nil {
+			getContainerLogger().Debug("WebSocket write error",
+				zap.String("direction", direction),
+				zap.Error(err),
+			)
+			select {
+			case done <- struct{}{}:
+			default:
+			}
+			return
+		}
+	}
+}
+
+// writeWSCloseMsg sends a close message to the WebSocket connection.
+func writeWSCloseMsg(conn *websocket.Conn, closeCode int, reason string) {
+	msg := websocket.FormatCloseMessage(closeCode, reason)
+	if err := conn.WriteMessage(websocket.CloseMessage, msg); err != nil {
+		getContainerLogger().Debug("failed to send WebSocket close", zap.Error(err))
+	}
+}
+
+// GetContainer handles GET /api/containers/:id
+func GetContainer(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Unauthorized",
+		})
+		return
+	}
+
+	containerID := c.Param("id")
+	if containerID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Container ID is required",
+		})
+		return
+	}
+
+	db := model.GetDB()
+
+	var container model.Container
+	if err := db.First(&container, "id = ?", containerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   "Container not found",
+		})
+		return
+	}
+
+	if container.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   "Only the container owner can view it",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"id":          container.ID,
+			"userId":      container.UserID,
+			"name":        container.Name,
+			"description": container.Description,
+			"variant":     container.Variant,
+			"roleId":      container.RoleID,
+			"containerId": container.ContainerID,
+			"port":        container.Port,
+			"sshPort":     container.SSHPort,
+			"status":      container.Status,
+			"image":       container.Image,
+			"createdAt":   container.CreatedAt,
+			"updatedAt":   container.UpdatedAt,
+		},
+	})
+}
+
+// --- Container File APIs ---
+
+// GetContainerFiles handles GET /api/containers/:id/files
+func GetContainerFiles(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+
+	containerID := c.Param("id")
+	db := model.GetDB()
+	var container model.Container
+	if err := db.First(&container, "id = ?", containerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Container not found"})
+		return
+	}
+
+	if container.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden"})
+		return
+	}
+
+	// Use container directory
+	containerDir := service.ContainerSecurityDir(user.ID, containerID)
+	files, err := service.GetEntityFiles(containerDir)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": files})
+}
+
+// readContainerFiles reads the container directory and returns file entries
+// GetContainerFileContent handles GET /api/containers/:id/files/*path
+func GetContainerFileContent(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+
+	containerID := c.Param("id")
+	filePath := c.Param("path")
+	if len(filePath) > 0 && filePath[0] == '/' {
+		filePath = filePath[1:]
+	}
+
+	db := model.GetDB()
+	var container model.Container
+	if err := db.First(&container, "id = ?", containerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Container not found"})
+		return
+	}
+
+	if container.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden"})
+		return
+	}
+
+	// Read from container directory
+	containerDir := service.ContainerSecurityDir(user.ID, containerID)
+	content, err := service.GetEntityFile(containerDir, filePath)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"path": filePath, "content": content}})
+}
+
+// SaveContainerFileContent handles PUT /api/containers/:id/files/*path
+func SaveContainerFileContent(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+
+	containerID := c.Param("id")
+	filePath := c.Param("path")
+	if len(filePath) > 0 && filePath[0] == '/' {
+		filePath = filePath[1:]
+	}
+
+	var body struct {
+		Content string `json:"content"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid request body"})
+		return
+	}
+
+	db := model.GetDB()
+	var container model.Container
+	if err := db.First(&container, "id = ?", containerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Container not found"})
+		return
+	}
+
+	if container.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden"})
+		return
+	}
+
+	// Write to container directory
+	containerDir := service.ContainerSecurityDir(user.ID, containerID)
+	_, size, err := service.SaveEntityFile(containerDir, filePath, body.Content)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"path": filePath, "size": size}})
+}
+
+// copyDirectory recursively copies a directory from src to dst
+func copyDirectory(src, dst string) error {
+	// Create destination directory with proper permissions
+	if err := os.MkdirAll(dst, 0755); err != nil {
+		return err
+	}
+	// Ensure directory is readable
+	if err := os.Chmod(dst, 0755); err != nil {
+		return err
+	}
+
+	// Read source directory
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			// Recursively copy subdirectory
+			if err := copyDirectory(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			// Copy file
+			if err := copyFile(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// copyFile copies a single file from src to dst
+func copyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	_, err = io.Copy(dstFile, srcFile)
+	if err != nil {
+		return err
+	}
+
+	// Set readable permissions (644 for files)
+	return os.Chmod(dst, 0644)
+}
+
+// fixContainerPermissions changes ownership and permissions of container directory
+// so the host user can read/write files created by the container (which runs as root)
+func fixContainerPermissions(dir string) error {
+	// Run sudo chmod to fix permissions created by container (running as root)
+	// Password can be provided via SUDO_PASSWORD environment variable
+	cmd := exec.Command("sudo", "-S", "chmod", "-R", "a+rwX", dir)
+
+	// Get password from environment if set
+	sudoPassword := os.Getenv("SUDO_PASSWORD")
+	if sudoPassword != "" {
+		cmd.Stdin = strings.NewReader(sudoPassword + "\n")
+	}
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("chmod failed: %w", err)
+	}
+	return nil
 }

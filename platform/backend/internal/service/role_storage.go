@@ -273,11 +273,10 @@ This is your long-term memory. Important information about the user will be stor
 }
 
 // GetRoleFiles lists all files in a role directory
-func GetRoleFiles(userID, roleID string) ([]RoleFileEntry, error) {
-	rolePath := GetRoleDir(userID, roleID)
-
+// GetEntityFiles lists all files in a given base directory (works for roles and containers)
+func GetEntityFiles(basePath string) ([]RoleFileEntry, error) {
 	// Check if directory exists
-	info, err := os.Stat(rolePath)
+	info, err := os.Stat(basePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return []RoleFileEntry{}, nil
@@ -287,7 +286,7 @@ func GetRoleFiles(userID, roleID string) ([]RoleFileEntry, error) {
 
 	// If it's a file, return it as a single entry
 	if !info.IsDir() {
-		name := filepath.Base(rolePath)
+		name := filepath.Base(basePath)
 		return []RoleFileEntry{
 			{
 				Name:       name,
@@ -299,7 +298,12 @@ func GetRoleFiles(userID, roleID string) ([]RoleFileEntry, error) {
 		}, nil
 	}
 
-	return listDirEntries(rolePath, "")
+	return listDirEntries(basePath, "")
+}
+
+// GetRoleFiles lists all files in the role directory
+func GetRoleFiles(userID, roleID string) ([]RoleFileEntry, error) {
+	return GetEntityFiles(GetRoleDir(userID, roleID))
 }
 
 // listDirEntries recursively lists files and directories under basePath,
@@ -379,12 +383,10 @@ func listDirEntries(basePath, relPrefix string) ([]RoleFileEntry, error) {
 	return files, nil
 }
 
-// GetRoleFile reads a single file from the role directory
-func GetRoleFile(userID, roleID, filename string) (string, error) {
-	rolePath := GetRoleDir(userID, roleID)
-
+// GetEntityFile reads a single file from a given base directory (works for roles and containers)
+func GetEntityFile(basePath, filename string) (string, error) {
 	// Validate path to prevent directory traversal
-	fullPath, err := validatePath(rolePath, filename)
+	fullPath, err := validatePath(basePath, filename)
 	if err != nil {
 		return "", err
 	}
@@ -417,12 +419,15 @@ func GetRoleFile(userID, roleID, filename string) (string, error) {
 	return string(content), nil
 }
 
-// SaveRoleFile writes content to a file in the role directory
-func SaveRoleFile(userID, roleID, filename, content string) (string, int, error) {
-	rolePath := GetRoleDir(userID, roleID)
+// GetRoleFile reads a single file from the role directory
+func GetRoleFile(userID, roleID, filename string) (string, error) {
+	return GetEntityFile(GetRoleDir(userID, roleID), filename)
+}
 
+// SaveEntityFile writes content to a file in a given base directory (works for roles and containers)
+func SaveEntityFile(basePath, filename, content string) (string, int, error) {
 	// Validate path to prevent directory traversal
-	fullPath, err := validatePath(rolePath, filename)
+	fullPath, err := validatePath(basePath, filename)
 	if err != nil {
 		return "", 0, err
 	}
@@ -448,6 +453,11 @@ func SaveRoleFile(userID, roleID, filename, content string) (string, int, error)
 	size := len([]byte(content))
 
 	return filename, size, nil
+}
+
+// SaveRoleFile writes content to a file in the role directory
+func SaveRoleFile(userID, roleID, filename, content string) (string, int, error) {
+	return SaveEntityFile(GetRoleDir(userID, roleID), filename, content)
 }
 
 // DeleteRoleFile deletes a single file from the role directory
