@@ -2,10 +2,10 @@ package router
 
 import (
 	"fmt"
-	"strings"
-	"time"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+	"strings"
+	"time"
 
 	"github.com/nexus-agents/backend/internal/config"
 	"github.com/nexus-agents/backend/internal/handler"
@@ -21,7 +21,7 @@ type CORSConfig struct {
 	AllowHeaders     []string
 	ExposeHeaders    []string
 	AllowCredentials bool
-	MaxAge          int
+	MaxAge           int
 }
 
 // DefaultCORSConfig returns the default CORS configuration.
@@ -55,7 +55,7 @@ func DefaultCORSConfig() CORSConfig {
 			"Content-Type",
 		},
 		AllowCredentials: true,
-		MaxAge:          86400,
+		MaxAge:           86400,
 	}
 }
 
@@ -64,6 +64,7 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 	// Set container pool and logger for debug handlers
 	handler.SetContainerPool(pool)
 	handler.SetDebugLogger(log)
+	handler.SetContainerLogger(log)
 	// Initialize OSS service for both Skills and MCPs
 	ossSvc, err := service.NewOSSService(cfg)
 	if err != nil {
@@ -143,46 +144,46 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 		roles := api.Group("/roles")
 		{
 			// Public routes (no auth required)
-			roles.GET("", handler.ListPublicRoles)         // GET /api/roles - list public roles
-			roles.POST("/import", handler.ImportRole)       // POST /api/roles/import (multipart)
+			roles.GET("", handler.ListPublicRoles)    // GET /api/roles - list public roles
+			roles.POST("/import", handler.ImportRole) // POST /api/roles/import (multipart)
 
 			// Protected routes (require auth - handled by middleware.Auth)
-			roles.GET("/mine", handler.ListMyRoles)        // GET /api/roles/mine
-			roles.POST("", handler.CreateRole)              // POST /api/roles
-			roles.GET("/:id", handler.GetRole)             // GET /api/roles/:id
-			roles.PUT("/:id", handler.UpdateRole)          // PUT /api/roles/:id
-			roles.DELETE("/:id", handler.DeleteRole)       // DELETE /api/roles/:id
+			roles.GET("/mine", handler.ListMyRoles)  // GET /api/roles/mine
+			roles.POST("", handler.CreateRole)       // POST /api/roles
+			roles.GET("/:id", handler.GetRole)       // GET /api/roles/:id
+			roles.PUT("/:id", handler.UpdateRole)    // PUT /api/roles/:id
+			roles.DELETE("/:id", handler.DeleteRole) // DELETE /api/roles/:id
 
 			// Export role (public - no auth required)
-			roles.GET("/:id/export", handler.ExportRole)    // GET /api/roles/:id/export
+			roles.GET("/:id/export", handler.ExportRole) // GET /api/roles/:id/export
 
 			// OSS storage routes (protected - require auth)
-			roles.POST("/:id/upload", handler.UploadRole)     // POST /api/roles/:id/upload
+			roles.POST("/:id/upload", handler.UploadRole)    // POST /api/roles/:id/upload
 			roles.GET("/:id/download", handler.DownloadRole) // GET /api/roles/:id/download
 
 			// Role file operations (protected - require auth)
-			roles.GET("/:id/files", handler.ListRoleFiles)           // GET /api/roles/:id/files
-			roles.GET("/:id/files/*path", handler.GetRoleFileContent) // GET /api/roles/:id/files/:path
+			roles.GET("/:id/files", handler.ListRoleFiles)             // GET /api/roles/:id/files
+			roles.GET("/:id/files/*path", handler.GetRoleFileContent)  // GET /api/roles/:id/files/:path
 			roles.PUT("/:id/files/*path", handler.SaveRoleFileContent) // PUT /api/roles/:id/files/:path
 
 			// Debug routes (protected - require auth)
 			debug := roles.Group("/:id/debug")
 			{
-				debug.POST("/start", handler.StartDebug)    // POST /api/roles/:id/debug/start
-				debug.POST("/stop", handler.StopDebug)     // POST /api/roles/:id/debug/stop
-				debug.GET("/status", handler.DebugStatus)  // GET /api/roles/:id/debug/status
-				debug.GET("/ws", handler.DebugWebSocket)   // GET /api/roles/:id/debug/ws (WebSocket)
+				debug.POST("/start", handler.StartDebug)  // POST /api/roles/:id/debug/start
+				debug.POST("/stop", handler.StopDebug)    // POST /api/roles/:id/debug/stop
+				debug.GET("/status", handler.DebugStatus) // GET /api/roles/:id/debug/status
+				debug.GET("/ws", handler.DebugWebSocket)  // GET /api/roles/:id/debug/ws (WebSocket)
 			}
 
 			// Role skill/MCP routes (protected - require auth)
-			roles.POST("/:id/skills/:skillId", handler.AddSkillToRole)       // POST /api/roles/:id/skills/:skillId
+			roles.POST("/:id/skills/:skillId", handler.AddSkillToRole)        // POST /api/roles/:id/skills/:skillId
 			roles.DELETE("/:id/skills/:skillId", handler.RemoveSkillFromRole) // DELETE /api/roles/:id/skills/:skillId
-			roles.POST("/:id/mcps/:mcpId", handler.AddMCPToRole)           // POST /api/roles/:id/mcps/:mcpId
-			roles.DELETE("/:id/mcps/:mcpId", handler.RemoveMCPFromRole)     // DELETE /api/roles/:id/mcps/:mcpId
+			roles.POST("/:id/mcps/:mcpId", handler.AddMCPToRole)              // POST /api/roles/:id/mcps/:mcpId
+			roles.DELETE("/:id/mcps/:mcpId", handler.RemoveMCPFromRole)       // DELETE /api/roles/:id/mcps/:mcpId
 		}
 
 		// Marketplace routes (public - no auth required)
-		api.GET("/skills", handler.ListSkills)               // GET /api/skills
+		api.GET("/skills", handler.ListSkills) // GET /api/skills
 		api.GET("/mcps", handler.ListMCPs)
 
 		// Skills routes (protected - require auth)
@@ -213,31 +214,31 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 		}
 
 		// Marketplace roles routes (public - no auth required)
-		api.GET("/marketplace/roles", handler.ListMarketplaceRoles)                      // GET /api/marketplace/roles
+		api.GET("/marketplace/roles", handler.ListMarketplaceRoles)                    // GET /api/marketplace/roles
 		api.GET("/marketplace/roles/:id/download", handler.GetMarketplaceRoleDownload) // GET /api/marketplace/roles/:id/download
 		// Container routes (protected - require auth)
 		containers := api.Group("/containers")
 		{
-			containers.GET("", handler.ListContainers)            // GET /api/containers
-			containers.POST("", handler.CreateContainer)         // POST /api/containers
-			containers.GET("/:id", handler.GetContainer)         // GET /api/containers/:id
-			containers.GET("/:id/files", handler.GetContainerFiles)  // GET /api/containers/:id/files
-			containers.GET("/:id/files/*path", handler.GetContainerFileContent) // GET /api/containers/:id/files/:path
+			containers.GET("", handler.ListContainers)                           // GET /api/containers
+			containers.POST("", handler.CreateContainer)                         // POST /api/containers
+			containers.GET("/:id", handler.GetContainer)                         // GET /api/containers/:id
+			containers.GET("/:id/files", handler.GetContainerFiles)              // GET /api/containers/:id/files
+			containers.GET("/:id/files/*path", handler.GetContainerFileContent)  // GET /api/containers/:id/files/:path
 			containers.PUT("/:id/files/*path", handler.SaveContainerFileContent) // PUT /api/containers/:id/files/:path
-			containers.POST("/:id/start", handler.StartContainer)  // POST /api/containers/:id/start
-			containers.POST("/:id/stop", handler.StopContainer)    // POST /api/containers/:id/stop
-			containers.DELETE("/:id", handler.DeleteContainer)    // DELETE /api/containers/:id
+			containers.POST("/:id/start", handler.StartContainer)                // POST /api/containers/:id/start
+			containers.POST("/:id/stop", handler.StopContainer)                  // POST /api/containers/:id/stop
+			containers.DELETE("/:id", handler.DeleteContainer)                   // DELETE /api/containers/:id
 			debug := containers.Group("/:id/debug")
-				debug.GET("/status", handler.GetContainerDebugStatus) // GET /api/containers/:id/debug/status
-				debug.GET("/ws", handler.ContainerDebugWebSocket)   // GET /api/containers/:id/debug/ws (WebSocket)
-	}
+			debug.GET("/status", handler.GetContainerDebugStatus) // GET /api/containers/:id/debug/status
+			debug.GET("/ws", handler.ContainerDebugWebSocket)     // GET /api/containers/:id/debug/ws (WebSocket)
+		}
 	}
 
 	// 404 handler
 	engine.NoRoute(func(c *gin.Context) {
 		c.JSON(404, gin.H{
 			"success": false,
-			"error":  "Not Found",
+			"error":   "Not Found",
 		})
 	})
 

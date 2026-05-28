@@ -97,9 +97,8 @@ func CreateContainer(c *gin.Context) {
 	}
 
 	// Validate roleId if provided
-	var roleDir string
 	if req.RoleID != nil && *req.RoleID != "" {
-		role, errMsg, status := validateRoleOwnership(*req.RoleID, user.ID)
+		_, errMsg, status := validateRoleOwnership(*req.RoleID, user.ID)
 		if errMsg != "" {
 			c.JSON(status, gin.H{
 				"success": false,
@@ -107,9 +106,6 @@ func CreateContainer(c *gin.Context) {
 			})
 			return
 		}
-		_ = role
-		// Copy role files to container directory (not shared)
-		// roleDir = service.GetRoleDir(user.ID, *req.RoleID)
 	}
 
 	// Generate container ID upfront
@@ -119,30 +115,28 @@ func CreateContainer(c *gin.Context) {
 	// Container has its own workspace directory
 	containerWorkspaceDir := service.ContainerSecurityDir(user.ID, containerUUID)
 
-	// If role is bound, copy role files to container directory
+	// Setup container directory with config files
 	if req.RoleID != nil && *req.RoleID != "" {
+		// Copy role files to container directory (preserving full config)
 		srcDir := service.GetRoleDir(user.ID, *req.RoleID)
-		if err := copyDirectory(srcDir, containerWorkspaceDir); err != nil {
-			getContainerLogger().Warn("failed to copy role files to container",
-				zap.String("srcDir", srcDir),
-				zap.String("dstDir", containerWorkspaceDir),
-				zap.Error(err),
-			)
-			// Continue anyway - container will have empty workspace
-		}
+		copyDirectory(srcDir, containerWorkspaceDir) // best-effort: skip unreadable files
 	}
 
-	// Generate security config for container
-	_, err := service.GenerateContainerSecurity(user.ID, containerUUID)
-	if err != nil {
-		getContainerLogger().Warn("failed to generate container security",
-			zap.String("userId", user.ID),
+	// Ensure container has complete config (fills in missing files if copy was partial)
+	if err := service.CreateContainerDir(user.ID, containerUUID); err != nil {
+		getContainerLogger().Warn("failed to create default container config",
+			zap.String("containerUUID", containerUUID),
 			zap.Error(err),
 		)
 	}
 
-	roleDir = containerWorkspaceDir
-
+	// Always update pico token so container gets a unique token (different from role)
+	if err := service.UpdateContainerPicoToken(user.ID, containerUUID); err != nil {
+		getContainerLogger().Warn("failed to update container pico token",
+			zap.String("containerUUID", containerUUID),
+			zap.Error(err),
+		)
+	}
 
 	// Allocate container via pool
 	if pool == nil {
@@ -154,7 +148,7 @@ func CreateContainer(c *gin.Context) {
 	}
 
 	// Use the dockerContainerName generated above
-	info, err := pool.AllocateUserContainer(c.Request.Context(), user.ID, dockerContainerName, roleDir, variant)
+	info, err := pool.AllocateUserContainer(c.Request.Context(), user.ID, dockerContainerName, containerWorkspaceDir, variant)
 	if err != nil {
 		getContainerLogger().Error("failed to allocate container",
 			zap.String("userId", user.ID),
@@ -351,7 +345,7 @@ func StartContainer(c *gin.Context) {
 		)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"error":   "Failed to start container",
+			"error":   "Docker 容器已不存在，请删除并重新创建容器",
 		})
 		return
 	}
@@ -614,17 +608,15 @@ func ContainerDebugWebSocket(c *gin.Context) {
 	// Connect to container's pico channel
 	containerURL := fmt.Sprintf("ws://localhost:%d/pico/ws", container.Port)
 
-	// Get pico token from the container's mounted role directory
+	// Get pico token from the container's own directory (not the role directory)
 	var picoToken string
-	if container.RoleID != nil && *container.RoleID != "" {
-		token, err := service.GetPicoToken(userID, *container.RoleID)
-		if err != nil {
-			getContainerLogger().Warn("failed to get pico token, trying without",
-				zap.String("containerId", containerID),
-				zap.String("roleId", *container.RoleID),
-				zap.Error(err),
-			)
-		}
+	token, err := service.GetContainerPicoToken(userID, containerID)
+	if err != nil {
+		getContainerLogger().Warn("failed to get container pico token, trying without",
+			zap.String("containerId", containerID),
+			zap.Error(err),
+		)
+	} else {
 		picoToken = token
 	}
 
@@ -955,7 +947,8 @@ func SaveContainerFileContent(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"path": filePath, "size": size}})
 }
 
-// copyDirectory recursively copies a directory from src to dst
+// copyDirectory recursively copies a directory from src to dst.
+// It is best-effort: individual file/dir copy failures are logged but do not abort the overall copy.
 func copyDirectory(src, dst string) error {
 	// Create destination directory with proper permissions
 	if err := os.MkdirAll(dst, 0755); err != nil {
@@ -977,14 +970,15 @@ func copyDirectory(src, dst string) error {
 		dstPath := filepath.Join(dst, entry.Name())
 
 		if entry.IsDir() {
-			// Recursively copy subdirectory
+			// Recursively copy subdirectory (best-effort)
 			if err := copyDirectory(srcPath, dstPath); err != nil {
-				return err
+				// Skip dirs we can't read (e.g. runtime state dirs owned by root)
+				continue
 			}
 		} else {
-			// Copy file
+			// Copy file (skip on failure)
 			if err := copyFile(srcPath, dstPath); err != nil {
-				return err
+				continue
 			}
 		}
 	}

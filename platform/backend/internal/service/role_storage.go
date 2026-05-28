@@ -42,10 +42,10 @@ func (e *RoleStorageError) Error() string {
 // Common error codes
 const (
 	ErrCodePathTraversal = "PATH_TRAVERSAL"
-	ErrCodeAccessDenied = "ACCESS_DENIED"
-	ErrCodeFileNotFound = "FILE_NOT_FOUND"
-	ErrCodeIsDirectory  = "IS_DIRECTORY"
-	ErrCodeInvalidType  = "INVALID_FILE_TYPE"
+	ErrCodeAccessDenied  = "ACCESS_DENIED"
+	ErrCodeFileNotFound  = "FILE_NOT_FOUND"
+	ErrCodeIsDirectory   = "IS_DIRECTORY"
+	ErrCodeInvalidType   = "INVALID_FILE_TYPE"
 )
 
 // Required filenames at root level
@@ -93,10 +93,188 @@ func GetPicoToken(userID, roleID string) (string, error) {
 	return config.ChannelList.Pico.Settings.Token, nil
 }
 
-
 // parseSecurityYAML parses the .security.yml content using yaml.v3
 func parseSecurityYAML(content []byte, config *PicoSecurityConfig) error {
 	return yaml.Unmarshal(content, config)
+}
+
+// CreateContainerDir creates the container directory structure with default files.
+// This is used when a container is created without a role binding,
+// or as a fallback when role file copy fails.
+func CreateContainerDir(userID, containerID string) error {
+	containerPath := ContainerSecurityDir(userID, containerID)
+
+	// Create container directory
+	if err := os.MkdirAll(containerPath, 0755); err != nil {
+		return err
+	}
+
+	// Create workspace subdirectory
+	workspacePath := filepath.Join(containerPath, "workspace")
+	memoryPath := filepath.Join(workspacePath, "memory")
+
+	if err := os.MkdirAll(workspacePath, 0755); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(memoryPath, 0755); err != nil {
+		return err
+	}
+
+	// Write default config.json if not exists (same as CreateRoleDir)
+	configPath := filepath.Join(containerPath, "config.json")
+	if !fileExists(configPath) {
+		defaultConfig := `{ "version": 3, "session": { "dimensions": ["chat"] }, "isolation": {}, "agents": { "defaults": { "workspace": "/root/.picoclaw/workspace", "restrict_to_workspace": true, "allow_read_outside_workspace": false, "model_name": "tx/glm-5", "max_tokens": 32768, "max_tool_iterations": 50, "summarize_message_threshold": 20, "summarize_token_percent": 75, "steering_mode": "one-at-a-time", "tool_feedback": { "enabled": false, "max_args_length": 300, "separate_messages": false }, "split_on_marker": false } }, "model_list": [ { "model_name": "tx/glm-5", "provider": "openai", "model": "glm-5", "api_base": "https://api.lkeap.cloud.tencent.com/coding/v3" } ], "channel_list": { "pico": { "enabled": true, "type": "pico", "settings": { "ping_interval": 30, "read_timeout": 60, "write_timeout": 10, "max_connections": 100 } } }, "gateway": { "host": "0.0.0.0", "port": 18790, "hot_reload": false, "log_level": "warn" }, "tools": { "web": { "enabled": true, "duckduckgo": { "enabled": true, "max_results": 5 } } }, "heartbeat": { "enabled": true, "interval": 30 } }`
+		if err := os.WriteFile(configPath, []byte(defaultConfig), 0644); err != nil {
+			return err
+		}
+	}
+
+	// Write default .security.yml if not exists
+	securityPath := filepath.Join(containerPath, ".security.yml")
+	if !fileExists(securityPath) {
+		picoToken := generateRandomToken()
+		defaultSecurity := fmt.Sprintf(`channel_list:
+  pico:
+    settings:
+      token: %s
+model_list:
+  tx/glm-5:0:
+    api_keys:
+      - CHANGE_ME
+`, picoToken)
+		if err := os.WriteFile(securityPath, []byte(defaultSecurity), 0644); err != nil {
+			return err
+		}
+	}
+
+	// Write default AGENT.md if not exists
+	agentPath := filepath.Join(workspacePath, "AGENT.md")
+	if !fileExists(agentPath) {
+		defaultAgent := `You are a helpful AI assistant.
+
+Your role is to assist users with their tasks efficiently and professionally. You should:
+- Understand the user's intent and provide relevant solutions
+- Ask clarifying questions when needed
+- Proactively offer helpful suggestions
+- Maintain professionalism and courtesy in all interactions
+`
+		if err := os.WriteFile(agentPath, []byte(defaultAgent), 0644); err != nil {
+			return err
+		}
+	}
+
+	// Write default SOUL.md if not exists
+	soulPath := filepath.Join(workspacePath, "SOUL.md")
+	if !fileExists(soulPath) {
+		defaultSoul := `## Core Personality
+
+You are an empathetic and patient assistant who genuinely cares about helping users succeed. You believe in:
+- Continuous learning and improvement
+- Transparent communication
+- Respect for user autonomy
+- Collaboration over competition
+
+## Values
+
+- **Helpfulness**: Prioritize user success above all
+- **Honesty**: Be truthful, even when difficult
+- **Privacy**: Respect user confidentiality
+- **Excellence**: Strive for quality in every response
+`
+		if err := os.WriteFile(soulPath, []byte(defaultSoul), 0644); err != nil {
+			return err
+		}
+	}
+
+	// Write default USER.md if not exists
+	userPath := filepath.Join(workspacePath, "USER.md")
+	if !fileExists(userPath) {
+		defaultUser := `## Interaction Style
+
+- Address the user respectfully
+- Use clear, concise language
+- Adapt to user preferences
+- Remember previous conversations for continuity
+
+## Communication Preferences
+
+- Preferred tone: Professional yet friendly
+- Response length: Adequate to the question
+- Detail level: Depends on complexity
+`
+		if err := os.WriteFile(userPath, []byte(defaultUser), 0644); err != nil {
+			return err
+		}
+	}
+
+	// Write default MEMORY.md if not exists
+	memoryFilePath := filepath.Join(memoryPath, "MEMORY.md")
+	if !fileExists(memoryFilePath) {
+		defaultMemory := `# Memory
+
+This is your long-term memory. Important information about the user will be stored here.
+
+---
+
+## Session History
+
+(No sessions yet)
+`
+		if err := os.WriteFile(memoryFilePath, []byte(defaultMemory), 0644); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// UpdateContainerPicoToken generates a new random pico token and updates
+// the .security.yml in the container directory, preserving all other content.
+func UpdateContainerPicoToken(userID, containerID string) error {
+	containerPath := ContainerSecurityDir(userID, containerID)
+	securityPath := filepath.Join(containerPath, ".security.yml")
+
+	content, err := os.ReadFile(securityPath)
+	if err != nil {
+		return fmt.Errorf("failed to read .security.yml: %w", err)
+	}
+
+	// Generate new token
+	newToken := generateRandomToken()
+
+	// Parse existing security config to preserve all fields
+	var rawConfig map[string]interface{}
+	if err := yaml.Unmarshal(content, &rawConfig); err != nil {
+		return fmt.Errorf("failed to parse .security.yml: %w", err)
+	}
+
+	// Update the pico token
+	if channelList, ok := rawConfig["channel_list"].(map[string]interface{}); ok {
+		if pico, ok := channelList["pico"].(map[string]interface{}); ok {
+			if settings, ok := pico["settings"].(map[string]interface{}); ok {
+				settings["token"] = newToken
+			} else {
+				pico["settings"] = map[string]interface{}{"token": newToken}
+			}
+		} else {
+			channelList["pico"] = map[string]interface{}{"settings": map[string]interface{}{"token": newToken}}
+		}
+	} else {
+		rawConfig["channel_list"] = map[string]interface{}{
+			"pico": map[string]interface{}{"settings": map[string]interface{}{"token": newToken}},
+		}
+	}
+
+	newContent, err := yaml.Marshal(rawConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal .security.yml: %w", err)
+	}
+
+	if err := os.WriteFile(securityPath, newContent, 0644); err != nil {
+		return fmt.Errorf("failed to write .security.yml: %w", err)
+	}
+
+	return nil
 }
 
 // RoleDirExists checks if the role directory exists
@@ -358,7 +536,6 @@ func listDirEntries(basePath, relPrefix string) ([]RoleFileEntry, error) {
 			relPath = relPrefix + "/" + entry.Name()
 		}
 
-
 		fileEntry := RoleFileEntry{
 			Name:       entry.Name(),
 			Path:       relPath,
@@ -588,7 +765,6 @@ func GetFileInfo(path string) (fs.FileInfo, error) {
 	return os.Stat(path)
 }
 
-
 // generateRandomToken generates a random 32-character token for pico channel
 func generateRandomToken() string {
 	bytes := make([]byte, 16)
@@ -607,9 +783,9 @@ func DeleteRoleDir(rolePath string) error {
 // PicoConfig represents the picoclaw config.json structure
 // We only need the agents.defaults section for skill/MCP updates
 type PicoConfig struct {
-	Version  int                    `json:"version"`
-	Agents   PicoAgentsConfig       `json:"agents"`
-	ModelList []PicoModelConfig      `json:"model_list"`
+	Version     int                    `json:"version"`
+	Agents      PicoAgentsConfig       `json:"agents"`
+	ModelList   []PicoModelConfig      `json:"model_list"`
 	ChannelList map[string]interface{} `json:"channel_list"`
 }
 
