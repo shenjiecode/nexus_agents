@@ -947,8 +947,18 @@ func SaveContainerFileContent(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"path": filePath, "size": size}})
 }
 
+// runtimeDirs are directories created by the container at runtime (owned by root).
+// They should NOT be copied when cloning a role config to a container.
+var runtimeDirs = map[string]bool{
+	"sessions": true,
+	"state":    true,
+	"cron":     true,
+	"logs":     true,
+}
+
 // copyDirectory recursively copies a directory from src to dst.
 // It is best-effort: individual file/dir copy failures are logged but do not abort the overall copy.
+// Runtime directories (sessions, state, cron, logs) are skipped as the container creates them itself.
 func copyDirectory(src, dst string) error {
 	// Create destination directory with proper permissions
 	if err := os.MkdirAll(dst, 0755); err != nil {
@@ -966,13 +976,17 @@ func copyDirectory(src, dst string) error {
 	}
 
 	for _, entry := range entries {
+		// Skip runtime directories (owned by root, created by container at runtime)
+		if entry.IsDir() && runtimeDirs[entry.Name()] {
+			continue
+		}
+
 		srcPath := filepath.Join(src, entry.Name())
 		dstPath := filepath.Join(dst, entry.Name())
 
 		if entry.IsDir() {
 			// Recursively copy subdirectory (best-effort)
 			if err := copyDirectory(srcPath, dstPath); err != nil {
-				// Skip dirs we can't read (e.g. runtime state dirs owned by root)
 				continue
 			}
 		} else {

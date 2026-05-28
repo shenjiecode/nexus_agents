@@ -31,7 +31,6 @@ func TestLoadWithEnvVars(t *testing.T) {
 
 	// Set required values using viper.Set
 	viper.Set("DATABASE_URL", "postgres://user:pass@localhost:5432/testdb")
-	viper.Set("ADMIN_PASSWORD", "secret123")
 	viper.Set("PORT", 8080)
 	viper.Set("LOG_LEVEL", "debug")
 	viper.Set("DOCKER_HOST", "unix:///var/run/docker.sock")
@@ -44,9 +43,6 @@ func TestLoadWithEnvVars(t *testing.T) {
 	// Verify values
 	if cfg.DatabaseURL != "postgres://user:pass@localhost:5432/testdb" {
 		t.Errorf("Expected database URL, got %s", cfg.DatabaseURL)
-	}
-	if cfg.AdminPassword != "secret123" {
-		t.Errorf("Expected admin password, got %s", cfg.AdminPassword)
 	}
 	if cfg.Port != 8080 {
 		t.Errorf("Expected port 8080, got %d", cfg.Port)
@@ -63,25 +59,9 @@ func TestLoadMissingDatabaseURL(t *testing.T) {
 	// Reset viper for test
 	viper.Reset()
 
-	// Only set admin password, not database URL
-	viper.Set("ADMIN_PASSWORD", "secret123")
-
 	_, err := Load()
 	if err == nil {
 		t.Error("Expected error for missing DATABASE_URL")
-	}
-}
-
-func TestLoadMissingAdminPassword(t *testing.T) {
-	// Reset viper for test
-	viper.Reset()
-
-	// Only set database URL, not admin password
-	viper.Set("DATABASE_URL", "postgres://user:pass@localhost:5432/testdb")
-
-	_, err := Load()
-	if err == nil {
-		t.Error("Expected error for missing ADMIN_PASSWORD")
 	}
 }
 
