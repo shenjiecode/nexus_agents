@@ -77,6 +77,18 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 		log.Info("OSS service initialized for Skills, MCPs and Roles")
 	}
 
+	// Initialize Matrix service if configured
+	if cfg.MatrixHomeserver != "" && cfg.MatrixRegistrationSecret != "" {
+		matrixSvc := handler.NewMatrixProvisioner(service.MatrixCredentials{
+			Homeserver:         cfg.MatrixHomeserver,
+			ServerName:         cfg.MatrixServerName,
+			RegistrationSecret: cfg.MatrixRegistrationSecret,
+		})
+		handler.SetMatrixService(matrixSvc)
+		service.SetMatrixLogger(log)
+		log.Info("Matrix service initialized", zap.String("homeserver", cfg.MatrixHomeserver))
+	}
+
 	// Build CORS allowed origins from config
 	corsConfig := DefaultCORSConfig()
 	if cfg.FrontendURL != "" {
@@ -223,11 +235,18 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 			containers.POST("", handler.CreateContainer)                         // POST /api/containers
 			containers.GET("/:id", handler.GetContainer)                         // GET /api/containers/:id
 			containers.GET("/:id/files", handler.GetContainerFiles)              // GET /api/containers/:id/files
+			containers.GET("/:id/file-index", handler.GetContainerFileIndex)      // GET /api/containers/:id/file-index
+			containers.GET("/:id/installed-skills", handler.GetContainerInstalledSkills) // GET /api/containers/:id/installed-skills
 			containers.GET("/:id/files/*path", handler.GetContainerFileContent)  // GET /api/containers/:id/files/:path
 			containers.PUT("/:id/files/*path", handler.SaveContainerFileContent) // PUT /api/containers/:id/files/:path
 			containers.POST("/:id/start", handler.StartContainer)                // POST /api/containers/:id/start
 			containers.POST("/:id/stop", handler.StopContainer)                  // POST /api/containers/:id/stop
 			containers.DELETE("/:id", handler.DeleteContainer)                   // DELETE /api/containers/:id
+			// Container skill/MCP routes
+			containers.POST("/:id/skills/:skillId", handler.AddSkillToContainer)        // POST /api/containers/:id/skills/:skillId
+			containers.DELETE("/:id/skills/:skillId", handler.RemoveSkillFromContainer) // DELETE /api/containers/:id/skills/:skillId
+			containers.POST("/:id/mcps/:mcpId", handler.AddMCPToContainer)              // POST /api/containers/:id/mcps/:mcpId
+			containers.DELETE("/:id/mcps/:mcpId", handler.RemoveMCPFromContainer)       // DELETE /api/containers/:id/mcps/:mcpId
 			debug := containers.Group("/:id/debug")
 			debug.GET("/status", handler.GetContainerDebugStatus) // GET /api/containers/:id/debug/status
 			debug.GET("/ws", handler.ContainerDebugWebSocket)     // GET /api/containers/:id/debug/ws (WebSocket)

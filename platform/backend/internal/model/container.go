@@ -11,16 +11,21 @@ import (
 type Container struct {
 	ID          string    `gorm:"primaryKey" json:"id"`
 	UserID      string    `gorm:"index" json:"userId"`
-	User       User      `gorm:"foreignKey:UserID" json:"-"`
-	Name       string    `json:"name"`
-	Description string  `json:"description"`
-	Variant    string    `json:"variant"` // kept for record, image is always sipeed/picoclaw:latest
-	RoleID     *string   `json:"roleId"` // optional, references role
-	ContainerID string   `json:"containerId"` // Docker container ID
-	Port       int       `json:"port"`
-	SSHPort    int       `json:"sshPort"`
-	Status     string    `json:"status"` // running, stopped, creating, error
-	Image      string    `json:"image"`
+	User        User      `gorm:"foreignKey:UserID" json:"-"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Variant     string    `json:"variant"` // kept for record, image is always sipeed/picoclaw:latest
+	RoleID      *string   `json:"roleId"` // optional, references role
+	ContainerID string    `json:"containerId"` // Docker container ID
+	Port        int       `json:"port"`
+	SSHPort     int       `json:"sshPort"`
+	Status      string    `json:"status"` // running, stopped, creating, error
+	Image       string    `json:"image"`
+	// Matrix account info (auto-provisioned)
+	MatrixHomeserver  string `gorm:"column:matrix_homeserver" json:"matrixHomeserver,omitempty"`
+	MatrixUserID      string `gorm:"column:matrix_user_id" json:"matrixUserId,omitempty"`
+	MatrixPassword    string `gorm:"column:matrix_password" json:"-"`
+	MatrixAccessToken string `gorm:"column:matrix_access_token" json:"-"`
 	CreatedAt  time.Time `json:"createdAt"`
 	UpdatedAt  time.Time `json:"updatedAt"`
 }

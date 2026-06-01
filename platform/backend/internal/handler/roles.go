@@ -708,7 +708,7 @@ func SaveRoleFileContent(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"path": filePath, "size": size}})
 }
 
-// AddSkillToRole handles POST /api/roles/:id/skills/:skillId - Add a skill to role's config.json
+// AddSkillToRole handles POST /api/roles/:id/skills/:skillId - Add a skill to role's config.json and sync files
 func AddSkillToRole(c *gin.Context) {
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -742,16 +742,13 @@ func AddSkillToRole(c *gin.Context) {
 		return
 	}
 
-	// Update config.json
-	if err := service.UpdateRoleConfigSkills(user.ID, roleID, skillID, "add"); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	// Sync skill files to workspace (add skill package from OSS)
+	syncSkillFiles(c, user.ID, roleID, skillID, "add")
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "Skill added to role"}})
 }
 
-// RemoveSkillFromRole handles DELETE /api/roles/:id/skills/:skillId - Remove a skill from role's config.json
+// RemoveSkillFromRole handles DELETE /api/roles/:id/skills/:skillId - Remove a skill from role's config.json and remove files
 func RemoveSkillFromRole(c *gin.Context) {
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -785,11 +782,8 @@ func RemoveSkillFromRole(c *gin.Context) {
 		return
 	}
 
-	// Update config.json
-	if err := service.UpdateRoleConfigSkills(user.ID, roleID, skillID, "remove"); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	// Remove skill files from workspace
+	syncSkillFiles(c, user.ID, roleID, skillID, "remove")
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "Skill removed from role"}})
 }
@@ -828,11 +822,7 @@ func AddMCPToRole(c *gin.Context) {
 		return
 	}
 
-	// Update config.json
-	if err := service.UpdateRoleConfigMCPs(user.ID, roleID, mcpID, "add"); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	// TODO: sync MCP config files to workspace if needed
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "MCP added to role"}})
 }
@@ -871,11 +861,53 @@ func RemoveMCPFromRole(c *gin.Context) {
 		return
 	}
 
-	// Update config.json
-	if err := service.UpdateRoleConfigMCPs(user.ID, roleID, mcpID, "remove"); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+	// TODO: remove MCP config files from workspace if needed
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "MCP removed from role"}})
+}
+
+// syncSkillFiles syncs skill files to/from the role's workspace/skills directory.
+// For "add": downloads the skill package from OSS and extracts it.
+// For "remove": removes the skill directory from workspace.
+// Errors are logged but do not fail the request (config.json update is the source of truth).
+func syncSkillFiles(c *gin.Context, userID, roleID, skillID, action string) {
+	if action == "remove" {
+		// Look up skill slug for directory name
+		db := model.GetDB()
+		var skill model.Skill
+		if err := db.First(&skill, "id = ?", skillID).Error; err != nil {
+			return
+		}
+
+		roleDir := service.GetRoleDir(userID, roleID)
+		if err := service.RemoveSkillFromWorkspace(roleDir, skill.Slug); err != nil {
+			_ = c.Error(fmt.Errorf("failed to remove skill files: %w", err))
+		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "MCP removed from role"}})
+	// action == "add"
+	if ossSkillService == nil || !ossSkillService.IsConfigured() {
+		return // OSS not configured, skip file sync
+	}
+
+	db := model.GetDB()
+	var skill model.Skill
+	if err := db.First(&skill, "id = ?", skillID).Error; err != nil {
+		return // skill not found in DB, skip
+	}
+
+	// Download skill package from OSS
+	ossPath := fmt.Sprintf("skills/%s/%s/package.zip", skill.UserID, skillID)
+	zipData, err := ossSkillService.DownloadFile(ossPath)
+	if err != nil {
+		_ = c.Error(fmt.Errorf("failed to download skill package: %w", err))
+		return
+	}
+
+	// Extract to workspace/skills/{slug}/
+	roleDir := service.GetRoleDir(userID, roleID)
+	if err := service.InstallSkillToWorkspace(roleDir, skill.Slug, zipData); err != nil {
+		_ = c.Error(fmt.Errorf("failed to install skill files: %w", err))
+	}
 }

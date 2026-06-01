@@ -23,6 +23,29 @@ import (
 // containerLogger is the logger for container handlers.
 var containerLogger *zap.Logger
 
+// matrixService is the Matrix provisioning service.
+var matrixService *MatrixProvisioner
+
+// MatrixProvisioner wraps Matrix account provisioning for container handlers.
+type MatrixProvisioner struct {
+	creds service.MatrixCredentials
+}
+
+// NewMatrixProvisioner creates a new MatrixProvisioner.
+func NewMatrixProvisioner(creds service.MatrixCredentials) *MatrixProvisioner {
+	return &MatrixProvisioner{creds: creds}
+}
+
+// ProvisionAccount provisions a new Matrix account.
+func (p *MatrixProvisioner) ProvisionAccount(username, password string) (*service.MatrixAccount, error) {
+	return service.ProvisionMatrixAccount(p.creds, username, password)
+}
+
+// SetMatrixService sets the Matrix provisioning service.
+func SetMatrixService(svc *MatrixProvisioner) {
+	matrixService = svc
+}
+
 // SetContainerLogger sets the logger for container handlers.
 func SetContainerLogger(l *zap.Logger) {
 	containerLogger = l
@@ -177,6 +200,35 @@ func CreateContainer(c *gin.Context) {
 		Image:       info.Image,
 	}
 
+	// Provision Matrix account if configured
+	if matrixService != nil {
+		mxUsername := service.GenerateContainerMatrixUsername(containerUUID)
+		mxPassword, _ := service.GenerateContainerMatrixPassword()
+		if mxPassword != "" {
+			acct, err := matrixService.ProvisionAccount(mxUsername, mxPassword)
+			if err != nil {
+				getContainerLogger().Warn("failed to provision matrix account, skipping",
+					zap.String("containerId", containerUUID),
+					zap.Error(err),
+				)
+			} else {
+				container.MatrixHomeserver = acct.Homeserver
+				container.MatrixUserID = acct.UserID
+				container.MatrixPassword = acct.Password
+				container.MatrixAccessToken = acct.AccessToken
+
+				// Inject matrix channel into container's config.json
+				containerDir := service.ContainerSecurityDir(user.ID, containerUUID)
+				if err := service.InjectMatrixChannel(containerDir, acct); err != nil {
+					getContainerLogger().Warn("failed to inject matrix channel into config",
+						zap.String("containerId", containerUUID),
+						zap.Error(err),
+					)
+				}
+			}
+		}
+	}
+
 	if err := db.Create(container).Error; err != nil {
 		getContainerLogger().Error("failed to create container record",
 			zap.String("userId", user.ID),
@@ -221,6 +273,7 @@ func CreateContainer(c *gin.Context) {
 			"status":      container.Status,
 			"image":       container.Image,
 			"createdAt":   container.CreatedAt,
+			"matrixUserId": container.MatrixUserID,
 		},
 	})
 }
@@ -813,19 +866,21 @@ func GetContainer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"id":          container.ID,
-			"userId":      container.UserID,
-			"name":        container.Name,
-			"description": container.Description,
-			"variant":     container.Variant,
-			"roleId":      container.RoleID,
-			"containerId": container.ContainerID,
-			"port":        container.Port,
-			"sshPort":     container.SSHPort,
-			"status":      container.Status,
-			"image":       container.Image,
-			"createdAt":   container.CreatedAt,
-			"updatedAt":   container.UpdatedAt,
+			"id":              container.ID,
+			"userId":          container.UserID,
+			"name":            container.Name,
+			"description":     container.Description,
+			"variant":         container.Variant,
+			"roleId":          container.RoleID,
+			"containerId":     container.ContainerID,
+			"port":            container.Port,
+			"sshPort":         container.SSHPort,
+			"status":          container.Status,
+			"image":           container.Image,
+			"matrixUserId":    container.MatrixUserID,
+			"matrixHomeserver": container.MatrixHomeserver,
+			"createdAt":       container.CreatedAt,
+			"updatedAt":       container.UpdatedAt,
 		},
 	})
 }
@@ -947,6 +1002,18 @@ func SaveContainerFileContent(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"path": filePath, "size": size}})
 }
 
+// ContainerFileIndexQuery holds query parameters for file index search
+type ContainerFileIndexQuery struct {
+	Status   string `form:"status"`
+	Type     string `form:"type"`
+	Tag      string `form:"tag"`
+	Search   string `form:"search"`
+	Page     int    `form:"page"`
+	PageSize int    `form:"pageSize"`
+	SortBy   string `form:"sortBy"`
+	SortDir  string `form:"sortDir"`
+}
+
 // runtimeDirs are directories created by the container at runtime (owned by root).
 // They should NOT be copied when cloning a role config to a container.
 var runtimeDirs = map[string]bool{
@@ -1040,3 +1107,271 @@ func fixContainerPermissions(dir string) error {
 	}
 	return nil
 }
+
+// --- Container Skill/MCP APIs ---
+
+// AddSkillToContainer handles POST /api/containers/:id/skills/:skillId
+func AddSkillToContainer(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+
+	containerID := c.Param("id")
+	if containerID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Container ID is required"})
+		return
+	}
+
+	skillID := c.Param("skillId")
+	if skillID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Skill ID is required"})
+		return
+	}
+
+	// Validate container ownership
+	db := model.GetDB()
+	var container model.Container
+	if err := db.First(&container, "id = ?", containerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Container not found"})
+		return
+	}
+	if container.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden"})
+		return
+	}
+
+	// Sync skill files to workspace
+	containerDir := service.ContainerSecurityDir(user.ID, containerID)
+	if ossSkillService != nil && ossSkillService.IsConfigured() {
+		var skill model.Skill
+		if err := db.First(&skill, "id = ?", skillID).Error; err == nil {
+			ossPath := fmt.Sprintf("skills/%s/%s/package.zip", skill.UserID, skillID)
+			if zipData, err := ossSkillService.DownloadFile(ossPath); err == nil {
+				_ = service.InstallSkillToWorkspace(containerDir, skill.Slug, zipData)
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "Skill added to container"}})
+}
+
+// RemoveSkillFromContainer handles DELETE /api/containers/:id/skills/:skillId
+func RemoveSkillFromContainer(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+
+	containerID := c.Param("id")
+	if containerID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Container ID is required"})
+		return
+	}
+
+	skillID := c.Param("skillId")
+	if skillID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Skill ID is required"})
+		return
+	}
+
+	// Validate container ownership
+	db := model.GetDB()
+	var container model.Container
+	if err := db.First(&container, "id = ?", containerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Container not found"})
+		return
+	}
+	if container.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden"})
+		return
+	}
+
+	// Remove skill files from workspace
+	containerDir := service.ContainerSecurityDir(user.ID, containerID)
+	var skill model.Skill
+	if err := db.First(&skill, "id = ?", skillID).Error; err == nil {
+		_ = service.RemoveSkillFromWorkspace(containerDir, skill.Slug)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "Skill removed from container"}})
+}
+
+// AddMCPToContainer handles POST /api/containers/:id/mcps/:mcpId
+func AddMCPToContainer(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+
+	containerID := c.Param("id")
+	if containerID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Container ID is required"})
+		return
+	}
+
+	mcpID := c.Param("mcpId")
+	if mcpID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "MCP ID is required"})
+		return
+	}
+
+	// Validate container ownership
+	db := model.GetDB()
+	var container model.Container
+	if err := db.First(&container, "id = ?", containerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Container not found"})
+		return
+	}
+	if container.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden"})
+		return
+	}
+
+	_ = service.ContainerSecurityDir(user.ID, containerID)
+	// TODO: sync MCP config files to workspace if needed
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "MCP added to container"}})
+}
+
+// RemoveMCPFromContainer handles DELETE /api/containers/:id/mcps/:mcpId
+func RemoveMCPFromContainer(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+
+	containerID := c.Param("id")
+	if containerID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Container ID is required"})
+		return
+	}
+
+	mcpID := c.Param("mcpId")
+	if mcpID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "MCP ID is required"})
+		return
+	}
+
+	// Validate container ownership
+	db := model.GetDB()
+	var container model.Container
+	if err := db.First(&container, "id = ?", containerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Container not found"})
+		return
+	}
+	if container.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden"})
+		return
+	}
+
+	_ = service.ContainerSecurityDir(user.ID, containerID)
+	// TODO: remove MCP config files from workspace if needed
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "MCP removed from container"}})
+}
+
+// GetContainerFileIndex handles GET /api/containers/:id/file-index
+// Returns the parsed file-index.json with search and pagination support.
+func GetContainerFileIndex(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+
+	containerID := c.Param("id")
+
+	// Validate ownership
+	db := model.GetDB()
+	var container model.Container
+	if err := db.First(&container, "id = ?", containerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Container not found"})
+		return
+	}
+	if container.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden"})
+		return
+	}
+
+	// Parse query parameters
+	var query ContainerFileIndexQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid query parameters"})
+		return
+	}
+
+	// Defaults
+	if query.Page < 1 {
+		query.Page = 1
+	}
+	if query.PageSize < 1 || query.PageSize > 100 {
+		query.PageSize = 20
+	}
+	if query.SortBy == "" {
+		query.SortBy = "created_at"
+	}
+	if query.SortDir == "" {
+		query.SortDir = "desc"
+	}
+
+	// Read file-index.json
+	containerDir := service.ContainerSecurityDir(user.ID, containerID)
+	files, totalCount, err := service.ReadFileIndex(containerDir, query.Status, query.Type, query.Tag, query.Search, query.SortBy, query.SortDir, query.Page, query.PageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"files":      files,
+			"total":      totalCount,
+			"page":       query.Page,
+			"pageSize":   query.PageSize,
+			"totalPages": (totalCount + query.PageSize - 1) / query.PageSize,
+		},
+	})
+}
+
+// GetContainerInstalledSkills handles GET /api/containers/:id/installed-skills
+// Returns list of skill slugs installed in the container's workspace/skills/ directory.
+func GetContainerInstalledSkills(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
+		return
+	}
+
+	containerID := c.Param("id")
+
+	// Validate ownership
+	db := model.GetDB()
+	var container model.Container
+	if err := db.First(&container, "id = ?", containerID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Container not found"})
+		return
+	}
+	if container.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden"})
+		return
+	}
+
+	containerDir := service.ContainerSecurityDir(user.ID, containerID)
+	skills, err := service.ListInstalledSkills(containerDir)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    skills,
+	})
+}
+

@@ -213,6 +213,9 @@ export function ConfigPanel({ entityId, isContainerMode, isOwner }: ConfigPanelP
   // Loading and error states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Installed skills state (for container mode, read from filesystem)
+  const [installedSkills, setInstalledSkills] = useState<string[]>([]);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
 
   // Model editing state
@@ -424,6 +427,12 @@ export function ConfigPanel({ entityId, isContainerMode, isOwner }: ConfigPanelP
           }
         }
       }
+    } else {
+      // Always include channel_list section to avoid losing config
+      lines.push('channel_list:');
+      lines.push('  pico:');
+      lines.push('    settings:');
+      lines.push('      token: ""');
     }
 
     if (sec.model_list && Object.keys(sec.model_list).length > 0) {
@@ -707,35 +716,58 @@ export function ConfigPanel({ entityId, isContainerMode, isOwner }: ConfigPanelP
     setEditingChannelKey(null);
   };
 
-  // Handle add skill to role
+  // Handle add skill to entity (role or container)
   const handleAddSkill = async (skillId: string) => {
     if (!config || !isOwner) return;
     try {
-      await apiRequest(`/api/roles/${entityId}/skills/${skillId}`, { method: 'POST' });
+      const baseEndpoint = isContainerMode
+        ? `/api/containers/${entityId}/skills/${skillId}`
+        : `/api/roles/${entityId}/skills/${skillId}`;
+      await apiRequest(baseEndpoint, { method: 'POST' });
       // Reload config to get updated state
       loadConfigs();
+      // Refresh installed skills for container mode
+      if (isContainerMode) {
+        try {
+          const result = await apiRequest<string[]>(`/api/containers/${entityId}/installed-skills`);
+          if (result.data) setInstalledSkills(result.data);
+        } catch {}
+      }
     } catch (err) {
       console.error('Failed to add skill:', err);
     }
   };
 
-  // Handle remove skill from role
+  // Handle remove skill from entity (role or container)
   const handleRemoveSkill = async (skillId: string) => {
     if (!config || !isOwner) return;
     try {
-      await apiRequest(`/api/roles/${entityId}/skills/${skillId}`, { method: 'DELETE' });
+      const baseEndpoint = isContainerMode
+        ? `/api/containers/${entityId}/skills/${skillId}`
+        : `/api/roles/${entityId}/skills/${skillId}`;
+      await apiRequest(baseEndpoint, { method: 'DELETE' });
       // Reload config to get updated state
       loadConfigs();
+      // Refresh installed skills for container mode
+      if (isContainerMode) {
+        try {
+          const result = await apiRequest<string[]>(`/api/containers/${entityId}/installed-skills`);
+          if (result.data) setInstalledSkills(result.data);
+        } catch {}
+      }
     } catch (err) {
       console.error('Failed to remove skill:', err);
     }
   };
 
-  // Handle add MCP to role
+  // Handle add MCP to entity (role or container)
   const handleAddMcp = async (mcpId: string) => {
     if (!config || !isOwner) return;
     try {
-      await apiRequest(`/api/roles/${entityId}/mcps/${mcpId}`, { method: 'POST' });
+      const baseEndpoint = isContainerMode
+        ? `/api/containers/${entityId}/mcps/${mcpId}`
+        : `/api/roles/${entityId}/mcps/${mcpId}`;
+      await apiRequest(baseEndpoint, { method: 'POST' });
       // Reload config to get updated state
       loadConfigs();
     } catch (err) {
@@ -743,11 +775,14 @@ export function ConfigPanel({ entityId, isContainerMode, isOwner }: ConfigPanelP
     }
   };
 
-  // Handle remove MCP from role
+  // Handle remove MCP from entity (role or container)
   const handleRemoveMcp = async (mcpId: string) => {
     if (!config || !isOwner) return;
     try {
-      await apiRequest(`/api/roles/${entityId}/mcps/${mcpId}`, { method: 'DELETE' });
+      const baseEndpoint = isContainerMode
+        ? `/api/containers/${entityId}/mcps/${mcpId}`
+        : `/api/roles/${entityId}/mcps/${mcpId}`;
+      await apiRequest(baseEndpoint, { method: 'DELETE' });
       // Reload config to get updated state
       loadConfigs();
     } catch (err) {
@@ -755,8 +790,26 @@ export function ConfigPanel({ entityId, isContainerMode, isOwner }: ConfigPanelP
     }
   };
 
+  // Fetch installed skills for container mode (from filesystem, not config.json)
+  useEffect(() => {
+    if (!isContainerMode || !entityId) return;
+    const fetchInstalledSkills = async () => {
+      try {
+        const result = await apiRequest<string[]>(`/api/containers/${entityId}/installed-skills`);
+        if (result.data) {
+          setInstalledSkills(result.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch installed skills:', err);
+      }
+    };
+    fetchInstalledSkills();
+  }, [isContainerMode, entityId]);
+
   // Get attached skills and MCPs
-  const attachedSkills = config?.agents?.defaults?.skills || [];
+  const attachedSkills = isContainerMode
+    ? installedSkills
+    : (config?.agents?.defaults?.skills || []);
   const attachedMcps = config?.agents?.defaults?.mcp_servers || [];
 
   if (loading) {
@@ -1115,11 +1168,11 @@ export function ConfigPanel({ entityId, isContainerMode, isOwner }: ConfigPanelP
 
               <div className="space-y-2">
                 {attachedSkills.length > 0 ? (
-                  attachedSkills.map((skillId) => {
-                    const skill = availableSkills.find((s) => s.id === skillId);
+                  attachedSkills.map((skillSlugOrId) => {
+                    const skill = availableSkills.find((s) => s.id === skillSlugOrId || s.slug === skillSlugOrId);
                     return (
                       <div
-                        key={skillId}
+                        key={skillSlugOrId}
                         className="p-3 bg-cyber-dark-lighter/30 rounded-lg border border-cyber-cyan/10 hover:border-cyber-cyan/30 transition-colors"
                       >
                         <div className="flex items-center justify-between">
@@ -1127,7 +1180,7 @@ export function ConfigPanel({ entityId, isContainerMode, isOwner }: ConfigPanelP
                             <WrenchIcon className="w-4 h-4 text-cyber-cyan" />
                             <div>
                               <p className="font-medium text-cyber-white text-sm">
-                                {skill?.name || skillId}
+                                {skill?.name || skillSlugOrId}
                               </p>
                               {skill?.description && (
                                 <p className="text-xs text-cyber-muted line-clamp-1">
@@ -1139,7 +1192,7 @@ export function ConfigPanel({ entityId, isContainerMode, isOwner }: ConfigPanelP
                           <CyberButton
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleRemoveSkill(skillId)}
+                            onClick={() => handleRemoveSkill(skill?.id || skillSlugOrId)}
                             disabled={!isOwner}
                             icon={<TrashIcon className="w-3.5 h-3.5" />}
                             className="text-cyber-error hover:text-cyber-error"
@@ -1174,7 +1227,7 @@ export function ConfigPanel({ entityId, isContainerMode, isOwner }: ConfigPanelP
               ) : (
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {availableSkills
-                    .filter((skill) => !attachedSkills.includes(skill.id))
+                    .filter((skill) => !attachedSkills.includes(skill.id) && !attachedSkills.includes(skill.slug))
                     .map((skill) => (
                       <div
                         key={skill.id}

@@ -30,6 +30,10 @@ SMTPFrom     string `mapstructure:"SMTP_FROM"`
 	OSSAccessKeyID     string `mapstructure:"OSS_ACCESS_KEY_ID"`
 	OSSAccessKeySecret string `mapstructure:"OSS_ACCESS_KEY_SECRET"`
 	OSSRegion          string `mapstructure:"OSS_REGION"`
+	// Matrix Configuration
+	MatrixHomeserver         string `mapstructure:"MATRIX_HOMESERVER"`
+	MatrixServerName         string `mapstructure:"MATRIX_SERVER_NAME"`
+	MatrixRegistrationSecret string `mapstructure:"MATRIX_REGISTRATION_SECRET"`
 }
 const (
 	DefaultPort        = 13207
@@ -60,6 +64,9 @@ func Load() (*Config, error) {
 	viper.BindEnv("OSS_ACCESS_KEY_ID")
 	viper.BindEnv("OSS_ACCESS_KEY_SECRET")
 	viper.BindEnv("OSS_REGION")
+	viper.BindEnv("MATRIX_HOMESERVER")
+	viper.BindEnv("MATRIX_SERVER_NAME")
+	viper.BindEnv("MATRIX_REGISTRATION_SECRET")
 
 	viper.SetDefault("PORT", DefaultPort)
 	viper.SetDefault("LOG_LEVEL", DefaultLogLevel)

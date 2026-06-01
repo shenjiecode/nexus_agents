@@ -83,3 +83,8 @@ deploy/auth.json
 picoclaw-deploy/base/data/
 picoclaw-deploy/full/data/
 data/
+
+# Temp/debug files
+.omo/
+container-debug-working.png
+skills/
