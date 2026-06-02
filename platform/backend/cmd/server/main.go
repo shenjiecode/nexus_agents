@@ -97,11 +97,8 @@ func main() {
 		log.Error("Server forced to shutdown", zap.Error(err))
 	}
 
-	// Cleanup container pool
-	if pool != nil {
-		pool.CleanupAll(context.Background())
-		log.Info("Container pool cleaned up")
-	}
+	// Note: DO NOT call pool.CleanupAll() on shutdown.
+	// Containers are persistent (user containers) and must survive backend restarts.
 
 	// Close Docker client
 	if dockerClient != nil {
