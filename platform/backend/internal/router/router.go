@@ -65,6 +65,9 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 	handler.SetContainerPool(pool)
 	handler.SetDebugLogger(log)
 	handler.SetContainerLogger(log)
+	handler.SetRoleLogger(log)
+	handler.SetSkillLogger(log)
+	handler.SetMCPLogger(log)
 	// Initialize OSS service for both Skills and MCPs
 	ossSvc, err := service.NewOSSService(cfg)
 	if err != nil {
@@ -74,7 +77,8 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 		handler.SetOSSMCPService(ossSvc)
 		handler.SetOSSSkillService(ossSvc)
 		handler.SetOSSService(ossSvc)
-		log.Info("OSS service initialized for Skills, MCPs and Roles")
+		handler.SetContainerOSSService(ossSvc)
+		log.Info("OSS service initialized for Skills, MCPs, Roles and Containers")
 	}
 
 	// Initialize Matrix service if configured
@@ -188,6 +192,7 @@ func New(log *zap.Logger, pool *service.ContainerPool, cfg *config.Config) *gin.
 			}
 
 			// Role skill/MCP routes (protected - require auth)
+			roles.GET("/:id/installed-skills", handler.GetRoleInstalledSkills) // GET /api/roles/:id/installed-skills
 			roles.POST("/:id/skills/:skillId", handler.AddSkillToRole)        // POST /api/roles/:id/skills/:skillId
 			roles.DELETE("/:id/skills/:skillId", handler.RemoveSkillFromRole) // DELETE /api/roles/:id/skills/:skillId
 			roles.POST("/:id/mcps/:mcpId", handler.AddMCPToRole)              // POST /api/roles/:id/mcps/:mcpId

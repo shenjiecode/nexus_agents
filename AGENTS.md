@@ -32,6 +32,7 @@
 | `部署`、`Docker`、`docker-compose`、`容器` | deployment.md + templates.md | 部署规范、Dockerfile模板 |
 | `写Dockerfile` | templates.md | Dockerfile模板 |
 | `修改规则`、`新增规则`、`删除规则`、`AGENTS.md` | philosophy.md | 规则哲学 |
+| `Role`、`Container`、`Entity`、`角色`、`容器`、`实体` | entity-refactoring.md | Role/Container 通用 Entity 层设计 |
 
 **规则文件位置**: `docs/rules/`
 

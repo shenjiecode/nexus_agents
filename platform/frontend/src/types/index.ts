@@ -50,6 +50,8 @@ export interface Role {
   containerId?: string;
   containerPort?: number;
   isPublic: string;
+  modifiedAt?: string;  // 本地修改时间
+  uploadedAt?: string;  // OSS 上传时间
   createdAt: string;
   updatedAt: string;
 }

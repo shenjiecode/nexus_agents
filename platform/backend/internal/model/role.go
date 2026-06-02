@@ -19,6 +19,8 @@ type Role struct {
 	ContainerID  string    `json:"containerId"`
 	ContainerPort int     `json:"containerPort"`
 	IsPublic     string    `json:"isPublic"` // text, not boolean (matches Node.js)
+	ModifiedAt   *time.Time `json:"modifiedAt"`  // 本地修改时间
+	UploadedAt   *time.Time `json:"uploadedAt"`  // OSS 上传时间
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
 }

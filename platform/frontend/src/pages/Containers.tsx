@@ -414,9 +414,6 @@ export function Containers() {
                 <div className="mt-4 flex items-center justify-between text-xs text-cyber-muted font-mono">
                   <div className="flex items-center gap-2">
                     <span>端口: {container.port}</span>
-                    {container.roleId && (
-                      <span className="text-cyber-cyan/70">关联Role</span>
-                    )}
                   </div>
                   <span>{new Date(container.createdAt).toLocaleDateString()}</span>
                 </div>
@@ -506,17 +503,18 @@ export function Containers() {
             />
           </div>
 
-          {/* Role Dropdown */}
+          {/* Role Dropdown - Import from Role template */}
           {userRoles && userRoles.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-cyber-muted mb-1">关联 Role（可选）</label>
+              <label className="block text-sm font-medium text-cyber-muted mb-1">从 Role 导入（可选）</label>
+              <p className="text-xs text-cyber-muted/70 mb-2">导入后容器与 Role 无关联，数据独立</p>
               <div className="relative">
                 <select
                   value={formData.roleId}
                   onChange={e => setFormData(prev => ({ ...prev, roleId: e.target.value }))}
                   className="appearance-none w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white focus:border-cyber-cyan focus:outline-none cursor-pointer"
                 >
-                  <option value="">不关联</option>
+                  <option value="">不导入（创建空白容器）</option>
                   {userRoles.map(role => (
                     <option key={role.id} value={role.id}>
                       {role.name}

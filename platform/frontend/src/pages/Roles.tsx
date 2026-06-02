@@ -38,6 +38,53 @@ function SearchIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+// Cloud upload icon for OSS sync
+function CloudUploadIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+    </svg>
+  );
+}
+
+// Sync status indicator icons
+function SyncedIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-green-400">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+function UnsyncedIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-yellow-400">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+function NotUploadedIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-cyber-muted">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+// Helper to check sync status
+function getSyncStatus(role: Role): 'synced' | 'unsynced' | 'not_uploaded' {
+  if (!role.uploadedAt) {
+    return 'not_uploaded';
+  }
+  if (!role.modifiedAt) {
+    return 'synced';
+  }
+  const modified = new Date(role.modifiedAt);
+  const uploaded = new Date(role.uploadedAt);
+  return modified > uploaded ? 'unsynced' : 'synced';
+}
+
 function GlobeIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -85,6 +132,24 @@ export function Roles() {
 
   // Download state
   const [downloadingRoleId, setDownloadingRoleId] = useState<string | null>(null);
+
+  // Upload state
+  const [uploadingRoleId, setUploadingRoleId] = useState<string | null>(null);
+
+  // Handle upload role to OSS
+  const handleUploadRole = async (role: Role, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
+    setUploadingRoleId(role.id);
+    try {
+      await apiRequest(`/api/roles/${role.id}/upload`, { method: 'POST' });
+      // Refresh the list to get updated uploadedAt
+      refetchMyRoles();
+    } catch (err) {
+      console.error('Upload failed:', err);
+    } finally {
+      setUploadingRoleId(null);
+    }
+  };
 
   // Keep localStorage reading logic for future use (StoredUser interface is used elsewhere)
   useEffect(() => {
@@ -394,6 +459,22 @@ export function Roles() {
                         <UserGroupIcon className="w-6 h-6" />
                       </div>
                       <div className="flex items-center gap-2">
+                        {/* Sync status indicator */}
+                        {getSyncStatus(role) === 'synced' && (
+                          <span title="已同步到 OSS">
+                            <SyncedIcon className="w-4 h-4" />
+                          </span>
+                        )}
+                        {getSyncStatus(role) === 'unsynced' && (
+                          <span title="有未上传的改动">
+                            <UnsyncedIcon className="w-4 h-4" />
+                          </span>
+                        )}
+                        {getSyncStatus(role) === 'not_uploaded' && (
+                          <span title="未上传到 OSS">
+                            <NotUploadedIcon className="w-4 h-4" />
+                          </span>
+                        )}
                         <StatusDot
                           status={role.status === 'running' ? 'running' : 'stopped'}
                           size="sm"
@@ -414,9 +495,26 @@ export function Roles() {
                       <span className="text-xs text-cyber-muted">
                         {role.status === 'running' ? '运行中' : '已停止'}
                       </span>
-                      <span className="text-xs text-cyber-muted font-mono">
-                        {new Date(role.createdAt).toLocaleDateString()}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {/* Upload button */}
+                        <button
+                          onClick={(e) => handleUploadRole(role, e)}
+                          disabled={uploadingRoleId === role.id}
+                          className="p-1 rounded hover:bg-cyber-cyan/20 text-cyber-cyan/70 hover:text-cyber-cyan transition-colors disabled:opacity-50"
+                          title="上传到 OSS"
+                        >
+                          {uploadingRoleId === role.id ? (
+                            <span className="animate-spin w-4 h-4 block">
+                              <CloudUploadIcon className="w-4 h-4" />
+                            </span>
+                          ) : (
+                            <CloudUploadIcon className="w-4 h-4" />
+                          )}
+                        </button>
+                        <span className="text-xs text-cyber-muted font-mono">
+                          {new Date(role.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </CyberCard>

@@ -2,6 +2,7 @@ package service
 
 import (
 	"archive/zip"
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -810,6 +812,131 @@ type PicoModelConfig struct {
 	APIBase   string `json:"api_base,omitempty"`
 }
 
+// UpdateConfigSkills reads config.json from baseDir, applies the given modifier to
+// agents.defaults.skills, and writes back. The modifier returns the new skills slice.
+func UpdateConfigSkills(baseDir string, modifier func([]string) []string) error {
+	configPath := filepath.Join(baseDir, "config.json")
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("read config.json: %w", err)
+	}
+
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return fmt.Errorf("parse config.json: %w", err)
+	}
+
+	// Navigate: agents -> defaults -> skills
+	agents, ok := cfg["agents"].(map[string]interface{})
+	if !ok {
+		agents = make(map[string]interface{})
+		cfg["agents"] = agents
+	}
+
+	defaults, ok := agents["defaults"].(map[string]interface{})
+	if !ok {
+		defaults = make(map[string]interface{})
+		agents["defaults"] = defaults
+	}
+
+	// Get current skills as []string
+	var current []string
+	if raw, ok := defaults["skills"]; ok {
+		if arr, ok := raw.([]interface{}); ok {
+			for _, v := range arr {
+				if s, ok := v.(string); ok {
+					current = append(current, s)
+				}
+			}
+		}
+	}
+
+	newSkills := modifier(current)
+	if newSkills == nil {
+		newSkills = []string{}
+	}
+
+	if len(newSkills) == 0 {
+		delete(defaults, "skills")
+	} else {
+		defaults["skills"] = newSkills
+	}
+
+	updated, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal config.json: %w", err)
+	}
+
+	// Write via temp file for atomicity
+	tmpPath := configPath + ".tmp"
+	if err := os.WriteFile(tmpPath, updated, 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, configPath)
+}
+
+// UpdateConfigMCPs reads config.json from baseDir, applies the given modifier to
+// agents.defaults.mcp_servers, and writes back. The modifier returns the new MCPs slice.
+func UpdateConfigMCPs(baseDir string, modifier func([]string) []string) error {
+	configPath := filepath.Join(baseDir, "config.json")
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("read config.json: %w", err)
+	}
+
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return fmt.Errorf("parse config.json: %w", err)
+	}
+
+	agents, ok := cfg["agents"].(map[string]interface{})
+	if !ok {
+		agents = make(map[string]interface{})
+		cfg["agents"] = agents
+	}
+
+	defaults, ok := agents["defaults"].(map[string]interface{})
+	if !ok {
+		defaults = make(map[string]interface{})
+		agents["defaults"] = defaults
+	}
+
+	var current []string
+	if raw, ok := defaults["mcp_servers"]; ok {
+		if arr, ok := raw.([]interface{}); ok {
+			for _, v := range arr {
+				if s, ok := v.(string); ok {
+					current = append(current, s)
+				}
+			}
+		}
+	}
+
+	newMCPs := modifier(current)
+	if newMCPs == nil {
+		newMCPs = []string{}
+	}
+
+	if len(newMCPs) == 0 {
+		delete(defaults, "mcp_servers")
+	} else {
+		defaults["mcp_servers"] = newMCPs
+	}
+
+	updated, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal config.json: %w", err)
+	}
+
+	tmpPath := configPath + ".tmp"
+	if err := os.WriteFile(tmpPath, updated, 0644); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, configPath)
+}
+
 // InstallSkillToWorkspace extracts a skill package (zip data) to the workspace/skills/{slug} directory.
 // The zip is extracted so that the skill files end up directly under workspace/skills/{slug}/.
 // If the zip has a top-level directory, its contents are flattened into the target.
@@ -831,7 +958,7 @@ func InstallSkillToWorkspace(baseDir, slug string, zipData []byte) error {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	if err := extractZipToDir(zipData, tmpDir); err != nil {
+	if err := ExtractZipToDir(zipData, tmpDir); err != nil {
 		return fmt.Errorf("failed to extract skill zip: %w", err)
 	}
 
@@ -859,8 +986,8 @@ func RemoveSkillFromWorkspace(baseDir, slug string) error {
 	return os.RemoveAll(skillsDir)
 }
 
-// extractZipToDir extracts a zip archive into the given directory.
-func extractZipToDir(zipData []byte, destDir string) error {
+// ExtractZipToDir extracts a zip archive into the given directory.
+func ExtractZipToDir(zipData []byte, destDir string) error {
 	// Create a temp file for the zip
 	tmpFile, err := os.CreateTemp("", "skill-*.zip")
 	if err != nil {
@@ -1186,4 +1313,113 @@ func ListInstalledSkills(containerDir string) ([]string, error) {
 		skills = []string{}
 	}
 	return skills, nil
+}
+
+// PackageRoleForUpload creates a zip package of role files for OSS upload.
+// It filters out runtime files and sanitizes sensitive information.
+func PackageRoleForUpload(roleDir string) ([]byte, error) {
+	// Files and directories to exclude from upload
+	excludePaths := map[string]bool{
+		"logs":                     true,
+		"workspace/memory":         true,
+		"workspace/sessions":       true,
+		"workspace/state":          true,
+		"workspace/cron":           true,
+		"workspace/heartbeat.log":  true,
+		"workspace/HEARTBEAT.md":   true,
+	}
+
+	// Create a buffer to write the zip to
+	buf := new(bytes.Buffer)
+	zipWriter := zip.NewWriter(buf)
+
+	// Walk the role directory
+	err := filepath.Walk(roleDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Get relative path
+		relPath, err := filepath.Rel(roleDir, path)
+		if err != nil {
+			return err
+		}
+
+		// Skip root directory
+		if relPath == "." {
+			return nil
+		}
+
+		// Check if this path should be excluded
+		for excludePath := range excludePaths {
+			if strings.HasPrefix(relPath, excludePath) || relPath == excludePath {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+		}
+
+		// Create zip header
+		header, err := zip.FileInfoHeader(info)
+		if err != nil {
+			return err
+		}
+		header.Name = relPath
+		if info.IsDir() {
+			header.Name += "/"
+		} else {
+			header.Method = zip.Deflate
+		}
+
+		// Create writer for this file
+		writer, err := zipWriter.CreateHeader(header)
+		if err != nil {
+			return err
+		}
+
+		// If it's a directory, nothing more to do
+		if info.IsDir() {
+			return nil
+		}
+
+		// Read file content
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		// Sanitize .security.yml
+		if relPath == ".security.yml" {
+			content = sanitizeSecurityYAML(content)
+		}
+
+		// Write content to zip
+		_, err = writer.Write(content)
+		return err
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to walk role directory: %w", err)
+	}
+
+	// Close zip writer
+	if err := zipWriter.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close zip writer: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+// sanitizeSecurityYAML replaces sensitive values with placeholders
+func sanitizeSecurityYAML(content []byte) []byte {
+	// Replace token values
+	tokenPattern := regexp.MustCompile(`token:\s*[^\s]+`)
+	content = tokenPattern.ReplaceAll(content, []byte("token: ${PICO_TOKEN}"))
+
+	// Replace API keys
+	apiKeyPattern := regexp.MustCompile(`api_keys:\s*\n\s*-\s*[^\s]+`)
+	content = apiKeyPattern.ReplaceAll(content, []byte("api_keys:\n  - ${API_KEY}"))
+
+	return content
 }

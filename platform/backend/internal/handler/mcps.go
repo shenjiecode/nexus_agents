@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/nexus-agents/backend/internal/middleware"
 	"github.com/nexus-agents/backend/internal/model"
@@ -17,6 +18,22 @@ import (
 // OSS service for MCP package storage
 // Must be set via SetOSSMCPService before handlers are called.
 var ossMCPService *service.OSSService
+
+// Logger for MCP handlers
+var mcpLogger *zap.Logger
+
+// SetMCPLogger sets the logger for MCP handlers.
+func SetMCPLogger(l *zap.Logger) {
+	mcpLogger = l
+}
+
+// getMCPLogger returns the logger for MCP handlers.
+func getMCPLogger() *zap.Logger {
+	if mcpLogger != nil {
+		return mcpLogger
+	}
+	return zap.NewNop()
+}
 
 // SetOSSMCPService sets the OSS service instance for MCP handlers.
 func SetOSSMCPService(s *service.OSSService) {
@@ -396,6 +413,19 @@ func DeleteMCP(c *gin.Context) {
 			"error":  "Forbidden: you can only delete your own MCPs",
 		})
 		return
+	}
+
+	// Delete from OSS if uploaded (StorageKey indicates upload to OSS)
+	if mcp.StorageKey != "" && ossMCPService != nil && ossMCPService.IsConfigured() {
+		ossPrefix := fmt.Sprintf("mcps/%s/%s/", mcp.UserID, mcp.ID)
+		if err := ossMCPService.DeletePrefix(ossPrefix); err != nil {
+			getMCPLogger().Warn("failed to delete MCP from OSS",
+				zap.String("mcpId", mcp.ID),
+				zap.String("ossPrefix", ossPrefix),
+				zap.Error(err),
+			)
+			// Continue with database deletion even if OSS deletion fails
+		}
 	}
 
 	if result = db.Delete(&mcp); result.Error != nil {

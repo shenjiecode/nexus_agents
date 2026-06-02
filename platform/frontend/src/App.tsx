@@ -8,7 +8,7 @@ import { Login } from './pages/Login';
 import { Roles } from './pages/Roles';
 import { ResetPassword } from './pages/ResetPassword';
 import { Containers } from './pages/Containers';
-import { RoleDebug } from './pages/RoleDebug';
+import { EntityDebug } from './pages/EntityDebug';
 import { ToastProvider } from './components/Toast';
 
 // Simple auth guard: check if user is stored in localStorage
@@ -84,9 +84,9 @@ function App() {
           <Route path="/skills" element={<ProtectedRoute><Layout><Skills /></Layout></ProtectedRoute>} />
           <Route path="/mcps" element={<ProtectedRoute><Layout><Mcps /></Layout></ProtectedRoute>} />
           <Route path="/roles" element={<ProtectedRoute><Layout><Roles /></Layout></ProtectedRoute>} />
-          <Route path="/roles/:id/debug" element={<ProtectedRoute><Layout><RoleDebug /></Layout></ProtectedRoute>} />
+          <Route path="/roles/:id/debug" element={<ProtectedRoute><Layout><EntityDebug /></Layout></ProtectedRoute>} />
           <Route path="/containers" element={<ProtectedRoute><Layout><Containers /></Layout></ProtectedRoute>} />
-          <Route path="/containers/:id/debug" element={<ProtectedRoute><Layout><RoleDebug mode="container" /></Layout></ProtectedRoute>} />
+          <Route path="/containers/:id/debug" element={<ProtectedRoute><Layout><EntityDebug mode="container" /></Layout></ProtectedRoute>} />
           <Route path="/logout" element={<LogoutWrapper />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -2,12 +2,12 @@ package handler
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/nexus-agents/backend/internal/middleware"
 	"github.com/nexus-agents/backend/internal/model"
@@ -18,6 +18,22 @@ import (
 // Must be set via SetOSSService before handlers are called.
 var ossService *service.OSSService
 
+// Logger for role handlers
+var roleLogger *zap.Logger
+
+// SetRoleLogger sets the logger for role handlers.
+func SetRoleLogger(l *zap.Logger) {
+	roleLogger = l
+}
+
+// getRoleLogger returns the logger for role handlers.
+func getRoleLogger() *zap.Logger {
+	if roleLogger != nil {
+		return roleLogger
+	}
+	return zap.NewNop()
+}
+
 // SetOSSService sets the OSS service instance for role handlers.
 func SetOSSService(s *service.OSSService) {
 	ossService = s
@@ -25,17 +41,19 @@ func SetOSSService(s *service.OSSService) {
 
 // RoleResponse represents the role data returned in responses.
 type RoleResponse struct {
-	ID            string    `json:"id"`
-	UserID        string    `json:"userId,omitempty"`
-	Name          string    `json:"name"`
-	Description   string    `json:"description,omitempty"`
-	Variant       string    `json:"variant"`
-	Status        string    `json:"status"`
-	ContainerID  string    `json:"containerId,omitempty"`
-	ContainerPort int      `json:"containerPort,omitempty"`
-	IsPublic     string    `json:"isPublic"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	ID            string     `json:"id"`
+	UserID        string     `json:"userId,omitempty"`
+	Name          string     `json:"name"`
+	Description   string     `json:"description,omitempty"`
+	Variant       string     `json:"variant"`
+	Status        string     `json:"status"`
+	ContainerID  string     `json:"containerId,omitempty"`
+	ContainerPort int        `json:"containerPort,omitempty"`
+	IsPublic     string     `json:"isPublic"`
+	ModifiedAt   *time.Time `json:"modifiedAt,omitempty"`
+	UploadedAt   *time.Time `json:"uploadedAt,omitempty"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	UpdatedAt    time.Time  `json:"updatedAt"`
 }
 
 // CreateRoleRequest represents the request body for creating a role.
@@ -127,8 +145,10 @@ func ListMyRoles(c *gin.Context) {
 			Variant:       role.Variant,
 			Status:        role.Status,
 			ContainerID:   role.ContainerID,
-			ContainerPort:  role.ContainerPort,
+			ContainerPort: role.ContainerPort,
 			IsPublic:      role.IsPublic,
+			ModifiedAt:    role.ModifiedAt,
+			UploadedAt:    role.UploadedAt,
 			CreatedAt:     role.CreatedAt,
 			UpdatedAt:     role.UpdatedAt,
 		})
@@ -426,6 +446,30 @@ func DeleteRole(c *gin.Context) {
 		return
 	}
 
+	// Delete from OSS if uploaded
+	if role.UploadedAt != nil && ossService != nil && ossService.IsConfigured() {
+		ossPrefix := fmt.Sprintf("roles/%s/%s/", role.UserID, role.ID)
+		if err := ossService.DeletePrefix(ossPrefix); err != nil {
+			getRoleLogger().Warn("failed to delete role from OSS",
+				zap.String("roleId", role.ID),
+				zap.String("ossPrefix", ossPrefix),
+				zap.Error(err),
+			)
+			// Continue with database deletion even if OSS deletion fails
+		}
+	}
+
+	// Delete role directory from local filesystem
+	roleDir := service.GetRoleDir(role.UserID, role.ID)
+	if err := service.DeleteRoleDir(roleDir); err != nil {
+		getRoleLogger().Warn("failed to delete role directory",
+			zap.String("roleId", role.ID),
+			zap.String("roleDir", roleDir),
+			zap.Error(err),
+		)
+		// Continue with database deletion even if directory deletion fails
+	}
+
 	// Delete role from database
 	if result = db.Delete(&role); result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -447,6 +491,8 @@ func deleteRoleDirRecursive(path string) error {
 }
 
 // UploadRole handles POST /api/roles/:id/upload - Upload role package directly to OSS via backend
+// UploadRole handles POST /api/roles/:id/upload - Package and upload role workspace to OSS
+// This creates a clean package from local files (filtering + sanitization)
 func UploadRole(c *gin.Context) {
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -495,33 +541,15 @@ func UploadRole(c *gin.Context) {
 		return
 	}
 
-	// Receive multipart file
-	file, header, err := c.Request.FormFile("file")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":  "File is required",
-		})
-		return
-	}
-	defer file.Close()
+	// Get role directory
+	roleDir := service.GetRoleDir(user.ID, roleID)
 
-	// Validate file size (max 50MB)
-	const maxSize = 50 * 1024 * 1024
-	if header.Size > maxSize {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":  "File size exceeds 50MB limit",
-		})
-		return
-	}
-
-	// Read file content
-	data, err := io.ReadAll(file)
+	// Package role files (filter + sanitize)
+	zipData, err := service.PackageRoleForUpload(roleDir)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"error":  "Failed to read file",
+			"error":   fmt.Sprintf("Failed to package role: %v", err),
 		})
 		return
 	}
@@ -529,8 +557,8 @@ func UploadRole(c *gin.Context) {
 	// Generate OSS path for role package
 	ossPath := fmt.Sprintf("roles/%s/%s/package.zip", user.ID, roleID)
 
-	// Upload directly to OSS
-	_, err = ossService.UploadFile(ossPath, data)
+	// Upload to OSS
+	_, err = ossService.UploadFile(ossPath, zipData)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -539,12 +567,17 @@ func UploadRole(c *gin.Context) {
 		return
 	}
 
+	// Update UploadedAt in database
+	now := time.Now()
+	db.Model(&role).Update("uploaded_at", now)
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"ossPath":   ossPath,
-			"size":      header.Size,
-			"roleId":    roleID,
+			"ossPath":    ossPath,
+			"size":       len(zipData),
+			"roleId":     roleID,
+			"uploadedAt": now,
 		},
 	})
 }
@@ -646,268 +679,45 @@ func DownloadRole(c *gin.Context) {
 
 // ListRoleFiles handles GET /api/roles/:id/files
 func ListRoleFiles(c *gin.Context) {
-	user := middleware.GetUser(c)
-	if user == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
-		return
-	}
-	roleID := c.Param("id")
-	files, err := service.GetRoleFiles(user.ID, roleID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": files})
+	listEntityFiles(resolveRole)(c)
 }
 
 // GetRoleFileContent handles GET /api/roles/:id/files/*path
 func GetRoleFileContent(c *gin.Context) {
-	user := middleware.GetUser(c)
-	if user == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
-		return
-	}
-	roleID := c.Param("id")
-	filePath := c.Param("path")
-	if len(filePath) > 0 && filePath[0] == '/' {
-		filePath = filePath[1:]
-	}
-	content, err := service.GetRoleFile(user.ID, roleID, filePath)
-	if err != nil {
-		code := http.StatusInternalServerError
-		c.JSON(code, gin.H{"success": false, "error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"path": filePath, "content": content}})
+	getEntityFileContent(resolveRole)(c)
 }
 
 // SaveRoleFileContent handles PUT /api/roles/:id/files/*path
 func SaveRoleFileContent(c *gin.Context) {
-	user := middleware.GetUser(c)
-	if user == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
-		return
-	}
-	roleID := c.Param("id")
-	filePath := c.Param("path")
-	if len(filePath) > 0 && filePath[0] == '/' {
-		filePath = filePath[1:]
-	}
-	var body struct {
-		Content string `json:"content"`
-	}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid request body"})
-		return
-	}
-	_, size, err := service.SaveRoleFile(user.ID, roleID, filePath, body.Content)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"path": filePath, "size": size}})
+	saveEntityFileContent(resolveRole)(c)
 }
 
-// AddSkillToRole handles POST /api/roles/:id/skills/:skillId - Add a skill to role's config.json and sync files
+// AddSkillToRole handles POST /api/roles/:id/skills/:skillId - Add a skill to role's workspace
 func AddSkillToRole(c *gin.Context) {
-	user := middleware.GetUser(c)
-	if user == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
-		return
-	}
-
-	roleID := c.Param("id")
-	if roleID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Role ID is required"})
-		return
-	}
-
-	skillID := c.Param("skillId")
-	if skillID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Skill ID is required"})
-		return
-	}
-
-	// Validate role ownership
-	db := model.GetDB()
-	var role model.Role
-	result := db.First(&role, "id = ?", roleID)
-	if result.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Role not found"})
-		return
-	}
-
-	if role.UserID != user.ID {
-		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden: you can only modify your own roles"})
-		return
-	}
-
-	// Sync skill files to workspace (add skill package from OSS)
-	syncSkillFiles(c, user.ID, roleID, skillID, "add")
-
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "Skill added to role"}})
+	addSkillToEntity(resolveRole)(c)
 }
 
-// RemoveSkillFromRole handles DELETE /api/roles/:id/skills/:skillId - Remove a skill from role's config.json and remove files
+// RemoveSkillFromRole handles DELETE /api/roles/:id/skills/:skillId - Remove a skill from role's workspace
 func RemoveSkillFromRole(c *gin.Context) {
-	user := middleware.GetUser(c)
-	if user == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
-		return
-	}
-
-	roleID := c.Param("id")
-	if roleID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Role ID is required"})
-		return
-	}
-
-	skillID := c.Param("skillId")
-	if skillID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Skill ID is required"})
-		return
-	}
-
-	// Validate role ownership
-	db := model.GetDB()
-	var role model.Role
-	result := db.First(&role, "id = ?", roleID)
-	if result.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Role not found"})
-		return
-	}
-
-	if role.UserID != user.ID {
-		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden: you can only modify your own roles"})
-		return
-	}
-
-	// Remove skill files from workspace
-	syncSkillFiles(c, user.ID, roleID, skillID, "remove")
-
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "Skill removed from role"}})
+	removeSkillFromEntity(resolveRole)(c)
 }
 
 // AddMCPToRole handles POST /api/roles/:id/mcps/:mcpId - Add an MCP to role's config.json
 func AddMCPToRole(c *gin.Context) {
-	user := middleware.GetUser(c)
-	if user == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
-		return
-	}
-
-	roleID := c.Param("id")
-	if roleID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Role ID is required"})
-		return
-	}
-
-	mcpID := c.Param("mcpId")
-	if mcpID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "MCP ID is required"})
-		return
-	}
-
-	// Validate role ownership
-	db := model.GetDB()
-	var role model.Role
-	result := db.First(&role, "id = ?", roleID)
-	if result.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Role not found"})
-		return
-	}
-
-	if role.UserID != user.ID {
-		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden: you can only modify your own roles"})
-		return
-	}
-
-	// TODO: sync MCP config files to workspace if needed
-
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "MCP added to role"}})
+	addMCPToEntity(resolveRole)(c)
 }
 
 // RemoveMCPFromRole handles DELETE /api/roles/:id/mcps/:mcpId - Remove an MCP from role's config.json
 func RemoveMCPFromRole(c *gin.Context) {
-	user := middleware.GetUser(c)
-	if user == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Unauthorized"})
-		return
-	}
-
-	roleID := c.Param("id")
-	if roleID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Role ID is required"})
-		return
-	}
-
-	mcpID := c.Param("mcpId")
-	if mcpID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "MCP ID is required"})
-		return
-	}
-
-	// Validate role ownership
-	db := model.GetDB()
-	var role model.Role
-	result := db.First(&role, "id = ?", roleID)
-	if result.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Role not found"})
-		return
-	}
-
-	if role.UserID != user.ID {
-		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Forbidden: you can only modify your own roles"})
-		return
-	}
-
-	// TODO: remove MCP config files from workspace if needed
-
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "MCP removed from role"}})
+	removeMCPFromEntity(resolveRole)(c)
 }
 
-// syncSkillFiles syncs skill files to/from the role's workspace/skills directory.
-// For "add": downloads the skill package from OSS and extracts it.
-// For "remove": removes the skill directory from workspace.
-// Errors are logged but do not fail the request (config.json update is the source of truth).
-func syncSkillFiles(c *gin.Context, userID, roleID, skillID, action string) {
-	if action == "remove" {
-		// Look up skill slug for directory name
-		db := model.GetDB()
-		var skill model.Skill
-		if err := db.First(&skill, "id = ?", skillID).Error; err != nil {
-			return
-		}
-
-		roleDir := service.GetRoleDir(userID, roleID)
-		if err := service.RemoveSkillFromWorkspace(roleDir, skill.Slug); err != nil {
-			_ = c.Error(fmt.Errorf("failed to remove skill files: %w", err))
-		}
-		return
-	}
-
-	// action == "add"
-	if ossSkillService == nil || !ossSkillService.IsConfigured() {
-		return // OSS not configured, skip file sync
-	}
-
-	db := model.GetDB()
-	var skill model.Skill
-	if err := db.First(&skill, "id = ?", skillID).Error; err != nil {
-		return // skill not found in DB, skip
-	}
-
-	// Download skill package from OSS
-	ossPath := fmt.Sprintf("skills/%s/%s/package.zip", skill.UserID, skillID)
-	zipData, err := ossSkillService.DownloadFile(ossPath)
-	if err != nil {
-		_ = c.Error(fmt.Errorf("failed to download skill package: %w", err))
-		return
-	}
-
-	// Extract to workspace/skills/{slug}/
-	roleDir := service.GetRoleDir(userID, roleID)
-	if err := service.InstallSkillToWorkspace(roleDir, skill.Slug, zipData); err != nil {
-		_ = c.Error(fmt.Errorf("failed to install skill files: %w", err))
-	}
+// GetRoleInstalledSkills handles GET /api/roles/:id/installed-skills
+// Returns skill slugs found under workspace/skills/ (picoclaw auto-discovers from there).
+func GetRoleInstalledSkills(c *gin.Context) {
+	listInstalledSkills(resolveRole)(c)
 }
+
+// syncSkillFiles is deprecated - skill sync is now handled by entity_handler.go
+// This function is kept for reference but no longer used.
+

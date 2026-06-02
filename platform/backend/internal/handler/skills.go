@@ -8,8 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/nexus-agents/backend/internal/middleware"
 	"github.com/nexus-agents/backend/internal/model"
@@ -19,6 +21,22 @@ import (
 // OSS service for skill package storage
 // Must be set via SetOSSSkillService before handlers are called.
 var ossSkillService *service.OSSService
+
+// Logger for skill handlers
+var skillLogger *zap.Logger
+
+// SetSkillLogger sets the logger for skill handlers.
+func SetSkillLogger(l *zap.Logger) {
+	skillLogger = l
+}
+
+// getSkillLogger returns the logger for skill handlers.
+func getSkillLogger() *zap.Logger {
+	if skillLogger != nil {
+		return skillLogger
+	}
+	return zap.NewNop()
+}
 
 // SetOSSSkillService sets the OSS service instance for skill handlers.
 func SetOSSSkillService(s *service.OSSService) {
@@ -402,6 +420,19 @@ func DeleteSkill(c *gin.Context) {
 			"error":  "Forbidden: you can only delete your own skills",
 		})
 		return
+	}
+
+	// Delete from OSS if uploaded (StorageKey indicates upload to OSS)
+	if skill.StorageKey != "" && ossSkillService != nil && ossSkillService.IsConfigured() {
+		ossPrefix := fmt.Sprintf("skills/%s/%s/", skill.UserID, skill.ID)
+		if err := ossSkillService.DeletePrefix(ossPrefix); err != nil {
+			getSkillLogger().Warn("failed to delete skill from OSS",
+				zap.String("skillId", skill.ID),
+				zap.String("ossPrefix", ossPrefix),
+				zap.Error(err),
+			)
+			// Continue with database deletion even if OSS deletion fails
+		}
 	}
 
 	// Delete skill from database

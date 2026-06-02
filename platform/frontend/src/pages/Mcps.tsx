@@ -62,6 +62,22 @@ function OrganizationIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function LockIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+    </svg>
+  );
+}
+
+function UnlockIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 11V7a4 4 0 118 0m-4 0v4m0 0H6a2 2 0 00-2 2v6a2 2 0 002 2h12a2 2 0 002-2v-6a2 2 0 00-2-2h-6z" />
+    </svg>
+  );
+}
+
 function JsonIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -89,6 +105,7 @@ export function Mcps() {
     slug: '',
     description: '',
     category: '',
+    isPublic: 'true',
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -180,6 +197,7 @@ export function Mcps() {
           slug: formData.slug,
           description: formData.description,
           category: formData.category || '',
+          isPublic: formData.isPublic,
         }),
       });
 
@@ -204,7 +222,7 @@ export function Mcps() {
 
 
       setIsUploadModalOpen(false);
-      setFormData({ name: '', slug: '', description: '', category: '' });
+      setFormData({ name: '', slug: '', description: '', category: '', isPublic: 'true' });
       setSelectedFile(null);
       refetch();
     } catch (err) {
@@ -234,6 +252,23 @@ export function Mcps() {
         }
       },
     });
+  };
+
+  // Toggle MCP public status
+  const handleTogglePublic = async (mcp: Mcp, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newStatus = mcp.isPublic === 'true' ? 'false' : 'true';
+    try {
+      await apiRequest(`/api/mcps/${mcp.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPublic: newStatus }),
+      });
+      refetch();
+      toast.success(newStatus === 'true' ? '已设为公开' : '已设为私有');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '操作失败');
+    }
   };
 
   // Fetch MCP config via backend proxy
@@ -434,6 +469,18 @@ export function Mcps() {
                         <ServerIcon className="w-6 h-6" />
                       </div>
                       <div className="flex items-center gap-2">
+                        {/* Visibility indicator */}
+                        <button
+                          onClick={(e) => handleTogglePublic(mcp, e)}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            mcp.isPublic === 'true'
+                              ? 'bg-cyber-cyan/10 text-cyber-cyan hover:bg-cyber-cyan/20'
+                              : 'bg-cyber-yellow/10 text-cyber-yellow hover:bg-cyber-yellow/20'
+                          }`}
+                          title={mcp.isPublic === 'true' ? '公开 - 点击切换为私有' : '私有 - 点击切换为公开'}
+                        >
+                          {mcp.isPublic === 'true' ? <UnlockIcon className="w-4 h-4" /> : <LockIcon className="w-4 h-4" />}
+                        </button>
                         {mcp.category && (
                           <span className="px-2 py-0.5 text-xs rounded-full bg-cyber-cyan/20 text-cyber-cyan">
                             {mcp.category}
@@ -473,7 +520,7 @@ export function Mcps() {
         onClose={() => {
           setIsUploadModalOpen(false);
           setSubmitError(null);
-          setFormData({ name: '', slug: '', description: '', category: '' });
+          setFormData({ name: '', slug: '', description: '', category: '', isPublic: 'true' });
           setSelectedFile(null);
         }}
         title="上传 MCP"
@@ -485,7 +532,7 @@ export function Mcps() {
               onClick={() => {
                 setIsUploadModalOpen(false);
                 setSubmitError(null);
-                setFormData({ name: '', slug: '', description: '', category: '' });
+                setFormData({ name: '', slug: '', description: '', category: '', isPublic: 'true' });
                 setSelectedFile(null);
               }}
             >
@@ -560,6 +607,33 @@ export function Mcps() {
               placeholder="例如：API、数据库、工具"
               className="w-full px-3 py-2 rounded-lg bg-cyber-dark border border-cyber-cyan/20 text-cyber-white placeholder-cyber-muted focus:border-cyber-cyan focus:outline-none"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-cyber-muted mb-2">可见性</label>
+            <div className="flex gap-2">
+              <CyberButton
+                type="button"
+                variant={formData.isPublic === 'true' ? 'primary' : 'ghost'}
+                size="sm"
+                onClick={() => setFormData(prev => ({ ...prev, isPublic: 'true' }))}
+                icon={<UnlockIcon className="w-4 h-4" />}
+              >
+                公开
+              </CyberButton>
+              <CyberButton
+                type="button"
+                variant={formData.isPublic === 'false' ? 'primary' : 'ghost'}
+                size="sm"
+                onClick={() => setFormData(prev => ({ ...prev, isPublic: 'false' }))}
+                icon={<LockIcon className="w-4 h-4" />}
+              >
+                私有
+              </CyberButton>
+            </div>
+            <p className="text-xs text-cyber-muted mt-1">
+              {formData.isPublic === 'true' ? '公开后所有用户可在市场看到此 MCP' : '私有 MCP 仅自己可见'}
+            </p>
           </div>
 
           <div>

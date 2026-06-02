@@ -254,6 +254,49 @@ func (s *OSSService) DeleteObject(bucketPath string) error {
 	return nil
 }
 
+// DeletePrefix deletes all objects with the given prefix from the bucket.
+// This is useful for deleting entire directories.
+func (s *OSSService) DeletePrefix(prefix string) error {
+	if s == nil || s.client == nil {
+		return fmt.Errorf("OSS service not configured")
+	}
+
+	// List all objects with the prefix
+	objects, err := s.ListObjects(prefix)
+	if err != nil {
+		return fmt.Errorf("failed to list objects for deletion: %w", err)
+	}
+
+	if len(objects) == 0 {
+		s.logger.Debug("No objects to delete",
+			zap.String("prefix", prefix),
+		)
+		return nil
+	}
+
+	// Delete each object
+	deletedCount := 0
+	for _, obj := range objects {
+		if err := s.DeleteObject(obj); err != nil {
+			s.logger.Warn("Failed to delete object",
+				zap.String("path", obj),
+				zap.Error(err),
+			)
+			// Continue deleting other objects even if one fails
+			continue
+		}
+		deletedCount++
+	}
+
+	s.logger.Debug("Deleted objects with prefix",
+		zap.String("prefix", prefix),
+		zap.Int("total", len(objects)),
+		zap.Int("deleted", deletedCount),
+	)
+
+	return nil
+}
+
 // ObjectExists checks if an object exists in the bucket.
 func (s *OSSService) ObjectExists(bucketPath string) (bool, error) {
 	if s == nil || s.client == nil {
