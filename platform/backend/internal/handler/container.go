@@ -699,6 +699,22 @@ func ContainerDebugWebSocket(c *gin.Context) {
 	// Container -> Client
 	go proxyWebSocketMessages("container->client", containerConn, clientConn, done)
 
+	// Keepalive: send pings to container every 25s to prevent 60s read_timeout disconnect
+	go func() {
+		ticker := time.NewTicker(25 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := containerConn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(5*time.Second)); err != nil {
+					return
+				}
+			case <-done:
+				return
+			}
+		}
+	}()
+
 	// Wait for either direction to finish
 	<-done
 
