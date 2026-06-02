@@ -1183,6 +1183,18 @@ func GetContainerFileIndex(c *gin.Context) {
 		return
 	}
 
+	// Generate OSS presigned URLs for files with oss_key
+	if containerOSSService != nil && containerOSSService.IsConfigured() {
+		for i := range files {
+			if files[i].OSSKey != "" && files[i].OSSKey != "null" {
+				url, err := containerOSSService.GeneratePresignedDownloadURL(files[i].OSSKey, 1*time.Hour)
+				if err == nil {
+					files[i].OSSUrl = url
+				}
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{

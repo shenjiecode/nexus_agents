@@ -216,7 +216,7 @@ curl -X PUT "http://server:13208/api/containers/xxx/files/config.json" \
 
 ## 文件索引搜索
 
-容器会自动维护一个 `file-index.json` 文件，记录所有处理的文件信息。
+容器内的 Agent 会通过 `file-manager` skill 自动维护 `file-index.json` 文件，记录所有处理的文件信息。
 
 ### 搜索文件索引
 
@@ -227,9 +227,9 @@ GET /api/containers/:id/file-index
 **查询参数**:
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| status | string | - | 筛选状态：pending, processing, completed, failed |
-| type | string | - | 筛选文件类型：document, image, code, data, other |
-| tag | string | - | 筛选标签 |
+| status | string | - | 筛选状态：active, deleted |
+| type | string | - | 筛选文件类型：document, image, archive, other |
+| tag | string | - | 筛选标签（支持前缀匹配，如 project:xxx） |
 | search | string | - | 搜索文件名或描述 |
 | page | int | 1 | 页码 |
 | pageSize | int | 20 | 每页数量（最大100） |
@@ -243,12 +243,16 @@ GET /api/containers/:id/file-index
   "data": {
     "files": [
       {
-        "filename": "report.pdf",
-        "path": "/workspace/docs/report.pdf",
+        "id": "file-uuid",
+        "name": "report.pdf",
+        "local_path": "workspace/output/report.pdf",
         "type": "document",
-        "status": "completed",
+        "mime_type": "application/pdf",
+        "tags": ["project:nexus_agents", "report"],
+        "oss_key": "agents/workspace-123/output/report.pdf",
+        "oss_url": "https://bucket.oss.com/agents/workspace-123/output/report.pdf?sign=xxx",
+        "status": "active",
         "size": 102400,
-        "tags": ["report", "finance"],
         "description": "月度财务报告",
         "created_at": "2026-06-02T10:00:00+08:00",
         "updated_at": "2026-06-02T10:05:00+08:00"
@@ -261,6 +265,18 @@ GET /api/containers/:id/file-index
   }
 }
 ```
+
+**重要字段说明**:
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `oss_key` | string\|null | OSS 存储路径，未上传时为 `null` |
+| `oss_url` | string | **预签名下载 URL**（1小时有效），仅当 `oss_key` 不为空时返回 |
+| `local_path` | string | 文件在容器内的本地路径（相对于工作目录） |
+| `status` | string | 文件状态：`active`（正常）或 `deleted`（已废弃） |
+| `type` | string | 文件类型：document、image、archive、other |
+| `tags` | string[] | 标签数组，通常包含 `project:<项目名>` |
+
+**注意**: `oss_url` 是预签名 URL，有效期为 1 小时，可直接用于下载文件。
 
 ---
 

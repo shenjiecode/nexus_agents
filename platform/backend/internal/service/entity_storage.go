@@ -1167,6 +1167,7 @@ type FileIndexEntry struct {
 	MimeType    string   `json:"mime_type"`
 	Tags        []string `json:"tags"`
 	OSSKey      string   `json:"oss_key"`
+	OSSUrl      string   `json:"oss_url,omitempty"`      // 预签名下载 URL（动态生成）
 	LocalPath   string   `json:"local_path"`
 	Size        int64    `json:"size"`
 	Status      string   `json:"status"`
